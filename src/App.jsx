@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { NAV, ENERGY_IDS } from "./constants";
 import { BADGE } from "./components/shared";
 import { ApiKeyProvider, useApiKey } from "./context/ApiKeyContext";
+import SplashScreen, { useSplash } from "./components/SplashScreen";
 
 import Home        from "./tools/Home";
 import ThreatMap   from "./tools/ThreatMap";
@@ -136,10 +137,29 @@ function AppInner() {
   );
 }
 
+function AppWithSplash() {
+  const [, setApiKey] = useApiKey();
+  const [splashVisible, dismissSplash] = useSplash();
+
+  function handleEnter(key) {
+    if (key) setApiKey(key);
+    dismissSplash();
+  }
+
+  return (
+    <>
+      {splashVisible && (
+        <SplashScreen onEnter={handleEnter} onSkip={dismissSplash} />
+      )}
+      <AppInner />
+    </>
+  );
+}
+
 export default function App() {
   return (
     <ApiKeyProvider>
-      <AppInner />
+      <AppWithSplash />
     </ApiKeyProvider>
   );
 }
