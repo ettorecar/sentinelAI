@@ -130,6 +130,42 @@ export const riskColor = r =>
 export const riskBadgeColor = r =>
   r === "CRITICAL" || r === "HIGH" ? "red" : r === "MEDIUM" ? "yellow" : "green";
 
+// Standard page header — replaces raw <h2>+<p> across all tools
+export const PageHeader = ({ icon, title, sub, badges = [], accent = "#00ff9d", mock }) => (
+  <div style={{ paddingBottom: 16, borderBottom: "1px solid #1f2d45", marginBottom: 20 }}>
+    <div style={{ color: "#3a4a5c", fontSize: 9, letterSpacing: 4, marginBottom: 8, fontWeight: 600 }}>
+      SENTINEL · {title.toUpperCase()}
+    </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      {icon && <span style={{ fontSize: 22 }}>{icon}</span>}
+      <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#e2e8f0", letterSpacing: -0.5 }}>{title}</h2>
+      {mock && <MockBadge />}
+    </div>
+    {sub && <div style={{ color: "#4a5568", fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>{sub}</div>}
+    {badges.length > 0 && (
+      <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+        {badges.map((b, i) => <BADGE key={i} text={b.text} color={b.color || accent} />)}
+      </div>
+    )}
+  </div>
+);
+
+// Stat card row — 4-column metrics strip
+export const StatBar = ({ stats }) => (
+  <div style={{ display: "grid", gridTemplateColumns: `repeat(${stats.length}, 1fr)`, gap: 10, marginBottom: 16 }}>
+    {stats.map(({ label, value, color = "#00ff9d" }) => (
+      <div key={label} style={{
+        background: "#0d1626", border: "1px solid #1f2d45",
+        borderTop: `2px solid ${color}`,
+        borderRadius: 8, padding: "12px 14px", textAlign: "center",
+      }}>
+        <div style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+        <div style={{ color: "#4a5568", fontSize: 10, marginTop: 4, letterSpacing: 1 }}>{label}</div>
+      </div>
+    ))}
+  </div>
+);
+
 // Horizontal divider with optional label
 export const Divider = ({ label }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0 16px" }}>
