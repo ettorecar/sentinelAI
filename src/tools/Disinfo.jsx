@@ -1,30 +1,46 @@
 import { useState } from "react";
-import { Card, Input, Btn, ST, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, LiveBadge } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1200,
-      messages: [{ role: "user", content: prompt }],
-    }),
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1200, messages: [{ role: "user", content: prompt }] }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  return JSON.parse(
-    data.content
-      .map((b) => b.text || "")
-      .join("")
-      .replace(/```json|```/g, "")
-      .trim()
+  return JSON.parse(data.content.map(b => b.text || "").join("").replace(/```json|```/g, "").trim());
+}
+
+const verdictColor = v => v?.includes("DISINFORMATION") ? "#ff4d4d" : v === "SUSPICIOUS" ? "#ffd700" : "#00ff9d";
+const verdictBadge = v => v?.includes("DISINFORMATION") ? "red" : v === "SUSPICIOUS" ? "yellow" : "green";
+
+function TechniqueBar({ name, intensity }) {
+  const [hovered, setHovered] = useState(false);
+  const color = intensity > 80 ? "#ff4d4d" : intensity > 60 ? "#ffd700" : "#4db8ff";
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? "#0f1a2e" : "#0d1626",
+        borderRadius: 6,
+        padding: "10px 12px",
+        marginBottom: 7,
+        border: `1px solid ${hovered ? "#2a3f5f" : "#1f2d45"}`,
+        borderLeft: `3px solid ${color}`,
+        transition: "background 0.15s, border-color 0.15s",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <span style={{ color: hovered ? "#e2e8f0" : "#c8d0dc", fontSize: 13, fontWeight: 500 }}>{name}</span>
+        <span style={{ color, fontWeight: 800, fontSize: 13 }}>{intensity}%</span>
+      </div>
+      <div style={{ background: "#1f2d45", borderRadius: 3, height: 6 }}>
+        <div style={{ background: color, height: 6, borderRadius: 3, width: `${intensity}%`, transition: "width 0.4s" }} />
+      </div>
+    </div>
   );
 }
 
@@ -54,67 +70,65 @@ Include 4-6 specific techniques from this list (or similar): Emotional Appeal, F
     setLoading(false);
   }
 
-  const verdictColor = (v) =>
-    v?.includes("DISINFORMATION") ? "#ff4d4d" : v === "SUSPICIOUS" ? "#ffd700" : "#00ff9d";
-
   return (
     <div>
-      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>📰 Disinformation Detector</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>
-        Classify disinformation techniques, origin and narrative. <LiveBadge />
-      </p>
+      <PageHeader icon="📰" title="Disinformation Detector" sub="Classify disinformation techniques, origin and narrative." accent="#ff4d4d" badges={[{text:"AI Live",color:"#00ff9d"}]} />
 
       <Card>
-        <Input label="📄 Content" value={text} onChange={setText} placeholder="Paste article or social post..." rows={4} />
+        <Input label="📄 Content" value={text} onChange={setText} placeholder="Paste article, social post, broadcast transcript..." rows={4} />
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
         <Btn onClick={analyze} disabled={loading}>
-          {loading ? "⏳ Analyzing..." : "Analyze"}
+          {loading ? "⏳ Analyzing..." : "Analyze Content"}
         </Btn>
       </Card>
 
       {result && (
         <>
-          <Card style={{ borderColor: verdictColor(result.verdict) }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontWeight: 800, fontSize: 16, color: verdictColor(result.verdict) }}>{result.verdict}</div>
+          {/* Verdict card */}
+          <Card style={{ borderColor: verdictColor(result.verdict) + "55", borderLeft: `3px solid ${verdictColor(result.verdict)}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+              <div>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 5 }}>ANALYSIS VERDICT</div>
+                <div style={{ fontWeight: 900, fontSize: 18, color: verdictColor(result.verdict) }}>{result.verdict}</div>
+              </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: "#9ca3af", fontSize: 11 }}>CONFIDENCE</div>
-                <div style={{ color: "#ffd700", fontWeight: 800, fontSize: 22 }}>{result.confidence}%</div>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>CONFIDENCE</div>
+                <div style={{ color: "#ffd700", fontWeight: 800, fontSize: 26, lineHeight: 1 }}>{result.confidence}%</div>
               </div>
             </div>
+
+            {/* Confidence bar */}
+            <div style={{ background: "#0d1626", borderRadius: 3, height: 6, marginBottom: 12 }}>
+              <div style={{ background: verdictColor(result.verdict), height: 6, borderRadius: 3, width: `${result.confidence}%`, transition: "width 0.4s" }} />
+            </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: 10 }}>
-                <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 2 }}>NARRATIVE</div>
-                <div style={{ color: "#e2e8f0" }}>{result.narrative}</div>
+              <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>NARRATIVE</div>
+                <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{result.narrative}</div>
               </div>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: 10 }}>
-                <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 2 }}>ORIGIN</div>
-                <div style={{ color: "#ffd700" }}>{result.origin}</div>
+              <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>ATTRIBUTED ORIGIN</div>
+                <div style={{ color: "#ffd700", fontSize: 12, lineHeight: 1.5 }}>{result.origin}</div>
               </div>
             </div>
           </Card>
 
-          <Card>
-            <ST icon="📊" label="Technique Intensity" color="#ff4d4d" />
-            {result.techniques?.map(({ name, intensity }) => (
-              <div key={name} style={{ marginBottom: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                  <span style={{ color: "#e2e8f0", fontSize: 12 }}>{name}</span>
-                  <span style={{ color: "#ffd700", fontSize: 12, fontWeight: 700 }}>{intensity}%</span>
-                </div>
-                <div style={{ background: "#1f2d45", borderRadius: 4, height: 7 }}>
-                  <div
-                    style={{
-                      background: intensity > 80 ? "#ff4d4d" : intensity > 60 ? "#ffd700" : "#4db8ff",
-                      height: 7,
-                      borderRadius: 4,
-                      width: `${intensity}%`,
-                    }}
-                  />
+          {/* Techniques */}
+          {result.techniques?.length > 0 && (
+            <Card>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <ST icon="📊" label="Technique Intensity" color="#ff4d4d" sub={`${result.techniques.length} techniques identified`} />
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <LiveBadge />
+                  <BADGE text={result.verdict} color={verdictBadge(result.verdict)} />
                 </div>
               </div>
-            ))}
-          </Card>
+              {result.techniques.map(({ name, intensity }) => (
+                <TechniqueBar key={name} name={name} intensity={intensity} />
+              ))}
+            </Card>
+          )}
         </>
       )}
     </div>

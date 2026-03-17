@@ -1,6 +1,25 @@
 import { useState } from "react";
-import { BADGE, Card, Btn, ST, MockBadge, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, Btn, ST, PageHeader, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
+
+function ScenarioCard({ s, active, onClick, children }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: active ? "#1a1200" : hovered ? "#0f1a2e" : "#0d1626",
+        border: `1px solid ${active ? "#ff9d00" : hovered ? "#2a3f5f" : "#1f2d45"}`,
+        borderRadius: 8, padding: 14, cursor: "pointer",
+        transition: "background 0.15s, border-color 0.15s",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 async function callClaude(apiKey, prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -166,10 +185,7 @@ export default function EnergyGrid() {
 
   return (
     <div>
-      <h2 style={{ color: "#ff9d00", marginTop: 0 }}>⚡ Energy Grid Resilience Simulator</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 16 }}>
-        Simulate cascading failures and assess resilience of national energy grid infrastructure. <MockBadge />
-      </p>
+      <PageHeader icon="⚡" title="Energy Grid Resilience Simulator" sub="Simulate cascading failures and assess resilience of national energy grids." accent="#ff9d00" mock />
 
       {/* Country selector */}
       <Card>
@@ -273,15 +289,14 @@ export default function EnergyGrid() {
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12, marginBottom: 16 }}>
               {d.cascade_scenarios.map((s, i) => (
-                <div key={i} onClick={() => runSimulation(s)}
-                  style={{ background: simScenario?.trigger === s.trigger ? "#1a1200" : "#0d1626", border: `1px solid ${simScenario?.trigger === s.trigger ? "#ff9d00" : "#1f2d45"}`, borderRadius: 8, padding: 14, cursor: "pointer" }}>
+                <ScenarioCard key={i} s={s} active={simScenario?.trigger === s.trigger} onClick={() => runSimulation(s)}>
                   <div style={{ fontWeight: 700, color: "#ffd700", marginBottom: 6 }}>💥 {s.trigger}</div>
                   <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>Affected: <span style={{ color: "#e2e8f0" }}>{s.affected.join(", ")}</span></div>
                   <div style={{ display: "flex", gap: 10 }}>
                     <div><span style={{ color: "#9ca3af", fontSize: 10 }}>BLACKOUT EST. </span><span style={{ color: "#ff4d4d", fontWeight: 700 }}>{s.blackout_pct}%</span></div>
                     <div><span style={{ color: "#9ca3af", fontSize: 10 }}>RECOVERY </span><span style={{ color: "#ffd700" }}>{s.recovery}</span></div>
                   </div>
-                </div>
+                </ScenarioCard>
               ))}
             </div>
 
@@ -308,17 +323,17 @@ export default function EnergyGrid() {
                 </div>
                 {apiKey && (
                   <div style={{ marginBottom: 14 }}>
-                    <Btn onClick={() => analyzeCascade(simScenario)} disabled={aiLoading} color="#1f2d45">
+                    <Btn onClick={() => analyzeCascade(simScenario)} disabled={aiLoading} color="#ff9d00" size="sm">
                       {aiLoading ? "⏳ Analyzing..." : "🤖 AI Cascade Analysis"}
                     </Btn>
                     {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
                     {aiResult && (
-                      <div style={{ background: "#0d1626", borderRadius: 6, padding: 12, marginTop: 10, borderLeft: "3px solid #ff9d00" }}>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                      <div style={{ background: "#0a0c00", border: "1px solid #ff9d0033", borderLeft: "3px solid #ff9d00", borderRadius: 6, padding: 12, marginTop: 10 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
                           <LiveBadge />
-                          <span style={{ color: "#9ca3af", fontSize: 11 }}>AI CASCADE ANALYSIS</span>
+                          <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI CASCADE ANALYSIS · {country}</span>
                         </div>
-                        <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.6 }}>{aiResult}</div>
+                        <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.7 }}>{aiResult}</div>
                       </div>
                     )}
                   </div>

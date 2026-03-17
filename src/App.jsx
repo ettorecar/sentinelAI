@@ -4,75 +4,136 @@ import { BADGE } from "./components/shared";
 import { ApiKeyProvider, useApiKey } from "./context/ApiKeyContext";
 import SplashScreen, { useSplash } from "./components/SplashScreen";
 
-import Home        from "./tools/Home";
-import ThreatMap   from "./tools/ThreatMap";
-import RedTeam     from "./tools/RedTeam";
-import Osint       from "./tools/Osint";
-import Disinfo     from "./tools/Disinfo";
-import Maritime    from "./tools/Maritime";
-import Satellite   from "./tools/Satellite";
-import PatLife     from "./tools/PatLife";
-import Psyop       from "./tools/Psyop";
-import BioThreat   from "./tools/BioThreat";
-import Cti         from "./tools/Cti";
-import Translator  from "./tools/Translator";
-import OilInfra    from "./tools/OilInfra";
-import Chokepoint  from "./tools/Chokepoint";
-import EnergyRisk  from "./tools/EnergyRisk";
-import EnergyGrid  from "./tools/EnergyGrid";
-import IntelReport      from "./tools/IntelReport";
+import Home            from "./tools/Home";
+import ThreatMap       from "./tools/ThreatMap";
+import RedTeam         from "./tools/RedTeam";
+import Osint           from "./tools/Osint";
+import Disinfo         from "./tools/Disinfo";
+import Maritime        from "./tools/Maritime";
+import Satellite       from "./tools/Satellite";
+import PatLife         from "./tools/PatLife";
+import Psyop           from "./tools/Psyop";
+import BioThreat       from "./tools/BioThreat";
+import Cti             from "./tools/Cti";
+import Translator      from "./tools/Translator";
+import OilInfra        from "./tools/OilInfra";
+import Chokepoint      from "./tools/Chokepoint";
+import EnergyRisk      from "./tools/EnergyRisk";
+import EnergyGrid      from "./tools/EnergyGrid";
+import IntelReport     from "./tools/IntelReport";
 import ScenarioBuilder from "./tools/ScenarioBuilder";
 
 const PAGES = {
-  home:        Home,
-  threatmap:   ThreatMap,
-  redteam:     RedTeam,
-  osint:       Osint,
-  disinfo:     Disinfo,
-  maritime:    Maritime,
-  satellite:   Satellite,
-  patlife:     PatLife,
-  psyop:       Psyop,
-  biothreat:   BioThreat,
-  cti:         Cti,
-  translator:  Translator,
-  oilinfra:    OilInfra,
-  chokepoint:  Chokepoint,
-  energyrisk:  EnergyRisk,
-  energygrid:  EnergyGrid,
+  home:           Home,
+  threatmap:      ThreatMap,
+  redteam:        RedTeam,
+  osint:          Osint,
+  disinfo:        Disinfo,
+  maritime:       Maritime,
+  satellite:      Satellite,
+  patlife:        PatLife,
+  psyop:          Psyop,
+  biothreat:      BioThreat,
+  cti:            Cti,
+  translator:     Translator,
+  oilinfra:       OilInfra,
+  chokepoint:     Chokepoint,
+  energyrisk:     EnergyRisk,
+  energygrid:     EnergyGrid,
   intelreport:    IntelReport,
   scenariobuilder: ScenarioBuilder,
 };
+
+function navAccent(id) {
+  if (ENERGY_IDS.includes(id)) return "#ff9d00";
+  if (id === "intelreport")    return "#b47fff";
+  if (id === "scenariobuilder") return "#22d3ee";
+  return "#00ff9d";
+}
+
+function NavBtn({ n, active, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  const accent = navAccent(n.id);
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: active
+          ? `${accent}14`
+          : hovered
+          ? `${accent}08`
+          : "transparent",
+        border: "none",
+        borderBottom: active
+          ? `2px solid ${accent}`
+          : hovered
+          ? `2px solid ${accent}44`
+          : "2px solid transparent",
+        borderTop: active ? `1px solid ${accent}33` : "1px solid transparent",
+        color: active ? accent : hovered ? `${accent}bb` : "#6b7a8d",
+        padding: "10px 10px",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: active ? 700 : 400,
+        whiteSpace: "nowrap",
+        letterSpacing: active ? 0.3 : 0,
+        transition: "background 0.15s, color 0.15s, border-color 0.15s",
+        outline: "none",
+      }}
+    >
+      {n.icon} {n.label}
+    </button>
+  );
+}
 
 function ApiKeyBanner() {
   const [apiKey, setApiKey] = useApiKey();
   const [draft, setDraft] = useState("");
   const [show, setShow] = useState(false);
 
-  function apply() {
-    setApiKey(draft.trim());
-    setShow(false);
-  }
-  function clear() {
-    setApiKey("");
-    setDraft("");
-    setShow(false);
-  }
+  function apply() { setApiKey(draft.trim()); setShow(false); }
+  function clear()  { setApiKey(""); setDraft(""); setShow(false); }
 
   return (
-    <div style={{ background: apiKey ? "#051a0d" : "#1a0d00", borderBottom: `1px solid ${apiKey ? "#00ff9d44" : "#ff9d0055"}`, padding: "6px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      <span style={{ fontSize: 12 }}>🔑</span>
+    <div style={{
+      background: apiKey ? "#030e07" : "#0e0800",
+      borderBottom: `1px solid ${apiKey ? "#00ff9d22" : "#ff9d0022"}`,
+      padding: "5px 16px",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+      minHeight: 34,
+    }}>
+      {/* Status indicator dot */}
+      <div style={{
+        width: 6, height: 6, borderRadius: "50%",
+        background: apiKey ? "#00ff9d" : "#ff9d00",
+        boxShadow: `0 0 6px ${apiKey ? "#00ff9d" : "#ff9d00"}`,
+        flexShrink: 0,
+      }} />
+
       {apiKey ? (
         <>
-          <span style={{ color: "#00ff9d", fontSize: 12, fontWeight: 700 }}>AI Key active — all tools enabled</span>
-          <BADGE text="AI Live" color="green" />
-          <button onClick={clear} style={{ background: "none", border: "1px solid #333", borderRadius: 4, color: "#9ca3af", fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>Clear</button>
+          <span style={{ color: "#00ff9d", fontSize: 11, fontWeight: 600 }}>AI ACTIVE</span>
+          <span style={{ color: "#2d4a3e", fontSize: 11 }}>·</span>
+          <span style={{ color: "#4a5568", fontSize: 11 }}>All 18 modules operating with live inference</span>
+          <button
+            onClick={clear}
+            style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 10, padding: "2px 8px", cursor: "pointer", marginLeft: "auto" }}>
+            Disconnect
+          </button>
         </>
       ) : (
         <>
-          <span style={{ color: "#ff9d00", fontSize: 12 }}>Enter Anthropic API key to enable AI across all tools</span>
+          <span style={{ color: "#ff9d00", fontSize: 11, fontWeight: 600 }}>NO API KEY</span>
+          <span style={{ color: "#3a2800", fontSize: 11 }}>·</span>
+          <span style={{ color: "#4a5568", fontSize: 11 }}>Connect Anthropic key to enable AI across all tools</span>
           {show ? (
-            <>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" }}>
               <input
                 type="password"
                 value={draft}
@@ -80,16 +141,79 @@ function ApiKeyBanner() {
                 onKeyDown={e => e.key === "Enter" && apply()}
                 placeholder="sk-ant-..."
                 autoFocus
-                style={{ background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 4, padding: "4px 10px", color: "#e2e8f0", fontSize: 12, width: 240 }}
+                style={{
+                  background: "#0d1626",
+                  border: "1px solid #ff9d0044",
+                  borderRadius: 4,
+                  padding: "4px 10px",
+                  color: "#e2e8f0",
+                  fontSize: 11,
+                  width: 220,
+                  outline: "none",
+                }}
               />
-              <button onClick={apply} style={{ background: "#00ff9d", color: "#0a0f1e", border: "none", borderRadius: 4, padding: "4px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Set</button>
-              <button onClick={() => setShow(false)} style={{ background: "none", border: "1px solid #333", borderRadius: 4, color: "#9ca3af", fontSize: 11, padding: "4px 8px", cursor: "pointer" }}>Cancel</button>
-            </>
+              <button onClick={apply} style={{ background: "#ff9d00", color: "#0a0f1e", border: "none", borderRadius: 4, padding: "4px 12px", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                Connect
+              </button>
+              <button onClick={() => setShow(false)} style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 11, padding: "4px 8px", cursor: "pointer" }}>
+                Cancel
+              </button>
+            </div>
           ) : (
-            <button onClick={() => setShow(true)} style={{ background: "#ff9d00", color: "#0a0f1e", border: "none", borderRadius: 4, padding: "4px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Set Key</button>
+            <button onClick={() => setShow(true)} style={{ background: "none", border: "1px solid #ff9d0055", borderRadius: 4, color: "#ff9d00", fontSize: 11, padding: "3px 12px", cursor: "pointer", marginLeft: "auto", fontWeight: 600 }}>
+              + Set Key
+            </button>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function StatusWidgets({ blink }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", paddingLeft: 12, flexShrink: 0 }}>
+      {/* CRITICAL alert widget */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        background: "#0f0505",
+        borderRadius: 5,
+        padding: "4px 9px",
+        border: "1px solid #ff4d4d33",
+      }}>
+        <div style={{
+          width: 5, height: 5, borderRadius: "50%",
+          background: blink ? "#ff4d4d" : "#1a0000",
+          transition: "background 0.3s",
+          boxShadow: blink ? "0 0 4px #ff4d4d" : "none",
+        }} />
+        <span style={{ color: "#ff4d4d", fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>3 CRITICAL</span>
+      </div>
+      {/* Energy sector widget */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        background: "#0e0800",
+        borderRadius: 5,
+        padding: "4px 9px",
+        border: "1px solid #ff9d0033",
+      }}>
+        <span style={{ fontSize: 9 }}>🛢️</span>
+        <span style={{ color: "#ff9d00", fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>ENERGY</span>
+      </div>
+      {/* Version */}
+      <div style={{
+        color: "#2d3f55",
+        fontSize: 9,
+        fontFamily: "monospace",
+        letterSpacing: 1,
+        paddingLeft: 4,
+      }}>
+        v0.8
+      </div>
     </div>
   );
 }
@@ -100,37 +224,27 @@ function AppInner() {
   useEffect(() => { const t = setInterval(() => setBlink(x => !x), 800); return () => clearInterval(t); }, []);
 
   const Page = PAGES[page] || Home;
-  const isEnergy = id => ENERGY_IDS.includes(id);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0f1e", color: "#e2e8f0", fontFamily: "'Segoe UI',sans-serif" }}>
-      <nav style={{ background: "#0d1626", borderBottom: "1px solid #1f2d45", padding: "0 10px", display: "flex", alignItems: "center", overflowX: "auto" }}>
+    <div style={{ minHeight: "100vh", background: "#0a0f1e", color: "#e2e8f0", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+      <nav style={{
+        background: "#0b111e",
+        borderBottom: "1px solid #131f33",
+        padding: "0 4px",
+        display: "flex",
+        alignItems: "stretch",
+        overflowX: "auto",
+        scrollbarWidth: "none",
+      }}>
         {NAV.map(n => (
-          <button key={n.id} onClick={() => setPage(n.id)}
-            style={{
-              background: "none", border: "none",
-              borderBottom: page === n.id ? `2px solid ${isEnergy(n.id) ? "#ff9d00" : n.id === "intelreport" ? "#b47fff" : n.id === "scenariobuilder" ? "#22d3ee" : "#00ff9d"}` : "2px solid transparent",
-              color: page === n.id ? (isEnergy(n.id) ? "#ff9d00" : n.id === "intelreport" ? "#b47fff" : n.id === "scenariobuilder" ? "#22d3ee" : "#00ff9d") : "#9ca3af",
-              padding: "11px 9px", cursor: "pointer", fontSize: 11,
-              fontWeight: page === n.id ? 700 : 400, whiteSpace: "nowrap",
-            }}>
-            {n.icon} {n.label}
-          </button>
+          <NavBtn key={n.id} n={n} active={page === n.id} onClick={() => setPage(n.id)} />
         ))}
-        <div style={{ marginLeft: "auto", paddingLeft: 10, display: "flex", alignItems: "center", gap: 7, minWidth: 190 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#1a0a0a", borderRadius: 5, padding: "3px 8px", border: "1px solid #ff4d4d" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: blink ? "#ff4d4d" : "#330000", transition: "background 0.3s" }} />
-            <span style={{ color: "#ff4d4d", fontSize: 10, fontWeight: 700 }}>3 CRITICAL</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#1a0e00", borderRadius: 5, padding: "3px 8px", border: "1px solid #ff9d00" }}>
-            <span style={{ fontSize: 9 }}>🛢️</span>
-            <span style={{ color: "#ff9d00", fontSize: 10, fontWeight: 700 }}>ENERGY</span>
-          </div>
-          <BADGE text="v0.8" color="gray" />
-        </div>
+        <StatusWidgets blink={blink} />
       </nav>
+
       <ApiKeyBanner />
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px" }}>
         <Page setPage={setPage} />
       </div>
     </div>

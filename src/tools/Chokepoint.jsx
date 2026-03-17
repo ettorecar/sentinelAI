@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BADGE, Card, ST, MockBadge, Spark, Btn, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -42,17 +42,14 @@ export default function Chokepoint() {
 
   return (
     <div>
-      <h2 style={{ color: "#ff9d00", marginTop: 0 }}>🚢 Strategic Chokepoint Monitor</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 16 }}>Global maritime energy chokepoints — flow, tension and disruption risk. <MockBadge /></p>
+      <PageHeader icon="🚢" title="Strategic Chokepoint Monitor" sub="Global maritime energy chokepoints — flow, tension and disruption risk." accent="#ff9d00" mock />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 14 }}>
-        {[["Total Monitored Flow", "55Mb/d", "#ff9d00"], ["Critical Chokepoints", "2", "#ff4d4d"], ["At Extreme Tension", "2", "#ff4d4d"], ["Rerouting Events", "3", "#ffd700"]].map(([l, v, c]) => (
-          <Card key={l} style={{ textAlign: "center", padding: 12 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: c }}>{v}</div>
-            <div style={{ color: "#9ca3af", fontSize: 11 }}>{l}</div>
-          </Card>
-        ))}
-      </div>
+      <StatBar stats={[
+        { label: "Total Flow",         value: "55Mb/d", color: "#ff9d00" },
+        { label: "Critical",           value: "2",      color: "#ff4d4d" },
+        { label: "Extreme Tension",    value: "2",      color: "#ff4d4d" },
+        { label: "Rerouting Events",   value: "3",      color: "#ffd700" },
+      ]} />
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "12px 16px 0", fontWeight: 700, color: "#4db8ff" }}>🗺️ Global Chokepoint Map — Click for detail</div>
@@ -123,18 +120,18 @@ export default function Chokepoint() {
             </div>
           </div>
           {apiKey && (
-            <Btn onClick={() => analyzeChokepoint(sel)} disabled={aiLoading} color="#1f2d45">
+            <Btn onClick={() => analyzeChokepoint(sel)} disabled={aiLoading} color="#ff9d00" size="sm">
               {aiLoading ? "⏳ Analyzing..." : "🤖 AI Geopolitical Analysis"}
             </Btn>
           )}
           {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
           {aiResult && (
-            <div style={{ background: "#0d1626", borderRadius: 6, padding: 12, marginTop: 10, borderLeft: "3px solid #ff9d00" }}>
-              <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+            <div style={{ background: "#0a0c00", border: "1px solid #ff9d0033", borderLeft: "3px solid #ff9d00", borderRadius: 6, padding: 12, marginTop: 10 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
                 <LiveBadge />
-                <span style={{ color: "#9ca3af", fontSize: 11 }}>AI CHOKEPOINT ANALYSIS</span>
+                <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI CHOKEPOINT ANALYSIS · {sel.id}</span>
               </div>
-              <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{aiResult}</div>
+              <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7 }}>{aiResult}</div>
             </div>
           )}
         </Card>
