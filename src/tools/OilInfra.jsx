@@ -110,7 +110,7 @@ export default function OilInfra() {
 
   return (
     <div>
-      <PageHeader icon="🛢️" title="Oil & Gas Infrastructure Monitor" sub="Real-time threat assessment for critical energy infrastructure worldwide." accent="#ff9d00" mock />
+      <PageHeader icon="🛢️" title="Oil & Gas Infrastructure Monitor" sub="Real-time threat assessment for critical energy infrastructure worldwide." accent="#ff9d00" dataMode={apiKey ? "hybrid" : "mock"} />
 
       <StatBar stats={[
         { label: "Monitored Assets", value: "47",       color: "#ff9d00" },

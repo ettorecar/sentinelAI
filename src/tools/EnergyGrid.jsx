@@ -185,7 +185,7 @@ export default function EnergyGrid() {
 
   return (
     <div>
-      <PageHeader icon="⚡" title="Energy Grid Resilience Simulator" sub="Simulate cascading failures and assess resilience of national energy grids." accent="#ff9d00" mock />
+      <PageHeader icon="⚡" title="Energy Grid Resilience Simulator" sub="Simulate cascading failures and assess resilience of national energy grids." accent="#ff9d00" dataMode={apiKey ? "hybrid" : "mock"} />
 
       {/* Country selector */}
       <Card>

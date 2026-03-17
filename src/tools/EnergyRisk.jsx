@@ -140,7 +140,7 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
 
   return (
     <div>
-      <PageHeader icon="📊" title="Energy Supply Chain Risk Analyzer" sub="National energy dependency analysis and disruption scenario modeling." accent="#ff9d00" badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"Mock Data",color:"#ffd700"}]} />
+      <PageHeader icon="📊" title="Energy Supply Chain Risk Analyzer" sub="National energy dependency analysis and disruption scenario modeling." accent="#ff9d00" dataMode={apiKey ? "hybrid" : "mock"} />
 
       <Card>
         <ST icon="🌍" label="Select Country" color="#4db8ff" />

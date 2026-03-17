@@ -125,7 +125,7 @@ Return ONLY a JSON object (no markdown, no backticks):
 
   return (
     <div>
-      <PageHeader icon="📋" title="Intelligence Report Generator" sub="Generate structured multi-domain intelligence briefs." accent="#b47fff" classification="TOP SECRET" badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"API Key Required",color:"#ffd700"}]} />
+      <PageHeader icon="📋" title="Intelligence Report Generator" sub="Generate structured multi-domain intelligence briefs." accent="#b47fff" classification="TOP SECRET" dataMode="ai" badges={apiKey ? [] : [{text:"API Key Required",color:"#ffd700"}]} />
 
       <Card>
         <ST icon="🎯" label="Intelligence Domains" color="#b47fff" sub="Select one or more domains to include" />

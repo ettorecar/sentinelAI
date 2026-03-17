@@ -282,7 +282,7 @@ Return ONLY this JSON structure:
 
   return (
     <div>
-      <PageHeader icon="🎯" title="Scenario Builder" sub="Multi-domain crisis scenarios — cascade effects, escalation paths and strategic responses." accent={ACCENT} badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"API Key Required",color:"#ffd700"}]} />
+      <PageHeader icon="🎯" title="Scenario Builder" sub="Multi-domain crisis scenarios — cascade effects, escalation paths and strategic responses." accent={ACCENT} dataMode="ai" badges={apiKey ? [] : [{text:"API Key Required",color:"#ffd700"}]} />
 
       <Stepper step={step} />
 

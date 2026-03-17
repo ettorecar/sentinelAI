@@ -66,7 +66,7 @@ export default function ThreatMap() {
         title="Global Threat Map"
         sub="Real-time geolocation of active threat incidents worldwide."
         accent="#ff4d4d"
-        mock
+        dataMode={apiKey ? "hybrid" : "mock"}
         classification="SECRET"
         badges={[{ text: "10 Hotspots", color: "#ff4d4d" }, { text: "Live", color: "#00ff9d" }]}
       />

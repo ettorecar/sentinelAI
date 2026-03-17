@@ -2,6 +2,19 @@ import { useState, useEffect } from "react";
 import { BADGE, Card, Btn, ST, Pulse, Divider } from "../components/shared";
 import { NAV, TOOL_DESC, ENERGY_IDS } from "../constants";
 
+// Per-tool data mode (used in ToolCard indicator dot)
+const TOOL_DATA_MODE = {
+  disinfo: "ai", osint: "ai", patlife: "ai", psyop: "ai",
+  redteam: "ai", intelreport: "ai", scenariobuilder: "ai",
+  threatmap: "hybrid", maritime: "hybrid", biothreat: "hybrid",
+  chokepoint: "hybrid", energygrid: "hybrid", oilinfra: "hybrid",
+  satellite: "hybrid", energyrisk: "hybrid", cti: "hybrid", translator: "hybrid",
+};
+const MODE_DOT = {
+  ai:     { dot: "●", color: "#00ff9d", label: "AI" },
+  hybrid: { dot: "◑", color: "#ff9d00", label: "MOCK+AI" },
+};
+
 const feed = [
   { time: "14:32", type: "CTI",        msg: "New IOC cluster linked to EMBER WOLF",               level: "CRITICAL", page: "cti"        },
   { time: "14:18", type: "Oil Infra",  msg: "Drone threat detected — Abqaiq perimeter",            level: "CRITICAL", page: "oilinfra"   },
@@ -254,6 +267,7 @@ export default function Home({ setPage }) {
 
 function ToolCard({ t, accent, setPage }) {
   const [hovered, setHovered] = useState(false);
+  const m = MODE_DOT[TOOL_DATA_MODE[t.id]];
   return (
     <div
       onClick={() => setPage(t.id)}
@@ -265,11 +279,18 @@ function ToolCard({ t, accent, setPage }) {
         borderTop: `2px solid ${hovered ? accent : "#1f2d45"}`,
         borderRadius: 8, padding: 13, cursor: "pointer",
         transition: "background 0.15s, border-color 0.15s",
+        display: "flex", flexDirection: "column",
       }}
     >
       <div style={{ fontSize: 20, marginBottom: 6 }}>{t.icon}</div>
       <div style={{ fontWeight: 700, color: hovered ? accent : "#e2e8f0", fontSize: 12, marginBottom: 4, transition: "color 0.15s" }}>{t.label}</div>
-      <div style={{ color: "#4a5568", fontSize: 11, marginBottom: 0, lineHeight: 1.4 }}>{TOOL_DESC[t.id]}</div>
+      <div style={{ color: "#4a5568", fontSize: 11, lineHeight: 1.4, flex: 1 }}>{TOOL_DESC[t.id]}</div>
+      {m && (
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8 }}>
+          <span style={{ color: m.color, fontSize: 9 }}>{m.dot}</span>
+          <span style={{ color: m.color, fontSize: 9, fontWeight: 700, letterSpacing: 0.8, opacity: 0.85 }}>{m.label}</span>
+        </div>
+      )}
     </div>
   );
 }

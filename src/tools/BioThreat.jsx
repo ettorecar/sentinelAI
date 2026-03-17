@@ -131,7 +131,7 @@ export default function BioThreat() {
         title="Bio-Threat Early Warning"
         sub="Epidemiological signal aggregation, biosurveillance, and pathogen intelligence."
         accent="#00ff9d"
-        mock
+        dataMode={apiKey ? "hybrid" : "mock"}
       />
 
       <StatBar stats={[

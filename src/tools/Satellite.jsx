@@ -97,7 +97,7 @@ export default function Satellite() {
 
   return (
     <div>
-      <PageHeader icon="🛰️" title="Satellite Pass Planner" sub="Overflight windows and coverage analysis for reconnaissance satellites." accent="#4db8ff" mock />
+      <PageHeader icon="🛰️" title="Satellite Pass Planner" sub="Overflight windows and coverage analysis for reconnaissance satellites." accent="#4db8ff" dataMode={apiKey ? "hybrid" : "mock"} />
 
       <Card>
         <Input label="📍 Area of Interest" value={zone} onChange={setZone} placeholder="e.g. 44.4°N 8.9°E · Coordinates or location name" />

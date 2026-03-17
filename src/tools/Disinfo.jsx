@@ -72,7 +72,7 @@ Include 4-6 specific techniques from this list (or similar): Emotional Appeal, F
 
   return (
     <div>
-      <PageHeader icon="📰" title="Disinformation Detector" sub="Classify disinformation techniques, origin and narrative." accent="#ff4d4d" badges={[{text:"AI Live",color:"#00ff9d"}]} />
+      <PageHeader icon="📰" title="Disinformation Detector" sub="Classify disinformation techniques, origin and narrative." accent="#ff4d4d" dataMode="ai" />
 
       <Card>
         <Input label="📄 Content" value={text} onChange={setText} placeholder="Paste article, social post, broadcast transcript..." rows={4} />
