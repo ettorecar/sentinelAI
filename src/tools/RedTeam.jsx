@@ -82,7 +82,7 @@ Return ONLY a JSON object: {"scenario_title":"string","threat_actor":"string","o
 
   return (
     <div>
-      <PageHeader icon="🤖" title="Red Team Scenario Generator" sub="AI-generated threat scenarios and attack paths for defensive planning." accent="#ff4d4d" badges={[{text:"AI Live",color:"#00ff9d"}]} />
+      <PageHeader icon="🤖" title="Red Team Scenario Generator" sub="AI-generated threat scenarios and attack paths for defensive planning." accent="#ff4d4d" dataMode="ai" />
 
       <Card>
         <Input label="🎯 Target" value={target} onChange={setTarget} placeholder="e.g. Nuclear power plant, pipeline infrastructure" />

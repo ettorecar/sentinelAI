@@ -129,6 +129,13 @@ export const ST = ({ icon, label, color = "#4db8ff", sub }) => (
 export const MockBadge = () => <BADGE text="Mock Data" color="yellow" />;
 export const LiveBadge = () => <BADGE text="AI Live" color="green" />;
 
+// ── Data Mode pill config ──────────────────────────────────────────────────
+const DATA_MODES = {
+  ai:     { dot: "●", color: "#00ff9d", label: "AI LIVE",   desc: "Contenuto generato da Claude API in tempo reale" },
+  hybrid: { dot: "◑", color: "#ff9d00", label: "MOCK + AI", desc: "Dati simulati · analisi AI disponibile su selezione" },
+  mock:   { dot: "○", color: "#4a5568", label: "SIMULATO",  desc: "Scenario dimostrativo con dati sintetici" },
+};
+
 // ── Pulse dot ─────────────────────────────────────────────────────────────
 export const Pulse = ({ color = "#ff4d4d", size = 10 }) => (
   <span style={{ position: "relative", display: "inline-block", width: size, height: size, flexShrink: 0 }}>
@@ -156,41 +163,60 @@ export const riskBadgeColor = r =>
   r === "CRITICAL" || r === "HIGH" ? "red" : r === "MEDIUM" ? "yellow" : "green";
 
 // ── Page Header ───────────────────────────────────────────────────────────
-export const PageHeader = ({ icon, title, sub, badges = [], accent = "#00ff9d", mock, classification }) => (
-  <div style={{
-    paddingBottom: 16, borderBottom: "1px solid #1f2d45", marginBottom: 20,
-    borderLeft: `3px solid ${accent}33`, paddingLeft: 12,
-    position: "relative",
-  }}>
-    {/* Classification badge */}
-    {classification && (
-      <div style={{
-        position: "absolute", right: 0, top: 2,
-        color: classification.startsWith("TOP") ? "#ff4d4d" : classification === "SECRET" ? "#ff9d00" : "#3a4a5c",
-        fontSize: 8, fontWeight: 700, letterSpacing: 2, fontFamily: "monospace",
-        border: `1px solid ${classification.startsWith("TOP") ? "#ff4d4d22" : "#1f2d45"}`,
-        borderRadius: 3, padding: "2px 7px",
-        background: classification.startsWith("TOP") ? "#1a050522" : "#0d1626",
-      }}>
-        {classification}
+export const PageHeader = ({ icon, title, sub, badges = [], accent = "#00ff9d", mock, classification, dataMode }) => {
+  // resolve mode: explicit dataMode wins, else backward-compat mock flag
+  const mode = DATA_MODES[dataMode] || (mock ? DATA_MODES.mock : null);
+  return (
+    <div style={{
+      paddingBottom: 16, borderBottom: "1px solid #1f2d45", marginBottom: 20,
+      borderLeft: `3px solid ${accent}33`, paddingLeft: 12,
+      position: "relative",
+    }}>
+      {/* Classification badge */}
+      {classification && (
+        <div style={{
+          position: "absolute", right: 0, top: 2,
+          color: classification.startsWith("TOP") ? "#ff4d4d" : classification === "SECRET" ? "#ff9d00" : "#3a4a5c",
+          fontSize: 8, fontWeight: 700, letterSpacing: 2, fontFamily: "monospace",
+          border: `1px solid ${classification.startsWith("TOP") ? "#ff4d4d22" : "#1f2d45"}`,
+          borderRadius: 3, padding: "2px 7px",
+          background: classification.startsWith("TOP") ? "#1a050522" : "#0d1626",
+        }}>
+          {classification}
+        </div>
+      )}
+      <div style={{ color: "#3a4a5c", fontSize: 9, letterSpacing: 4, marginBottom: 8, fontWeight: 600 }}>
+        SENTINEL · {title.toUpperCase()}
       </div>
-    )}
-    <div style={{ color: "#3a4a5c", fontSize: 9, letterSpacing: 4, marginBottom: 8, fontWeight: 600 }}>
-      SENTINEL · {title.toUpperCase()}
-    </div>
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      {icon && <span style={{ fontSize: 22 }}>{icon}</span>}
-      <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#e2e8f0", letterSpacing: -0.5 }}>{title}</h2>
-      {mock && <MockBadge />}
-    </div>
-    {sub && <div style={{ color: "#4a5568", fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>{sub}</div>}
-    {badges.length > 0 && (
-      <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-        {badges.map((b, i) => <BADGE key={i} text={b.text} color={b.color || accent} />)}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        {icon && <span style={{ fontSize: 22 }}>{icon}</span>}
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#e2e8f0", letterSpacing: -0.5 }}>{title}</h2>
       </div>
-    )}
-  </div>
-);
+      {sub && <div style={{ color: "#4a5568", fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>{sub}</div>}
+
+      {/* Data mode pill */}
+      {mode && (
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8 }}>
+          <span style={{ color: mode.color, fontSize: 12, lineHeight: 1 }}>{mode.dot}</span>
+          <span style={{
+            background: `${mode.color}18`, color: mode.color,
+            border: `1px solid ${mode.color}44`,
+            borderRadius: 3, padding: "1px 6px",
+            fontSize: 9, fontWeight: 700, letterSpacing: 1.5, whiteSpace: "nowrap",
+          }}>{mode.label}</span>
+          <span style={{ color: "#3a4a5c", fontSize: 10 }}>·</span>
+          <span style={{ color: "#4a5568", fontSize: 10 }}>{mode.desc}</span>
+        </div>
+      )}
+
+      {badges.length > 0 && (
+        <div style={{ display: "flex", gap: 6, marginTop: mode ? 6 : 8, flexWrap: "wrap" }}>
+          {badges.map((b, i) => <BADGE key={i} text={b.text} color={b.color || accent} />)}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ── Stat bar ──────────────────────────────────────────────────────────────
 export const StatBar = ({ stats }) => (

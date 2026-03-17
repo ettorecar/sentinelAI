@@ -107,7 +107,7 @@ Include 5-7 routine patterns. The heatmap must be a 6×7 matrix (6 time slots ×
 
   return (
     <div>
-      <PageHeader icon="📍" title="Pattern-of-Life Analyzer" sub="Spatio-temporal behaviour reconstruction and exposure analysis." accent="#4db8ff" badges={[{text:"AI Live",color:"#00ff9d"}]} />
+      <PageHeader icon="📍" title="Pattern-of-Life Analyzer" sub="Spatio-temporal behaviour reconstruction and exposure analysis." accent="#4db8ff" dataMode="ai" />
 
       <Card>
         <Input label="🎯 Subject Identifier" value={subject} onChange={setSubject}

@@ -119,7 +119,7 @@ Include 4-6 realistic connections and 3-4 intelligence notes. Make connections p
 
   return (
     <div>
-      <PageHeader icon="🔍" title="OSINT Correlation Engine" sub="Entity correlation graphs from open-source intelligence." accent="#00ff9d" badges={[{text:"AI Live",color:"#00ff9d"}]} />
+      <PageHeader icon="🔍" title="OSINT Correlation Engine" sub="Entity correlation graphs from open-source intelligence." accent="#00ff9d" dataMode="ai" />
 
       <Card>
         <Input label="🔎 Entity" value={query} onChange={setQuery} placeholder="Person name, company, vessel, domain, IP address, username..." />

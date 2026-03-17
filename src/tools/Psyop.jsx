@@ -75,7 +75,7 @@ Include 3-5 specific PSYOP techniques from: Fear Appeal, In-group/Out-group pola
 
   return (
     <div>
-      <PageHeader icon="🧠" title="PSYOP Content Analyzer" sub="Identify psychological operation techniques in media and influence campaigns." accent="#b47fff" badges={[{text:"AI Live",color:"#00ff9d"}]} />
+      <PageHeader icon="🧠" title="PSYOP Content Analyzer" sub="Identify psychological operation techniques in media and influence campaigns." accent="#b47fff" dataMode="ai" />
 
       <Card>
         <Input label="📄 Content" value={content} onChange={setContent} placeholder="Paste text, article, broadcast transcript..." rows={5} />

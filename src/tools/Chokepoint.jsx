@@ -42,7 +42,7 @@ export default function Chokepoint() {
 
   return (
     <div>
-      <PageHeader icon="🚢" title="Strategic Chokepoint Monitor" sub="Global maritime energy chokepoints — flow, tension and disruption risk." accent="#ff9d00" mock />
+      <PageHeader icon="🚢" title="Strategic Chokepoint Monitor" sub="Global maritime energy chokepoints — flow, tension and disruption risk." accent="#ff9d00" dataMode={apiKey ? "hybrid" : "mock"} />
 
       <StatBar stats={[
         { label: "Total Flow",         value: "55Mb/d", color: "#ff9d00" },

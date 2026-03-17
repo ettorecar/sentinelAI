@@ -115,7 +115,7 @@ Return ONLY JSON (no markdown): {
 
   return (
     <div>
-      <PageHeader icon="🌐" title="Battlefield Comms Translator" sub="Real-time translation and analysis of intercepted military communications." accent="#4db8ff" badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"Mock Data",color:"#ffd700"}]} />
+      <PageHeader icon="🌐" title="Battlefield Comms Translator" sub="Real-time translation and analysis of intercepted military communications." accent="#4db8ff" dataMode={apiKey ? "ai" : "mock"} />
 
       <Card>
         <ST icon="🗣️" label="Source Language" color="#4db8ff" />

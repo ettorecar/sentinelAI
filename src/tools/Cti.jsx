@@ -72,7 +72,7 @@ export default function Cti() {
         title="Cyber Threat Intelligence"
         sub="Threat actor profiling, TTP mapping, and IOC feed."
         accent="#4db8ff"
-        mock
+        dataMode={apiKey ? "hybrid" : "mock"}
         classification="TS/SCI"
         badges={[{ text: "38 Actors", color: "#4db8ff" }, { text: "47 IOCs 24h", color: "#ff9d00" }]}
       />

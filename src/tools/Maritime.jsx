@@ -101,7 +101,7 @@ export default function Maritime() {
         title="Maritime Anomaly Tracker"
         sub="AIS anomaly detection and vessel intelligence — Mediterranean theatre."
         accent="#00cfff"
-        mock
+        dataMode={apiKey ? "hybrid" : "mock"}
         classification="SECRET"
       />
 
