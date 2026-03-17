@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NAV, ENERGY_IDS } from "./constants";
-import { BADGE } from "./components/shared";
+import { BADGE, GlobalStyles } from "./components/shared";
 import { ApiKeyProvider, useApiKey } from "./context/ApiKeyContext";
 import SplashScreen, { useSplash } from "./components/SplashScreen";
 
@@ -171,16 +171,18 @@ function ApiKeyBanner() {
 }
 
 function StatusWidgets({ blink }) {
+  const [utc, setUtc] = useState(() => new Date().toISOString().slice(11, 19));
+  useEffect(() => {
+    const t = setInterval(() => setUtc(new Date().toISOString().slice(11, 19)), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", paddingLeft: 12, flexShrink: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto", paddingLeft: 12, flexShrink: 0 }}>
       {/* CRITICAL alert widget */}
       <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-        background: "#0f0505",
-        borderRadius: 5,
-        padding: "4px 9px",
+        display: "flex", alignItems: "center", gap: 5,
+        background: "#0f0505", borderRadius: 5, padding: "4px 9px",
         border: "1px solid #ff4d4d33",
       }}>
         <div style={{
@@ -193,25 +195,27 @@ function StatusWidgets({ blink }) {
       </div>
       {/* Energy sector widget */}
       <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-        background: "#0e0800",
-        borderRadius: 5,
-        padding: "4px 9px",
+        display: "flex", alignItems: "center", gap: 5,
+        background: "#0e0800", borderRadius: 5, padding: "4px 9px",
         border: "1px solid #ff9d0033",
       }}>
         <span style={{ fontSize: 9 }}>🛢️</span>
         <span style={{ color: "#ff9d00", fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>ENERGY</span>
       </div>
-      {/* Version */}
+      {/* Live UTC Clock */}
       <div style={{
-        color: "#2d3f55",
-        fontSize: 9,
-        fontFamily: "monospace",
-        letterSpacing: 1,
-        paddingLeft: 4,
+        display: "flex", alignItems: "center", gap: 4,
+        background: "#060d1a", borderRadius: 5, padding: "4px 9px",
+        border: "1px solid #0d1f3a",
       }}>
+        <span style={{ color: "#2d4a6a", fontSize: 8, letterSpacing: 1 }}>UTC</span>
+        <span style={{
+          color: "#4a6080", fontSize: 10, fontFamily: "monospace",
+          letterSpacing: 1, fontVariantNumeric: "tabular-nums",
+        }}>{utc}</span>
+      </div>
+      {/* Version */}
+      <div style={{ color: "#2d3f55", fontSize: 9, fontFamily: "monospace", letterSpacing: 1, paddingLeft: 2 }}>
         v0.8
       </div>
     </div>
@@ -227,6 +231,7 @@ function AppInner() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0f1e", color: "#e2e8f0", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+      <GlobalStyles />
       <nav style={{
         background: "#0b111e",
         borderBottom: "1px solid #131f33",

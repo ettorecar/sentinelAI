@@ -110,7 +110,7 @@ Return ONLY a JSON object: {"scenario_title":"string","threat_actor":"string","o
               </div>
               <BADGE text={result.risk_level} color={result.risk_level === "CRITICAL" || result.risk_level === "HIGH" ? "red" : "yellow"} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 10 }}>
               <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
                 <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 3 }}>THREAT ACTOR</div>
                 <div style={{ color: "#ffd700", fontWeight: 600 }}>{result.threat_actor}</div>
@@ -153,7 +153,7 @@ Return ONLY a JSON object: {"scenario_title":"string","threat_actor":"string","o
           </Card>
 
           {/* 4-grid details */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12 }}>
             <Card>
               <ST icon="🚪" label="Entry Points" color="#ff4d4d" />
               {result.likely_entry_points?.map((e, i) => <BulletItem key={i} text={e} color="#ff4d4d" />)}

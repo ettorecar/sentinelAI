@@ -44,7 +44,9 @@ export default function ThreatMap() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [scanY, setScanY] = useState(0);
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 1500); return () => clearInterval(t); }, []);
+  useEffect(() => { const t = setInterval(() => setScanY(y => (y + 6) % 384), 40); return () => clearInterval(t); }, []);
 
   async function analyzeHotspot(h) {
     setAiResult(null); setAiError(""); setAiLoading(true);
@@ -65,6 +67,7 @@ export default function ThreatMap() {
         sub="Real-time geolocation of active threat incidents worldwide."
         accent="#ff4d4d"
         mock
+        classification="SECRET"
         badges={[{ text: "10 Hotspots", color: "#ff4d4d" }, { text: "Live", color: "#00ff9d" }]}
       />
 
@@ -92,9 +95,12 @@ export default function ThreatMap() {
           <path d="M 295 130 Q 330 125 360 135 Q 375 155 372 185 Q 368 220 355 248 Q 338 268 318 265 Q 298 260 288 238 Q 278 210 280 180 Q 282 152 295 130Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
           <path d="M 400 65 Q 470 55 540 65 Q 600 70 650 85 Q 685 100 695 125 Q 690 150 665 160 Q 630 168 590 162 Q 545 155 500 148 Q 455 140 420 128 Q 395 115 390 95 Q 390 78 400 65Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
           <path d="M 600 260 Q 640 255 670 268 Q 685 285 678 305 Q 665 318 640 318 Q 615 315 605 298 Q 596 280 600 260Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
+          {/* Moving scan line */}
+          <line x1={0} y1={scanY} x2={780} y2={scanY} stroke="#00ff9d" strokeWidth="1" opacity="0.10" />
+          <line x1={0} y1={Math.max(0, scanY - 4)} x2={780} y2={Math.max(0, scanY - 4)} stroke="#00ff9d" strokeWidth="0.5" opacity="0.04" />
           {/* Connection lines for related hotspots */}
-          <line x1={390} y1={118} x2={360} y2={125} stroke="#ff4d4d" strokeWidth="0.5" strokeDasharray="3" opacity="0.3" />
-          <line x1={620} y1={195} x2={635} y2={168} stroke="#4db8ff" strokeWidth="0.5" strokeDasharray="3" opacity="0.3" />
+          <line x1={390} y1={118} x2={360} y2={125} stroke="#ff4d4d" strokeWidth="1" strokeDasharray="5 3" opacity="0.45" style={{ animation: "sentinelDash 1.4s linear infinite" }} />
+          <line x1={620} y1={195} x2={635} y2={168} stroke="#4db8ff" strokeWidth="1" strokeDasharray="5 3" opacity="0.45" style={{ animation: "sentinelDash 1.8s linear infinite" }} />
           {/* Hotspots */}
           {hotspots.map((h, i) => {
             const c = typeColor(h.type);

@@ -106,7 +106,7 @@ Include 3-5 specific PSYOP techniques from: Fear Appeal, In-group/Out-group pola
               <div style={{ background: result.detected ? "#ff4d4d" : "#00ff9d", height: 6, borderRadius: 3, width: `${result.confidence}%`, transition: "width 0.4s" }} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10 }}>
               <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
                 <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>TARGET EFFECT</div>
                 <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{result.target_effect}</div>

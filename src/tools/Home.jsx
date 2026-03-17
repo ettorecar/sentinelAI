@@ -25,7 +25,9 @@ const TYPE_COLOR = {
 
 export default function Home({ setPage }) {
   const [tick, setTick] = useState(0);
+  const [utc, setUtc] = useState(() => new Date().toISOString().slice(11, 16) + " UTC");
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 2000); return () => clearInterval(t); }, []);
+  useEffect(() => { const t = setInterval(() => setUtc(new Date().toISOString().slice(11, 16) + " UTC"), 10000); return () => clearInterval(t); }, []);
 
   const tools = NAV.slice(1);
   const isEnergy = id => ENERGY_IDS.includes(id);
@@ -62,13 +64,13 @@ export default function Home({ setPage }) {
             </div>
           </div>
           {/* System status widget */}
-          <div style={{ background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 8, padding: "12px 16px", minWidth: 180 }}>
+          <div style={{ background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 8, padding: "12px 16px", minWidth: 160, flexShrink: 0 }}>
             <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 3, marginBottom: 8 }}>SYSTEM STATUS</div>
             {[
               ["AI Engine",    "#00ff9d", "ONLINE"],
               ["Threat Feed",  "#00ff9d", "LIVE"],
               ["Energy Mod.",  "#ff9d00", "ACTIVE"],
-              ["Last sync",    "#4a5568", "14:32 UTC"],
+              ["Last sync",    "#4a5568", utc],
             ].map(([label, color, val]) => (
               <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
                 <span style={{ color: "#4a5568", fontSize: 10 }}>{label}</span>

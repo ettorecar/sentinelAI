@@ -200,7 +200,7 @@ Include 4-6 realistic connections and 3-4 intelligence notes. Make connections p
               ))}
             </Card>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12 }}>
               <Card>
                 <ST icon="🧾" label="Intelligence Notes" color="#4db8ff" />
                 {result.intelligence_notes?.map((n, i) => <ListItem key={i} text={n} color="#4db8ff" />)}

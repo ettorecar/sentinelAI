@@ -102,6 +102,7 @@ export default function Maritime() {
         sub="AIS anomaly detection and vessel intelligence — Mediterranean theatre."
         accent="#00cfff"
         mock
+        classification="SECRET"
       />
 
       <StatBar stats={[
@@ -193,7 +194,7 @@ export default function Maritime() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 8, marginBottom: 12 }}>
               {[
                 ["MMSI",    sel.mmsi,    "#4db8ff"],
                 ["TYPE",    sel.type,    "#e2e8f0"],

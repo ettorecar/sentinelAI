@@ -125,7 +125,7 @@ Return ONLY a JSON object (no markdown, no backticks):
 
   return (
     <div>
-      <PageHeader icon="📋" title="Intelligence Report Generator" sub="Generate structured multi-domain intelligence briefs." accent="#b47fff" badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"API Key Required",color:"#ffd700"}]} />
+      <PageHeader icon="📋" title="Intelligence Report Generator" sub="Generate structured multi-domain intelligence briefs." accent="#b47fff" classification="TOP SECRET" badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"API Key Required",color:"#ffd700"}]} />
 
       <Card>
         <ST icon="🎯" label="Intelligence Domains" color="#b47fff" sub="Select one or more domains to include" />
@@ -137,7 +137,7 @@ Return ONLY a JSON object (no markdown, no backticks):
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 14, marginBottom: 14 }}>
           <div>
             <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6, letterSpacing: 0.5 }}>⏱ Timeframe</div>
             <div style={{ display: "flex", gap: 5 }}>
@@ -218,7 +218,7 @@ Return ONLY a JSON object (no markdown, no backticks):
             ))}
           </Card>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 }}>
             <Card style={{ marginBottom: 0 }}>
               <ST icon="👤" label="Threat Actors" color="#ff4d4d" />
               {result.threat_actors?.map((a, i) => (
@@ -251,7 +251,7 @@ Return ONLY a JSON object (no markdown, no backticks):
           </Card>
 
           {/* Gaps + analyst note */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 }}>
             <Card style={{ marginBottom: 0 }}>
               <ST icon="❓" label="Intelligence Gaps" color="#4db8ff" />
               {result.intelligence_gaps?.map((g, i) => (

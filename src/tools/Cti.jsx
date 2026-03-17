@@ -73,6 +73,7 @@ export default function Cti() {
         sub="Threat actor profiling, TTP mapping, and IOC feed."
         accent="#4db8ff"
         mock
+        classification="TS/SCI"
         badges={[{ text: "38 Actors", color: "#4db8ff" }, { text: "47 IOCs 24h", color: "#ff9d00" }]}
       />
 
@@ -116,7 +117,8 @@ export default function Cti() {
 
       <Card>
         <ST icon="🔎" label="IOC Feed" color="#ff9d00" sub="Indicators of Compromise — last 72h" />
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", minWidth: 420, borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
             <tr style={{ borderBottom: "1px solid #1f2d45" }}>
               {["Type", "Indicator", "Actor", "Date"].map(h => (
@@ -128,6 +130,7 @@ export default function Cti() {
             {iocs.map((r, i) => <IocRow key={i} r={r} />)}
           </tbody>
         </table>
+        </div>
       </Card>
     </div>
   );

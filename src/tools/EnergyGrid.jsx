@@ -204,7 +204,7 @@ export default function EnergyGrid() {
       {ran && (
         <>
           {/* KPI row */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))", gap: 10, marginBottom: 14 }}>
             {[
               ["Capacity", d.capacity_gw + " GW", "#ff9d00"],
               ["Renewables", d.renewables_pct + "%", "#00ff9d"],
@@ -218,7 +218,7 @@ export default function EnergyGrid() {
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 14, marginBottom: 14 }}>
             {/* Grid topology */}
             <Card>
               <ST icon="🔌" label="Grid Topology" color="#ff9d00" />
@@ -303,7 +303,7 @@ export default function EnergyGrid() {
             {simScenario && (
               <div style={{ background: "#1a0a00", border: "1px solid #ff4d4d", borderRadius: 8, padding: 16 }}>
                 <div style={{ fontWeight: 800, color: "#ff4d4d", fontSize: 15, marginBottom: 10 }}>🔴 SIMULATION ACTIVE — {simScenario.trigger}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 12, marginBottom: 14 }}>
                   <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
                     <div style={{ fontSize: 22, fontWeight: 800, color: "#ff4d4d" }}>{simScenario.blackout_pct}%</div>
                     <div style={{ color: "#9ca3af", fontSize: 11 }}>Population Affected</div>

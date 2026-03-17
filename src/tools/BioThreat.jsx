@@ -79,7 +79,7 @@ function AlertRow({ a, selected, onSelect }) {
       {/* Expanded detail */}
       {selected && (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #1f2d45" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 120px), 1fr))", gap: 8, marginBottom: 12 }}>
             {[
               ["TYPE",    a.type,             "#4db8ff"],
               ["SOURCES", String(a.sources),  "#e2e8f0"],

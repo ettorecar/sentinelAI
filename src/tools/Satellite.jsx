@@ -113,7 +113,7 @@ export default function Satellite() {
             { label: "Coverage Hours", value: String(COV_HOURS.size), color: "#ffd700" },
           ]} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12, marginBottom: 12 }}>
             {/* Orbit viz */}
             <Card>
               <ST icon="🌐" label="Orbit Visualization" color="#4db8ff" sub="Live orbital tracking" />
