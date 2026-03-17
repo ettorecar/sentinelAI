@@ -30,9 +30,9 @@ export default function Home({ setPage }) {
           <BADGE text="AI Powered" color="green" />
           <BADGE text="OSINT" color="blue" />
           <BADGE text="Dual-Use" color="yellow" />
-          <BADGE text="17 Tools" color="orange" />
+          <BADGE text="18 Tools" color="orange" />
           <BADGE text="Energy Module" color="#ff9d00" />
-          <BADGE text="v0.7" color="gray" />
+          <BADGE text="v0.8" color="gray" />
         </div>
       </div>
 
@@ -119,6 +119,17 @@ export default function Home({ setPage }) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Scenario Builder highlight */}
+      <div style={{ background: "linear-gradient(135deg,#00131a,#111827)", border: "1px solid #22d3ee44", borderRadius: 10, padding: 16, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 20 }}>🎯</span>
+          <span style={{ fontWeight: 800, color: "#22d3ee", fontSize: 15 }}>Scenario Builder</span>
+          <BADGE text="New" color="#22d3ee" />
+        </div>
+        <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 10 }}>Build multi-domain crisis scenarios — define actors, events across domains, and get AI-powered cascade analysis, escalation paths and response options.</div>
+        <Btn onClick={() => setPage("scenariobuilder")} color="#22d3ee">🎯 Open Scenario Builder →</Btn>
       </div>
 
       {/* Intel Report highlight */}

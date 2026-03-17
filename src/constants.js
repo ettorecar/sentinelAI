@@ -23,7 +23,8 @@ export const NAV = [
   { id: "chokepoint",  label: "Chokepoints",              icon: "🚢" },
   { id: "energyrisk",  label: "Energy Risk",              icon: "📊" },
   { id: "energygrid",  label: "Energy Grid Simulator",    icon: "⚡" },
-  { id: "intelreport", label: "Intel Report",              icon: "📋" },
+  { id: "intelreport",    label: "Intel Report",       icon: "📋" },
+  { id: "scenariobuilder", label: "Scenario Builder",  icon: "🎯" },
 ];
 
 export const ENERGY_IDS = ["oilinfra", "chokepoint", "energyrisk", "energygrid"];
@@ -44,5 +45,6 @@ export const TOOL_DESC = {
   chokepoint: "Track strategic maritime chokepoints and their impact on global energy flows.",
   energyrisk: "Analyze national energy supply chain vulnerabilities and disruption scenarios.",
   energygrid:  "Simulate cascading failures and resilience of national energy grid infrastructure.",
-  intelreport: "Generate a structured multi-domain intelligence brief with executive summary and recommendations.",
+  intelreport:    "Generate a structured multi-domain intelligence brief with executive summary and recommendations.",
+  scenariobuilder: "Build multi-domain crisis scenarios, define actors and events across domains, and analyze cascade effects and escalation paths.",
 };

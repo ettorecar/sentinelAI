@@ -19,7 +19,8 @@ import OilInfra    from "./tools/OilInfra";
 import Chokepoint  from "./tools/Chokepoint";
 import EnergyRisk  from "./tools/EnergyRisk";
 import EnergyGrid  from "./tools/EnergyGrid";
-import IntelReport from "./tools/IntelReport";
+import IntelReport      from "./tools/IntelReport";
+import ScenarioBuilder from "./tools/ScenarioBuilder";
 
 const PAGES = {
   home:        Home,
@@ -38,7 +39,8 @@ const PAGES = {
   chokepoint:  Chokepoint,
   energyrisk:  EnergyRisk,
   energygrid:  EnergyGrid,
-  intelreport: IntelReport,
+  intelreport:    IntelReport,
+  scenariobuilder: ScenarioBuilder,
 };
 
 function ApiKeyBanner() {
@@ -106,8 +108,8 @@ function AppInner() {
           <button key={n.id} onClick={() => setPage(n.id)}
             style={{
               background: "none", border: "none",
-              borderBottom: page === n.id ? `2px solid ${isEnergy(n.id) ? "#ff9d00" : n.id === "intelreport" ? "#b47fff" : "#00ff9d"}` : "2px solid transparent",
-              color: page === n.id ? (isEnergy(n.id) ? "#ff9d00" : n.id === "intelreport" ? "#b47fff" : "#00ff9d") : "#9ca3af",
+              borderBottom: page === n.id ? `2px solid ${isEnergy(n.id) ? "#ff9d00" : n.id === "intelreport" ? "#b47fff" : n.id === "scenariobuilder" ? "#22d3ee" : "#00ff9d"}` : "2px solid transparent",
+              color: page === n.id ? (isEnergy(n.id) ? "#ff9d00" : n.id === "intelreport" ? "#b47fff" : n.id === "scenariobuilder" ? "#22d3ee" : "#00ff9d") : "#9ca3af",
               padding: "11px 9px", cursor: "pointer", fontSize: 11,
               fontWeight: page === n.id ? 700 : 400, whiteSpace: "nowrap",
             }}>
@@ -123,7 +125,7 @@ function AppInner() {
             <span style={{ fontSize: 9 }}>🛢️</span>
             <span style={{ color: "#ff9d00", fontSize: 10, fontWeight: 700 }}>ENERGY</span>
           </div>
-          <BADGE text="v0.7" color="gray" />
+          <BADGE text="v0.8" color="gray" />
         </div>
       </nav>
       <ApiKeyBanner />
