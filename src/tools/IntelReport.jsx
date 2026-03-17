@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Btn, ST, Input, LiveBadge } from "../components/shared";
+import { BADGE, Card, Btn, ST, Input, PageHeader, LiveBadge } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 const DOMAINS = [
@@ -101,11 +101,7 @@ Return ONLY a JSON object (no markdown, no backticks):
 
   return (
     <div>
-      <h2 style={{ color: "#b47fff", marginTop: 0 }}>📋 Intelligence Report Generator</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>
-        Generate structured multi-domain intelligence briefs.{" "}
-        {apiKey ? <LiveBadge /> : <BADGE text="API Key Required" color="yellow" />}
-      </p>
+      <PageHeader icon="📋" title="Intelligence Report Generator" sub="Generate structured multi-domain intelligence briefs." accent="#b47fff" badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"API Key Required",color:"#ffd700"}]} />
 
       <Card>
         <ST icon="🎯" label="Intelligence Domains" color="#b47fff" />

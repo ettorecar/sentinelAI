@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Input, Btn, ST, LiveBadge } from "../components/shared";
+import { Card, Input, Btn, ST, PageHeader } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -59,10 +59,7 @@ Include 4-6 specific techniques from this list (or similar): Emotional Appeal, F
 
   return (
     <div>
-      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>📰 Disinformation Detector</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>
-        Classify disinformation techniques, origin and narrative. <LiveBadge />
-      </p>
+      <PageHeader icon="📰" title="Disinformation Detector" sub="Classify disinformation techniques, origin and narrative." accent="#ff4d4d" badges={[{text:"AI Live",color:"#00ff9d"}]} />
 
       <Card>
         <Input label="📄 Content" value={text} onChange={setText} placeholder="Paste article or social post..." rows={4} />

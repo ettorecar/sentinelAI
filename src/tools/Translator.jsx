@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, MockBadge, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, MockBadge, LiveBadge } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 const LANGUAGES = [
@@ -77,11 +77,7 @@ Return ONLY JSON (no markdown): {
 
   return (
     <div>
-      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>🌐 Multilingual Battlefield Comms Translator</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 16 }}>
-        Real-time translation and analysis of intercepted military communications.{" "}
-        {apiKey ? <LiveBadge /> : <MockBadge />}
-      </p>
+      <PageHeader icon="🌐" title="Battlefield Comms Translator" sub="Real-time translation of intercepted military communications." accent="#4db8ff" badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"Mock Data",color:"#ffd700"}]} />
 
       <Card>
         <ST icon="🗣️" label="Source Language" color="#4db8ff" />

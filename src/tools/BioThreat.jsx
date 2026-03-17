@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, ST, MockBadge, Spark, Btn, LiveBadge } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -38,17 +38,14 @@ export default function BioThreat() {
 
   return (
     <div>
-      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>🦠 Bio-Threat Early Warning</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>Epidemiological signal aggregation. <MockBadge /></p>
+      <PageHeader icon="🦠" title="Bio-Threat Early Warning" sub="Epidemiological signal aggregation and biosurveillance." accent="#00ff9d" mock />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 12 }}>
-        {[["Alerts", "14"], ["Critical", "1"], ["Regions", "47"], ["Sources", "230+"]].map(([l, v]) => (
-          <Card key={l} style={{ textAlign: "center", padding: 12 }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#00ff9d" }}>{v}</div>
-            <div style={{ color: "#9ca3af", fontSize: 11 }}>{l}</div>
-          </Card>
-        ))}
-      </div>
+      <StatBar stats={[
+        { label: "Active Alerts",  value: "14",   color: "#ff4d4d" },
+        { label: "Critical",       value: "1",    color: "#ff0000" },
+        { label: "Regions",        value: "47",   color: "#4db8ff" },
+        { label: "Sources",        value: "230+", color: "#00ff9d" },
+      ]} />
 
       <Card>
         <ST icon="🚨" label="Active Signals" color="#ff4d4d" />

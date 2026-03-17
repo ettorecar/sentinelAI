@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BADGE, Card, Input, Btn, ST, MockBadge, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, LiveBadge } from "../components/shared";
 import { RC } from "../constants";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -52,8 +52,7 @@ export default function Satellite() {
 
   return (
     <div>
-      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>🛰️ Satellite Pass Planner</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>Overflight windows for reconnaissance satellites. <MockBadge /></p>
+      <PageHeader icon="🛰️" title="Satellite Pass Planner" sub="Overflight windows for reconnaissance satellites." accent="#4db8ff" mock />
 
       <Card>
         <Input label="📍 Area of Interest" value={zone} onChange={setZone} placeholder="e.g. 44.4°N 8.9°E" />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -88,10 +88,7 @@ Include 4-6 realistic connections and 3-4 intelligence notes. Make connections p
 
   return (
     <div>
-      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>🔍 OSINT Correlation Engine</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>
-        Entity correlation graphs from open-source intelligence. <LiveBadge />
-      </p>
+      <PageHeader icon="🔍" title="OSINT Correlation Engine" sub="Entity correlation graphs from open-source intelligence." accent="#00ff9d" badges={[{text:"AI Live",color:"#00ff9d"}]} />
 
       <Card>
         <Input label="🔎 Entity" value={query} onChange={setQuery} placeholder="Person name, company, vessel, domain, IP..." />

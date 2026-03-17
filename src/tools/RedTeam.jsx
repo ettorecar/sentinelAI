@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader } from "../components/shared";
 import { RC } from "../constants";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -38,8 +38,7 @@ Return ONLY a JSON object: {"scenario_title":"string","threat_actor":"string","o
 
   return (
     <div>
-      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>🤖 Red Team Scenario Generator</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>AI generates realistic threat scenarios. <LiveBadge /></p>
+      <PageHeader icon="🤖" title="Red Team Scenario Generator" sub="AI-generated realistic threat scenarios for defensive planning." accent="#ff4d4d" badges={[{text:"AI Live",color:"#00ff9d"}]} />
 
       <Card>
         <Input label="🎯 Target" value={target} onChange={setTarget} placeholder="e.g. Nuclear power plant, pipeline infrastructure" />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BADGE, Card, ST, MockBadge, Spark, Btn, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -42,17 +42,14 @@ export default function Chokepoint() {
 
   return (
     <div>
-      <h2 style={{ color: "#ff9d00", marginTop: 0 }}>🚢 Strategic Chokepoint Monitor</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 16 }}>Global maritime energy chokepoints — flow, tension and disruption risk. <MockBadge /></p>
+      <PageHeader icon="🚢" title="Strategic Chokepoint Monitor" sub="Global maritime energy chokepoints — flow, tension and disruption risk." accent="#ff9d00" mock />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 14 }}>
-        {[["Total Monitored Flow", "55Mb/d", "#ff9d00"], ["Critical Chokepoints", "2", "#ff4d4d"], ["At Extreme Tension", "2", "#ff4d4d"], ["Rerouting Events", "3", "#ffd700"]].map(([l, v, c]) => (
-          <Card key={l} style={{ textAlign: "center", padding: 12 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: c }}>{v}</div>
-            <div style={{ color: "#9ca3af", fontSize: 11 }}>{l}</div>
-          </Card>
-        ))}
-      </div>
+      <StatBar stats={[
+        { label: "Total Flow",         value: "55Mb/d", color: "#ff9d00" },
+        { label: "Critical",           value: "2",      color: "#ff4d4d" },
+        { label: "Extreme Tension",    value: "2",      color: "#ff4d4d" },
+        { label: "Rerouting Events",   value: "3",      color: "#ffd700" },
+      ]} />
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "12px 16px 0", fontWeight: 700, color: "#4db8ff" }}>🗺️ Global Chokepoint Map — Click for detail</div>

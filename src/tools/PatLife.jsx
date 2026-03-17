@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -73,10 +73,7 @@ Include 5-7 routine patterns. The heatmap must be a 6×7 matrix (6 time slots ×
 
   return (
     <div>
-      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>📍 Pattern-of-Life Analyzer</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>
-        Spatio-temporal behaviour reconstruction. <LiveBadge />
-      </p>
+      <PageHeader icon="📍" title="Pattern-of-Life Analyzer" sub="Spatio-temporal behaviour reconstruction." accent="#4db8ff" badges={[{text:"AI Live",color:"#00ff9d"}]} />
 
       <Card>
         <Input label="🎯 Subject" value={subject} onChange={setSubject} placeholder="Subject Alpha, plate LK-4422, @username, IP 91.x.x.x..." />

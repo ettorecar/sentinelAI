@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader } from "../components/shared";
 import { RC } from "../constants";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -57,10 +57,7 @@ Include 3-5 specific PSYOP techniques from: Fear Appeal, In-group/Out-group pola
 
   return (
     <div>
-      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>🧠 PSYOP Content Analyzer</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>
-        Identify psychological operation techniques in media. <LiveBadge />
-      </p>
+      <PageHeader icon="🧠" title="PSYOP Content Analyzer" sub="Identify psychological operation techniques in media." accent="#b47fff" badges={[{text:"AI Live",color:"#00ff9d"}]} />
 
       <Card>
         <Input label="📄 Content" value={content} onChange={setContent} placeholder="Paste text or transcript..." rows={5} />

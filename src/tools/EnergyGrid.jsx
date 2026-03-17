@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Btn, ST, MockBadge, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, Btn, ST, PageHeader, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -166,10 +166,7 @@ export default function EnergyGrid() {
 
   return (
     <div>
-      <h2 style={{ color: "#ff9d00", marginTop: 0 }}>⚡ Energy Grid Resilience Simulator</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 16 }}>
-        Simulate cascading failures and assess resilience of national energy grid infrastructure. <MockBadge />
-      </p>
+      <PageHeader icon="⚡" title="Energy Grid Resilience Simulator" sub="Simulate cascading failures and assess resilience of national energy grids." accent="#ff9d00" mock />
 
       {/* Country selector */}
       <Card>

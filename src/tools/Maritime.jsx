@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, MockBadge, Btn, LiveBadge } from "../components/shared";
+import { BADGE, Card, PageHeader, Btn, LiveBadge } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -40,8 +40,7 @@ export default function Maritime() {
 
   return (
     <div>
-      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>🌊 Maritime Anomaly Tracker</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>AIS anomaly detection — Mediterranean theatre. <MockBadge /></p>
+      <PageHeader icon="🌊" title="Maritime Anomaly Tracker" sub="AIS anomaly detection — Mediterranean theatre." accent="#00cfff" mock />
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "12px 16px 0", fontWeight: 700, color: "#4db8ff" }}>🗺️ Mediterranean Map</div>

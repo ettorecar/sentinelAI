@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Btn, ST, LiveBadge } from "../components/shared";
+import { BADGE, Card, Btn, ST, PageHeader, LiveBadge } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 const ACCENT = "#22d3ee";
@@ -265,11 +265,7 @@ Return ONLY this JSON structure:
 
   return (
     <div>
-      <h2 style={{ color: ACCENT, marginTop: 0 }}>🎯 Scenario Builder</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>
-        Construct multi-domain crisis scenarios and analyze cascade effects, escalation paths, and strategic responses.{" "}
-        {apiKey ? <LiveBadge /> : <BADGE text="API Key Required for Analysis" color="yellow" />}
-      </p>
+      <PageHeader icon="🎯" title="Scenario Builder" sub="Multi-domain crisis scenarios — cascade effects, escalation paths and strategic responses." accent={ACCENT} badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"API Key Required",color:"#ffd700"}]} />
 
       <Stepper step={step} />
 

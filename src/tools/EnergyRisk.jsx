@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, ST, Btn, Input, MockBadge, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, ST, Btn, Input, PageHeader, riskColor, riskBadgeColor } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 const countries = ["Germany", "Italy", "France", "Poland", "Japan", "South Korea", "India", "Turkey"];
@@ -92,11 +92,7 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
 
   return (
     <div>
-      <h2 style={{ color: "#ff9d00", marginTop: 0 }}>📊 Energy Supply Chain Risk Analyzer</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 16 }}>
-        National energy dependency analysis and disruption scenario modeling.{" "}
-        {apiKey ? <LiveBadge /> : <MockBadge />}
-      </p>
+      <PageHeader icon="📊" title="Energy Supply Chain Risk Analyzer" sub="National energy dependency analysis and disruption scenario modeling." accent="#ff9d00" badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"Mock Data",color:"#ffd700"}]} />
 
       <Card>
         <ST icon="🌍" label="Select Country" color="#4db8ff" />
