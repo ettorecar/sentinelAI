@@ -451,7 +451,7 @@ Return ONLY this JSON structure:
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10, marginBottom: 10 }}>
                   <div>
                     <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 6 }}>SEVERITY</div>
                     <div style={{ display: "flex", gap: 4 }}>

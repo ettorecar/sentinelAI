@@ -98,7 +98,7 @@ export default function Chokepoint() {
               <div style={{ color: "#9ca3af", fontSize: 11 }}>{sel.pct} of global oil trade</div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 12, marginBottom: 12 }}>
             <div style={{ background: "#0d1626", borderRadius: 6, padding: 10 }}>
               <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>ACTIVE THREATS</div>
               {sel.threats.map((t, i) => <div key={i} style={{ color: "#ffd700", fontSize: 12, marginBottom: 3 }}>• {t}</div>)}

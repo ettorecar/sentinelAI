@@ -59,7 +59,6 @@ function IncidentRow({ a, onClick, selected }) {
       style={{
         background: selected ? "#141e30" : hovered ? "#0f1a2e" : "#0d1626",
         borderRadius: 7, padding: "10px 14px", marginBottom: 7,
-        borderLeft: `3px solid ${color}`,
         border: `1px solid ${selected ? color + "55" : hovered ? "#2a3f5f" : "#1f2d45"}`,
         borderLeft: `3px solid ${color}`,
         cursor: "pointer",
@@ -159,7 +158,7 @@ export default function OilInfra() {
 
         {/* Selected asset detail */}
         {sel && (
-          <div style={{ margin: "0 14px 14px", background: "#0a1628", borderRadius: 8, padding: 14, borderLeft: `3px solid ${rc(sel.risk)}`, border: `1px solid ${rc(sel.risk)}33`, borderLeft: `3px solid ${rc(sel.risk)}` }}>
+          <div style={{ margin: "0 14px 14px", background: "#0a1628", borderRadius: 8, padding: 14, border: `1px solid ${rc(sel.risk)}33`, borderLeft: `3px solid ${rc(sel.risk)}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
               <div>
                 <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 3 }}>ASSET INTELLIGENCE</div>
@@ -170,7 +169,7 @@ export default function OilInfra() {
                 <button onClick={() => setSel(null)} style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>✕</button>
               </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))", gap: 8, marginBottom: 10 }}>
               {[["COUNTRY", sel.country, "#e2e8f0"], ["TYPE", sel.type, "#e2e8f0"], ["FLOW", sel.barrel, "#ff9d00"], ["LAST EVENT", sel.lastEvt, "#4db8ff"]].map(([l,v,c]) => (
                 <div key={l} style={{ background: "#0d1626", borderRadius: 6, padding: "8px 10px" }}>
                   <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 3 }}>{l}</div>

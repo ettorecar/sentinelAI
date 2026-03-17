@@ -176,7 +176,7 @@ Return ONLY JSON (no markdown): {
 
           <Card>
             <ST icon="🔍" label="Intelligence Analysis" color="#ffd700" />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12, marginBottom: 12 }}>
               <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
                 <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>COMMUNICATION INTENT</div>
                 <div style={{ color: "#ffd700", fontWeight: 700, fontSize: 14 }}>{result.intent}</div>

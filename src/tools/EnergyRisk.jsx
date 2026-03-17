@@ -25,7 +25,6 @@ function ScenarioRow({ s }) {
       style={{
         background: hovered ? "#0f1a2e" : "#0d1626",
         borderRadius: 7, padding: "11px 14px", marginBottom: 8,
-        borderLeft: `3px solid ${color}`,
         border: `1px solid ${hovered ? "#2a3f5f" : "#1f2d45"}`,
         borderLeft: `3px solid ${color}`,
         transition: "background 0.15s, border-color 0.15s",
@@ -71,7 +70,7 @@ function DonutChart({ suppliers, import_dep }) {
   const slices = suppliers.map(s => { const a = (s.pct / 100) * 360; const start = angle; angle += a; return { ...s, startAngle: start, endAngle: start + a }; });
   const toXY = (cx, cy, r, deg) => { const rad = deg * Math.PI / 180; return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)]; };
   return (
-    <svg viewBox="0 0 120 120" style={{ width: 120, height: 120 }}>
+    <svg viewBox="0 0 120 120" style={{ width: "min(120px, 100%)", height: "auto", flexShrink: 0 }}>
       {slices.map((s, i) => {
         const [x1, y1] = toXY(cx, cy, r, s.startAngle);
         const [x2, y2] = toXY(cx, cy, r, s.endAngle);
@@ -160,7 +159,7 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
 
       {ran && p && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))", gap: 10, marginBottom: 14 }}>
             {[["Import Dependency", p.import_dep + "%", "#ff9d00"], ["Vulnerability", p.vulnerability, riskColor(p.vulnerability)], ["Storage Days", p.storage_days + "d", "#4db8ff"], ["Resilience Score", p.resilience_score + "/100", p.resilience_score > 65 ? "#00ff9d" : p.resilience_score > 45 ? "#ffd700" : "#ff4d4d"]].map(([l, v, c]) => (
               <Card key={l} style={{ textAlign: "center", padding: 12 }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: c }}>{v}</div>
@@ -169,7 +168,7 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 14 }}>
             <Card>
               <ST icon="🥧" label="Supplier Mix" color="#ff9d00" />
               <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
@@ -249,7 +248,7 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
                 <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>GEOPOLITICAL CONTEXT</div>
                 <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{aiAssessment.geopolitical_context}</div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12, marginBottom: 12 }}>
                 <div>
                   <div style={{ color: "#ff4d4d", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>⚡ Immediate Threats</div>
                   {aiAssessment.immediate_threats?.map((t, i) => (

@@ -121,7 +121,7 @@ Include 5-7 routine patterns. The heatmap must be a 6×7 matrix (6 time slots ×
       {result && (
         <>
           {/* KPI strip */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 120px), 1fr))", gap: 10, marginBottom: 12 }}>
             {[
               ["Predictability",     `${result.predictability}%`,       "#ff4d4d"],
               ["Sources",            String(result.sources_count),        "#4db8ff"],
@@ -197,7 +197,7 @@ Include 5-7 routine patterns. The heatmap must be a 6×7 matrix (6 time slots ×
           </Card>
 
           {/* Vulnerabilities & counter-surveillance */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12 }}>
             <Card>
               <ST icon="⚠️" label="Vulnerabilities" color="#ff4d4d" />
               {result.vulnerabilities?.map((v, i) => (
