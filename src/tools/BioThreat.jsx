@@ -1,0 +1,60 @@
+import { useState } from "react";
+import { BADGE, Card, ST, MockBadge, Spark } from "../components/shared";
+
+const alerts = [
+  { id: "BT-2026-031", region: "Eastern Balkans", signal: "Unusual pneumonia cluster",     sources: 4,  confidence: 72, level: "HIGH",     date: "13/03", type: "Respiratory",  trend: [12,15,14,18,22,28,35] },
+  { id: "BT-2026-028", region: "Central Asia",    signal: "Livestock mass mortality",      sources: 6,  confidence: 65, level: "MEDIUM",   date: "11/03", type: "Zoonotic",      trend: [8,8,10,9,12,11,14]    },
+  { id: "BT-2026-019", region: "West Africa",     signal: "Haemorrhagic fever signals",   sources: 8,  confidence: 81, level: "HIGH",     date: "07/03", type: "Haemorrhagic",  trend: [30,35,40,38,45,50,48] },
+  { id: "BT-2026-003", region: "Horn of Africa",  signal: "Cholera, elevated fatality rate",sources:11,confidence: 93, level: "CRITICAL", date: "21/02", type: "Enteric",       trend: [60,70,80,75,90,95,100]},
+];
+
+export default function BioThreat() {
+  const [sel, setSel] = useState(null);
+
+  return (
+    <div>
+      <h2 style={{ color: "#00ff9d", marginTop: 0 }}>🦠 Bio-Threat Early Warning</h2>
+      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>Epidemiological signal aggregation. <MockBadge /></p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 12 }}>
+        {[["Alerts", "14"], ["Critical", "1"], ["Regions", "47"], ["Sources", "230+"]].map(([l, v]) => (
+          <Card key={l} style={{ textAlign: "center", padding: 12 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#00ff9d" }}>{v}</div>
+            <div style={{ color: "#9ca3af", fontSize: 11 }}>{l}</div>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <ST icon="🚨" label="Active Signals" color="#ff4d4d" />
+        {alerts.map(a => {
+          const c = a.level === "CRITICAL" ? "#ff0000" : a.level === "HIGH" ? "#ff4d4d" : "#ffd700";
+          return (
+            <div key={a.id} onClick={() => setSel(sel?.id === a.id ? null : a)}
+              style={{ background: sel?.id === a.id ? "#1a2535" : "#0d1626", border: `1px solid ${sel?.id === a.id ? c : "#1f2d45"}`, borderRadius: 7, padding: "10px 12px", marginBottom: 6, cursor: "pointer", borderLeft: `4px solid ${c}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ flex: 1 }}>
+                  <span style={{ color: "#9ca3af", fontSize: 10 }}>{a.id} · {a.date}</span>
+                  <div style={{ fontWeight: 700, color: "#e2e8f0" }}>{a.region}</div>
+                  <div style={{ color: "#9ca3af", fontSize: 12 }}>{a.signal}</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, marginLeft: 10 }}>
+                  <BADGE text={a.level} color={a.level === "CRITICAL" || a.level === "HIGH" ? "red" : "yellow"} />
+                  <Spark data={a.trend} color={c} />
+                  <span style={{ color: "#9ca3af", fontSize: 10 }}>{a.confidence}%</span>
+                </div>
+              </div>
+              {sel?.id === a.id && (
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1f2d45", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  <div><div style={{ color: "#9ca3af", fontSize: 10 }}>TYPE</div><div style={{ color: "#4db8ff" }}>{a.type}</div></div>
+                  <div><div style={{ color: "#9ca3af", fontSize: 10 }}>SOURCES</div><div style={{ color: "#e2e8f0" }}>{a.sources}</div></div>
+                  <div><div style={{ color: "#9ca3af", fontSize: 10 }}>STATUS</div><div style={{ color: "#ffd700" }}>Monitoring</div></div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </Card>
+    </div>
+  );
+}

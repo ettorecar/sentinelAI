@@ -1,0 +1,46 @@
+export const RC = {
+  CRITICAL: "#ff0000",
+  HIGH: "#ff4d4d",
+  MEDIUM: "#ffd700",
+  LOW: "#00ff9d",
+  INFO: "#4db8ff",
+};
+
+export const NAV = [
+  { id: "home",        label: "Home",                    icon: "🏠" },
+  { id: "threatmap",   label: "Threat Map",               icon: "🌍" },
+  { id: "redteam",     label: "Red Team",                 icon: "🤖" },
+  { id: "osint",       label: "OSINT",                    icon: "🔍" },
+  { id: "disinfo",     label: "Disinfo",                  icon: "📰" },
+  { id: "maritime",    label: "Maritime",                 icon: "🌊" },
+  { id: "satellite",   label: "Satellite",                icon: "🛰️" },
+  { id: "patlife",     label: "Pattern of Life",          icon: "📍" },
+  { id: "psyop",       label: "PSYOP",                    icon: "🧠" },
+  { id: "biothreat",   label: "Bio-Threat",               icon: "🦠" },
+  { id: "cti",         label: "Cyber Intel",              icon: "🔐" },
+  { id: "translator",  label: "Translator",               icon: "🌐" },
+  { id: "oilinfra",    label: "Oil Infrastructure",       icon: "🛢️" },
+  { id: "chokepoint",  label: "Chokepoints",              icon: "🚢" },
+  { id: "energyrisk",  label: "Energy Risk",              icon: "📊" },
+  { id: "energygrid",  label: "Energy Grid Simulator",    icon: "⚡" },
+];
+
+export const ENERGY_IDS = ["oilinfra", "chokepoint", "energyrisk", "energygrid"];
+
+export const TOOL_DESC = {
+  threatmap:  "Global real-time threat activity map with geolocation of active incidents.",
+  redteam:    "Generate realistic threat scenarios with AI to stress-test your defences.",
+  osint:      "Correlate open-source intelligence entities across multiple data sources.",
+  disinfo:    "Detect and classify disinformation campaigns using NLP analysis.",
+  maritime:   "Track vessel anomalies and suspicious AIS behaviour in real time.",
+  satellite:  "Plan operations around satellite overflight windows using TLE data.",
+  patlife:    "Reconstruct spatio-temporal behaviour patterns from open-source data.",
+  psyop:      "Identify psychological operation techniques in media and communications.",
+  biothreat:  "Aggregate epidemiological signals to detect potential bio-threat events.",
+  cti:        "Unified cyber threat intelligence feed with actor profiling and IOC tracking.",
+  translator: "Real-time multilingual translation for battlefield communications and intercepts.",
+  oilinfra:   "Monitor threats to critical oil & gas infrastructure worldwide.",
+  chokepoint: "Track strategic maritime chokepoints and their impact on global energy flows.",
+  energyrisk: "Analyze national energy supply chain vulnerabilities and disruption scenarios.",
+  energygrid: "Simulate cascading failures and resilience of national energy grid infrastructure.",
+};
