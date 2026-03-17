@@ -1,5 +1,17 @@
 import { useState } from "react";
-import { BADGE, Card, MockBadge } from "../components/shared";
+import { BADGE, Card, MockBadge, Btn, LiveBadge } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
+
+async function callClaude(apiKey, prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 700, messages: [{ role: "user", content: prompt }] }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(b => b.text || "").join("");
+}
 
 const vessels = [
   { mmsi: "247123456", name: "ADRIATICA SUN", flag: "🇮🇹", anomaly: "AIS blackout 6h",          risk: "HIGH",   type: "Cargo",     mx: 298, my: 112 },
@@ -11,7 +23,20 @@ const vessels = [
 const rc = r => r === "HIGH" ? "#ff4d4d" : r === "MEDIUM" ? "#ffd700" : "#00ff9d";
 
 export default function Maritime() {
+  const [apiKey] = useApiKey();
   const [sel, setSel] = useState(null);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+
+  async function analyzeVessel(v) {
+    setAiResult(null); setAiError(""); setAiLoading(true);
+    try {
+      const text = await callClaude(apiKey, `You are a maritime intelligence analyst. Analyze this AIS anomaly and provide an intelligence assessment in 3-4 sentences covering: likely explanation, risk level, and recommended action. Vessel: ${v.name} (MMSI: ${v.mmsi}, Flag: ${v.flag?.replace(/[\u{1F1E0}-\u{1F1FF}]/gu, "")}, Type: ${v.type}). Anomaly: ${v.anomaly}. Risk: ${v.risk}.`);
+      setAiResult(text);
+    } catch (e) { setAiError("Error: " + e.message); }
+    setAiLoading(false);
+  }
 
   return (
     <div>
@@ -37,11 +62,26 @@ export default function Maritime() {
               <div style={{ fontWeight: 800, color: "#e2e8f0" }}>{sel.flag} {sel.name}</div>
               <BADGE text={sel.risk} color={sel.risk === "HIGH" ? "red" : sel.risk === "MEDIUM" ? "yellow" : "green"} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, marginBottom: 10 }}>
               {[["MMSI", sel.mmsi], ["Type", sel.type], ["Anomaly", sel.anomaly], ["Risk", sel.risk]].map(([l, v]) => (
                 <div key={l}><div style={{ color: "#9ca3af", fontSize: 10 }}>{l}</div><div style={{ color: "#e2e8f0", fontSize: 11 }}>{v}</div></div>
               ))}
             </div>
+            {apiKey && (
+              <Btn onClick={() => analyzeVessel(sel)} disabled={aiLoading} color="#1f2d45">
+                {aiLoading ? "⏳ Analyzing..." : "🤖 AI AIS Analysis"}
+              </Btn>
+            )}
+            {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
+            {aiResult && (
+              <div style={{ background: "#051a0d", borderRadius: 6, padding: 10, marginTop: 10, borderLeft: "3px solid #00ff9d" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 5 }}>
+                  <LiveBadge />
+                  <span style={{ color: "#9ca3af", fontSize: 11 }}>AI VESSEL ASSESSMENT</span>
+                </div>
+                <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.6 }}>{aiResult}</div>
+              </div>
+            )}
           </div>
         )}
       </Card>

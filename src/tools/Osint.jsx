@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BADGE, Card, Input, Btn, ST, LiveBadge } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -34,14 +35,14 @@ const riskBadge = (r) =>
   r === "CRITICAL" || r === "HIGH" ? "red" : r === "MEDIUM" ? "yellow" : "green";
 
 export default function Osint() {
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey] = useApiKey();
   const [query, setQuery] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function run() {
-    if (!apiKey) { setError("Insert your Anthropic API key."); return; }
+    if (!apiKey) { setError("Set the Anthropic API key using the banner above."); return; }
     if (!query) { setError("Enter an entity to correlate."); return; }
     setError(""); setLoading(true); setResult(null);
     try {
@@ -93,7 +94,6 @@ Include 4-6 realistic connections and 3-4 intelligence notes. Make connections p
       </p>
 
       <Card>
-        <Input label="🔑 Anthropic API Key" value={apiKey} onChange={setApiKey} placeholder="sk-ant-..." type="password" />
         <Input label="🔎 Entity" value={query} onChange={setQuery} placeholder="Person name, company, vessel, domain, IP..." />
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
         <Btn onClick={run} disabled={loading}>

@@ -1,5 +1,17 @@
 import { useState } from "react";
-import { BADGE, Card, ST, MockBadge, Spark } from "../components/shared";
+import { BADGE, Card, ST, MockBadge, Spark, Btn, LiveBadge } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
+
+async function callClaude(apiKey, prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 700, messages: [{ role: "user", content: prompt }] }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(b => b.text || "").join("");
+}
 
 const alerts = [
   { id: "BT-2026-031", region: "Eastern Balkans", signal: "Unusual pneumonia cluster",     sources: 4,  confidence: 72, level: "HIGH",     date: "13/03", type: "Respiratory",  trend: [12,15,14,18,22,28,35] },
@@ -9,7 +21,20 @@ const alerts = [
 ];
 
 export default function BioThreat() {
+  const [apiKey] = useApiKey();
   const [sel, setSel] = useState(null);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+
+  async function analyzeAlert(a) {
+    setAiResult(null); setAiError(""); setAiLoading(true);
+    try {
+      const text = await callClaude(apiKey, `You are a biosurveillance intelligence analyst. Assess this epidemiological signal in 3-4 sentences covering: likely pathogen profile, transmission risk, weaponization potential, and recommended health security posture. Signal: ${a.id} — ${a.region}: ${a.signal} (Type: ${a.type}, Confidence: ${a.confidence}%, Level: ${a.level}).`);
+      setAiResult(text);
+    } catch (e) { setAiError("Error: " + e.message); }
+    setAiLoading(false);
+  }
 
   return (
     <div>
@@ -45,16 +70,33 @@ export default function BioThreat() {
                 </div>
               </div>
               {sel?.id === a.id && (
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1f2d45", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  <div><div style={{ color: "#9ca3af", fontSize: 10 }}>TYPE</div><div style={{ color: "#4db8ff" }}>{a.type}</div></div>
-                  <div><div style={{ color: "#9ca3af", fontSize: 10 }}>SOURCES</div><div style={{ color: "#e2e8f0" }}>{a.sources}</div></div>
-                  <div><div style={{ color: "#9ca3af", fontSize: 10 }}>STATUS</div><div style={{ color: "#ffd700" }}>Monitoring</div></div>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1f2d45" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+                    <div><div style={{ color: "#9ca3af", fontSize: 10 }}>TYPE</div><div style={{ color: "#4db8ff" }}>{a.type}</div></div>
+                    <div><div style={{ color: "#9ca3af", fontSize: 10 }}>SOURCES</div><div style={{ color: "#e2e8f0" }}>{a.sources}</div></div>
+                    <div><div style={{ color: "#9ca3af", fontSize: 10 }}>STATUS</div><div style={{ color: "#ffd700" }}>Monitoring</div></div>
+                  </div>
+                  {apiKey && (
+                    <Btn onClick={() => analyzeAlert(a)} disabled={aiLoading} color="#1f2d45">
+                      {aiLoading ? "⏳ Analyzing..." : "🤖 AI Bio Assessment"}
+                    </Btn>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
       </Card>
+      {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginBottom: 10 }}>{aiError}</div>}
+      {aiResult && (
+        <Card style={{ borderColor: "#00ff9d" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
+            <LiveBadge />
+            <span style={{ color: "#9ca3af", fontSize: 11 }}>AI BIOSURVEILLANCE ASSESSMENT</span>
+          </div>
+          <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7 }}>{aiResult}</div>
+        </Card>
+      )}
     </div>
   );
 }

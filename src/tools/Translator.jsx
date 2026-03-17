@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BADGE, Card, Input, Btn, ST, MockBadge, LiveBadge } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
 
 const LANGUAGES = [
   { code: "ar", label: "Arabic",   flag: "🇸🇦", region: "MENA"       },
@@ -27,20 +28,19 @@ const MOCK_TRANSLATIONS = {
 };
 
 export default function Translator() {
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey] = useApiKey();
   const [text, setText] = useState("");
   const [sourceLang, setSourceLang] = useState("ru");
   const [context, setContext] = useState("Military / Battlefield");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [useAI, setUseAI] = useState(false);
 
   async function translate() {
     if (!text) { setError("Enter text to translate."); return; }
     setError(""); setLoading(true); setResult(null);
 
-    if (useAI && apiKey) {
+    if (apiKey) {
       try {
         const lang = LANGUAGES.find(l => l.code === sourceLang);
         const prompt = `You are a military intelligence translator. Translate the following ${lang.label} text to English, then provide a brief intelligence analysis.
@@ -80,7 +80,7 @@ Return ONLY JSON (no markdown): {
       <h2 style={{ color: "#00ff9d", marginTop: 0 }}>🌐 Multilingual Battlefield Comms Translator</h2>
       <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 16 }}>
         Real-time translation and analysis of intercepted military communications.{" "}
-        {useAI && apiKey ? <LiveBadge /> : <MockBadge />}
+        {apiKey ? <LiveBadge /> : <MockBadge />}
       </p>
 
       <Card>
@@ -105,19 +105,11 @@ Return ONLY JSON (no markdown): {
         <Input label="📡 Intercepted Text / Audio Transcript" value={text} onChange={setText}
           placeholder="Paste intercepted communication, radio transcript, or document..." rows={4} />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-            <input type="checkbox" checked={useAI} onChange={e => setUseAI(e.target.checked)}
-              style={{ accentColor: "#00ff9d" }} />
-            <span style={{ color: "#9ca3af", fontSize: 13 }}>Use AI (Claude API)</span>
-          </label>
-          {useAI && (
-            <div style={{ flex: 1 }}>
-              <Input label="" value={apiKey} onChange={setApiKey} placeholder="sk-ant-... (Anthropic API Key)" type="password" />
-            </div>
-          )}
-        </div>
-
+        {!apiKey && (
+          <div style={{ color: "#ff9d00", fontSize: 13, marginBottom: 12 }}>
+            ⚠ Set API key in the banner above to enable AI translation. Currently using mock data.
+          </div>
+        )}
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
         <Btn onClick={translate} disabled={loading || !text}>{loading ? "⏳ Translating..." : "🌐 Translate & Analyze"}</Btn>
       </Card>
@@ -134,7 +126,7 @@ Return ONLY JSON (no markdown): {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                {result.live ? <LiveBadge /> : <MockBadge />}
+                {result.live ? <LiveBadge /> : <><MockBadge /> <span style={{ color: "#9ca3af", fontSize: 11 }}>Set API key to use AI</span></>}
                 <BADGE text={`${result.confidence}% conf.`} color="blue" />
               </div>
             </div>

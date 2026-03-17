@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BADGE, Card, ST, Btn, Input, MockBadge, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
 
 const countries = ["Germany", "Italy", "France", "Poland", "Japan", "South Korea", "India", "Turkey"];
 
@@ -63,7 +64,7 @@ async function callClaude(apiKey, prompt) {
 }
 
 export default function EnergyRisk() {
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey] = useApiKey();
   const [country, setCountry] = useState("Germany");
   const [ran, setRan] = useState(false);
   const [aiAssessment, setAiAssessment] = useState(null);
@@ -98,7 +99,6 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
       </p>
 
       <Card>
-        <Input label="🔑 Anthropic API Key (optional — for AI assessment)" value={apiKey} onChange={(v) => { setApiKey(v); setRan(false); }} placeholder="sk-ant-..." type="password" />
         <ST icon="🌍" label="Select Country" color="#4db8ff" />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {countries.map(c => (

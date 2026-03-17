@@ -1,5 +1,17 @@
 import { useState } from "react";
-import { BADGE, Card, Btn, ST, MockBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, Btn, ST, MockBadge, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
+
+async function callClaude(apiKey, prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 800, messages: [{ role: "user", content: prompt }] }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(b => b.text || "").join("");
+}
 
 const COUNTRIES = ["Germany", "France", "Italy", "Poland", "Ukraine", "UK"];
 
@@ -127,13 +139,27 @@ const GRID_DATA = {
 };
 
 export default function EnergyGrid() {
+  const [apiKey] = useApiKey();
   const [country, setCountry] = useState("Germany");
   const [ran, setRan] = useState(false);
   const [simScenario, setSimScenario] = useState(null);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   const d = GRID_DATA[country];
 
   function runSimulation(scenario) {
     setSimScenario(scenario);
+    setAiResult(null);
+  }
+
+  async function analyzeCascade(scenario) {
+    setAiResult(null); setAiError(""); setAiLoading(true);
+    try {
+      const text = await callClaude(apiKey, `You are a critical infrastructure analyst. Analyze this grid cascade failure scenario in 3-4 sentences covering: cascading effect chain, economic and social impact, recovery challenges, and resilience recommendations. Country: ${country}. Scenario trigger: ${scenario.trigger}. Affected zones: ${scenario.affected.join(", ")}. Estimated blackout: ${scenario.blackout_pct}% of population. Recovery: ${scenario.recovery}.`);
+      setAiResult(text);
+    } catch (e) { setAiError("Error: " + e.message); }
+    setAiLoading(false);
   }
 
   const mixColors = { renewables: "#00ff9d", fossil: "#ff9d00", nuclear: "#b47fff", import: "#4db8ff" };
@@ -277,9 +303,26 @@ export default function EnergyGrid() {
                   </div>
                 </div>
                 <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>IMPACTED ZONES:</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
                   {simScenario.affected.map((z, i) => <BADGE key={i} text={z} color="red" />)}
                 </div>
+                {apiKey && (
+                  <div style={{ marginBottom: 14 }}>
+                    <Btn onClick={() => analyzeCascade(simScenario)} disabled={aiLoading} color="#1f2d45">
+                      {aiLoading ? "⏳ Analyzing..." : "🤖 AI Cascade Analysis"}
+                    </Btn>
+                    {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
+                    {aiResult && (
+                      <div style={{ background: "#0d1626", borderRadius: 6, padding: 12, marginTop: 10, borderLeft: "3px solid #ff9d00" }}>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                          <LiveBadge />
+                          <span style={{ color: "#9ca3af", fontSize: 11 }}>AI CASCADE ANALYSIS</span>
+                        </div>
+                        <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.6 }}>{aiResult}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {/* Recovery progress bar */}
                 <div style={{ marginTop: 14 }}>
                   <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>GRID STABILITY INDEX (post-event)</div>

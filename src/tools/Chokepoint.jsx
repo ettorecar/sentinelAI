@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
-import { BADGE, Card, ST, MockBadge, Spark, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, ST, MockBadge, Spark, Btn, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
+
+async function callClaude(apiKey, prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 750, messages: [{ role: "user", content: prompt }] }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(b => b.text || "").join("");
+}
 
 const chokepoints = [
   { id: "CP-01", name: "Strait of Hormuz",    location: "Persian Gulf",          mx: 455, my: 188, risk: "CRITICAL", flow: "21Mb/d", pct: "21%", tension: "Extreme",  threats: ["Iranian naval exercises", "Mine laying reports", "Drone harassment of tankers"],        altRoute: "None — no viable alternative",                        history: [18, 19, 20, 21, 20, 19, 21] },
@@ -11,9 +23,22 @@ const chokepoints = [
 ];
 
 export default function Chokepoint() {
+  const [apiKey] = useApiKey();
   const [sel, setSel] = useState(null);
   const [tick, setTick] = useState(0);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 1800); return () => clearInterval(t); }, []);
+
+  async function analyzeChokepoint(cp) {
+    setAiResult(null); setAiError(""); setAiLoading(true);
+    try {
+      const text = await callClaude(apiKey, `You are a geopolitical energy analyst. Analyze this strategic chokepoint in 3-4 sentences covering: current geopolitical situation, threat actors and their intent, economic impact of a closure, and recommended diplomatic/military posture. Chokepoint: ${cp.name} (${cp.location}, Flow: ${cp.flow} = ${cp.pct} of global trade, Tension: ${cp.tension}). Active threats: ${cp.threats.join("; ")}.`);
+      setAiResult(text);
+    } catch (e) { setAiError("Error: " + e.message); }
+    setAiLoading(false);
+  }
 
   return (
     <div>
@@ -88,7 +113,7 @@ export default function Chokepoint() {
               <Spark data={sel.history} color={riskColor(sel.risk)} />
             </div>
           </div>
-          <div style={{ background: "#0d1626", borderRadius: 6, padding: 10 }}>
+          <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, marginBottom: 12 }}>
             <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>TENSION LEVEL</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ flex: 1, background: "#1f2d45", borderRadius: 4, height: 10 }}>
@@ -97,6 +122,21 @@ export default function Chokepoint() {
               <span style={{ color: riskColor(sel.risk), fontWeight: 700, fontSize: 14 }}>{sel.tension}</span>
             </div>
           </div>
+          {apiKey && (
+            <Btn onClick={() => analyzeChokepoint(sel)} disabled={aiLoading} color="#1f2d45">
+              {aiLoading ? "⏳ Analyzing..." : "🤖 AI Geopolitical Analysis"}
+            </Btn>
+          )}
+          {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
+          {aiResult && (
+            <div style={{ background: "#0d1626", borderRadius: 6, padding: 12, marginTop: 10, borderLeft: "3px solid #ff9d00" }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                <LiveBadge />
+                <span style={{ color: "#9ca3af", fontSize: 11 }}>AI CHOKEPOINT ANALYSIS</span>
+              </div>
+              <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{aiResult}</div>
+            </div>
+          )}
         </Card>
       )}
 

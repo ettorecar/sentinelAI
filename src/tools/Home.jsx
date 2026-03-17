@@ -3,13 +3,13 @@ import { BADGE, Card, Btn, ST, Pulse } from "../components/shared";
 import { NAV, TOOL_DESC, ENERGY_IDS } from "../constants";
 
 const feed = [
-  { time: "14:32", type: "CTI",        msg: "New IOC cluster linked to EMBER WOLF",               level: "HIGH"     },
-  { time: "14:18", type: "Oil Infra",  msg: "Drone threat detected — Abqaiq perimeter",            level: "CRITICAL" },
-  { time: "13:55", type: "Chokepoint", msg: "Hormuz: new mine-laying report, strait traffic -18%", level: "CRITICAL" },
-  { time: "13:41", type: "PSYOP",      msg: "Coordinated narrative surge — Telegram",              level: "MEDIUM"   },
-  { time: "12:59", type: "Maritime",   msg: "ADRIATICA SUN AIS blackout extended >8h",             level: "HIGH"     },
-  { time: "12:30", type: "Disinfo",    msg: "Campaign #UA-2023-11 reactivated",                    level: "MEDIUM"   },
-  { time: "11:44", type: "Energy",     msg: "Germany resilience score drops to 58/100",            level: "MEDIUM"   },
+  { time: "14:32", type: "CTI",        msg: "New IOC cluster linked to EMBER WOLF",               level: "HIGH",     page: "cti"        },
+  { time: "14:18", type: "Oil Infra",  msg: "Drone threat detected — Abqaiq perimeter",            level: "CRITICAL", page: "oilinfra"   },
+  { time: "13:55", type: "Chokepoint", msg: "Hormuz: new mine-laying report, strait traffic -18%", level: "CRITICAL", page: "chokepoint" },
+  { time: "13:41", type: "PSYOP",      msg: "Coordinated narrative surge — Telegram",              level: "MEDIUM",   page: "psyop"      },
+  { time: "12:59", type: "Maritime",   msg: "ADRIATICA SUN AIS blackout extended >8h",             level: "HIGH",     page: "maritime"   },
+  { time: "12:30", type: "Disinfo",    msg: "Campaign #UA-2023-11 reactivated",                    level: "MEDIUM",   page: "disinfo"    },
+  { time: "11:44", type: "Energy",     msg: "Germany resilience score drops to 58/100",            level: "MEDIUM",   page: "energyrisk" },
 ];
 
 export default function Home({ setPage }) {
@@ -18,6 +18,7 @@ export default function Home({ setPage }) {
 
   const tools = NAV.slice(1);
   const isEnergy = id => ENERGY_IDS.includes(id);
+  const isReport = id => id === "intelreport";
 
   return (
     <div>
@@ -29,9 +30,9 @@ export default function Home({ setPage }) {
           <BADGE text="AI Powered" color="green" />
           <BADGE text="OSINT" color="blue" />
           <BADGE text="Dual-Use" color="yellow" />
-          <BADGE text="15 Tools" color="orange" />
+          <BADGE text="17 Tools" color="orange" />
           <BADGE text="Energy Module" color="#ff9d00" />
-          <BADGE text="MVP v0.6" color="gray" />
+          <BADGE text="v0.7" color="gray" />
         </div>
       </div>
 
@@ -57,7 +58,7 @@ export default function Home({ setPage }) {
         <Card style={{ marginBottom: 0 }}>
           <ST icon="📡" label="Live Intelligence Feed" color="#00ff9d" />
           {feed.map((f, i) => (
-            <div key={i} style={{ display: "flex", gap: 7, alignItems: "flex-start", marginBottom: 6, opacity: tick % 2 === 0 && i === 0 ? 0.5 : 1, transition: "opacity 1s" }}>
+            <div key={i} onClick={() => setPage(f.page)} style={{ display: "flex", gap: 7, alignItems: "flex-start", marginBottom: 6, opacity: tick % 2 === 0 && i === 0 ? 0.5 : 1, transition: "opacity 1s", cursor: "pointer" }}>
               {i === 0 && <Pulse color="#ff4d4d" size={7} />}
               <span style={{ color: "#9ca3af", fontSize: 11, minWidth: 34 }}>{f.time}</span>
               <span style={{ background: "#1f2d45", color: f.type === "Oil Infra" || f.type === "Chokepoint" || f.type === "Energy" ? "#ff9d00" : "#4db8ff", fontSize: 9, fontWeight: 700, borderRadius: 3, padding: "1px 4px", minWidth: 48, textAlign: "center" }}>{f.type}</span>
@@ -120,9 +121,20 @@ export default function Home({ setPage }) {
         </div>
       </div>
 
+      {/* Intel Report highlight */}
+      <div style={{ background: "linear-gradient(135deg,#0d0a1e,#111827)", border: "1px solid #b47fff44", borderRadius: 10, padding: 16, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 20 }}>📋</span>
+          <span style={{ fontWeight: 800, color: "#b47fff", fontSize: 15 }}>Intelligence Report Generator</span>
+          <BADGE text="New" color="#b47fff" />
+        </div>
+        <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 10 }}>Generate structured multi-domain intelligence briefs — executive summary, key findings, threat actors, recommended actions.</div>
+        <Btn onClick={() => setPage("intelreport")} color="#b47fff">📋 Open Report Generator →</Btn>
+      </div>
+
       {/* Core tools grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 9 }}>
-        {tools.filter(t => !isEnergy(t.id)).map(t => (
+        {tools.filter(t => !isEnergy(t.id) && !isReport(t.id)).map(t => (
           <Card key={t.id} style={{ cursor: "pointer", position: "relative", padding: 13 }}>
             <div style={{ fontSize: 22, marginBottom: 5 }}>{t.icon}</div>
             <div style={{ fontWeight: 700, color: "#e2e8f0", marginBottom: 3, fontSize: 13 }}>{t.label}</div>
