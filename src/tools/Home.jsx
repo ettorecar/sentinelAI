@@ -54,7 +54,7 @@ export default function Home({ setPage }) {
       </div>
 
       {/* Feed + gauge */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginBottom: 12 }}>
         <Card style={{ marginBottom: 0 }}>
           <ST icon="📡" label="Live Intelligence Feed" color="#00ff9d" />
           {feed.map((f, i) => (
