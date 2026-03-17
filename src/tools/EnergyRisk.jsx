@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, ST, Btn, MockBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, ST, Btn, Input, MockBadge, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
 
 const countries = ["Germany", "Italy", "France", "Poland", "Japan", "South Korea", "India", "Turkey"];
 
@@ -36,26 +36,81 @@ function DonutChart({ suppliers, import_dep }) {
   );
 }
 
+async function callClaude(apiKey, prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1200,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return JSON.parse(
+    data.content
+      .map((b) => b.text || "")
+      .join("")
+      .replace(/```json|```/g, "")
+      .trim()
+  );
+}
+
 export default function EnergyRisk() {
+  const [apiKey, setApiKey] = useState("");
   const [country, setCountry] = useState("Germany");
   const [ran, setRan] = useState(false);
+  const [aiAssessment, setAiAssessment] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const p = profiles[country];
+
+  async function analyze() {
+    setRan(true);
+    setAiAssessment(null);
+    setError("");
+    if (!apiKey) return; // show static data only without API key
+    setLoading(true);
+    try {
+      const prof = profiles[country];
+      const prompt = `You are a senior energy security analyst. Provide a current intelligence assessment for ${country}'s energy supply chain risk. Context: import dependency ${prof.import_dep}%, vulnerability rated ${prof.vulnerability}, ${prof.storage_days} days strategic reserves, resilience score ${prof.resilience_score}/100, exposed to chokepoints: ${prof.chokepoint_exposure.join(", ")}. Top suppliers: ${prof.top_suppliers.map(s => `${s.name} ${s.pct}% (${s.risk} risk)`).join(", ")}. Return ONLY a JSON object (no markdown, no backticks):
+{"geopolitical_context":"string (2-3 sentences on current geopolitical situation affecting energy security)","immediate_threats":["string"],"long_term_risks":["string"],"recommended_actions":["string"],"trend":"IMPROVING|STABLE|DETERIORATING","analyst_note":"string (1-2 sentence expert opinion)"}
+Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
+      setAiAssessment(await callClaude(apiKey, prompt));
+    } catch (e) { setError("AI assessment error: " + e.message); }
+    setLoading(false);
+  }
+
+  const trendColor = (t) => t === "IMPROVING" ? "#00ff9d" : t === "DETERIORATING" ? "#ff4d4d" : "#ffd700";
 
   return (
     <div>
       <h2 style={{ color: "#ff9d00", marginTop: 0 }}>📊 Energy Supply Chain Risk Analyzer</h2>
-      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 16 }}>National energy dependency analysis and disruption scenario modeling. <MockBadge /></p>
+      <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 16 }}>
+        National energy dependency analysis and disruption scenario modeling.{" "}
+        {apiKey ? <LiveBadge /> : <MockBadge />}
+      </p>
 
       <Card>
+        <Input label="🔑 Anthropic API Key (optional — for AI assessment)" value={apiKey} onChange={(v) => { setApiKey(v); setRan(false); }} placeholder="sk-ant-..." type="password" />
         <ST icon="🌍" label="Select Country" color="#4db8ff" />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {countries.map(c => (
-            <button key={c} onClick={() => { setCountry(c); setRan(false); }}
+            <button key={c} onClick={() => { setCountry(c); setRan(false); setAiAssessment(null); }}
               style={{ background: country === c ? "#ff9d00" : "#1f2d45", color: country === c ? "#0a0f1e" : "#9ca3af", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: country === c ? 700 : 400 }}>{c}</button>
           ))}
         </div>
+        {error && <div style={{ color: "#ff4d4d", marginTop: 10, fontSize: 13 }}>{error}</div>}
         <div style={{ marginTop: 14 }}>
-          <Btn onClick={() => setRan(true)} color="#ff9d00">⚡ Analyze Risk Profile</Btn>
+          <Btn onClick={analyze} disabled={loading} color="#ff9d00">
+            {loading ? "⏳ Analyzing..." : "⚡ Analyze Risk Profile"}
+          </Btn>
         </div>
       </Card>
 
@@ -138,6 +193,55 @@ export default function EnergyRisk() {
               </div>
             ))}
           </Card>
+
+          {/* AI Intelligence Assessment — shown only when API key provided */}
+          {loading && (
+            <Card style={{ borderColor: "#ff9d00", textAlign: "center", color: "#9ca3af" }}>
+              ⏳ Generating AI intelligence assessment…
+            </Card>
+          )}
+
+          {aiAssessment && (
+            <Card style={{ borderColor: "#ff9d00" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <ST icon="🤖" label="AI Intelligence Assessment" color="#ff9d00" />
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: "#9ca3af", fontSize: 11 }}>TREND</span>
+                  <BADGE text={aiAssessment.trend} color={aiAssessment.trend === "IMPROVING" ? "green" : aiAssessment.trend === "DETERIORATING" ? "red" : "yellow"} />
+                </div>
+              </div>
+              <div style={{ background: "#0d1626", borderRadius: 6, padding: 12, marginBottom: 12 }}>
+                <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>GEOPOLITICAL CONTEXT</div>
+                <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{aiAssessment.geopolitical_context}</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                <div>
+                  <div style={{ color: "#ff4d4d", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>⚡ Immediate Threats</div>
+                  {aiAssessment.immediate_threats?.map((t, i) => (
+                    <div key={i} style={{ color: "#e2e8f0", fontSize: 12, marginBottom: 5 }}>• {t}</div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ color: "#ffd700", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🔭 Long-term Risks</div>
+                  {aiAssessment.long_term_risks?.map((r, i) => (
+                    <div key={i} style={{ color: "#e2e8f0", fontSize: 12, marginBottom: 5 }}>• {r}</div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ color: "#00ff9d", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🛡️ Recommended Actions</div>
+                {aiAssessment.recommended_actions?.map((a, i) => (
+                  <div key={i} style={{ color: "#e2e8f0", fontSize: 12, marginBottom: 5 }}>• {a}</div>
+                ))}
+              </div>
+              {aiAssessment.analyst_note && (
+                <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, borderLeft: `3px solid ${trendColor(aiAssessment.trend)}` }}>
+                  <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 3 }}>ANALYST NOTE</div>
+                  <div style={{ color: "#e2e8f0", fontSize: 13, fontStyle: "italic" }}>{aiAssessment.analyst_note}</div>
+                </div>
+              )}
+            </Card>
+          )}
         </>
       )}
     </div>
