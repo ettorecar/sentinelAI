@@ -3,15 +3,15 @@
 
 Agent‑based development roadmap.
 
-> **Stato aggiornato: Marzo 2026 — v0.7**
+> **Stato aggiornato: Marzo 2026 — v0.8**
 > La piattaforma ha completato le fasi frontend. Il prossimo step è la Fase 1 backend (Node.js + Vercel Functions).
 > Stack backend scelto: **Node.js + Vercel Functions** (non Python FastAPI).
 
 ---
 
-# ✅ FASE 0 — Frontend completo (COMPLETATA v0.7)
+# ✅ FASE 0 — Frontend completo (COMPLETATA v0.8)
 
-Tool implementati (17):
+Tool implementati (18):
 - [x] Home dashboard con live feed cliccabile
 - [x] Threat Map + AI on-demand per hotspot
 - [x] Red Team Scenario Generator (AI live)
@@ -29,6 +29,7 @@ Tool implementati (17):
 - [x] Energy Supply Chain Risk (AI live)
 - [x] Energy Grid Resilience Simulator + AI cascade on-demand
 - [x] **Intelligence Report Generator** (AI live — multi-domain brief + print export)
+- [x] **Scenario Builder** (AI live — wizard 3 step: setup, domain events, cascade/escalation analysis)
 
 Infrastruttura AI frontend:
 - [x] Global API Key — React Context (in-memory, no localStorage)
@@ -38,7 +39,6 @@ Infrastruttura AI frontend:
 
 Da fare (frontend — bassa priorità, pre-backend):
 - [ ] AI Copilot — chat globale trasversale (stand-by)
-- [ ] Scenario Builder — tool nuovo multi-dominio
 - [ ] Splash/login screen per aspetto prodotto
 
 ---
@@ -124,7 +124,7 @@ Reports:
 Tasks:
 - narrative analysis
 - predictive models
-- [ ] scenario simulations (Scenario Builder tool — pianificato)
+- [x] scenario simulations (Scenario Builder tool — completato v0.8)
 
 ---
 
