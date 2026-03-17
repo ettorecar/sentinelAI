@@ -15,6 +15,55 @@ const profiles = {
   Turkey:       { import_dep: 99, vulnerability: "CRITICAL",  storage_days: 28, alt_score: 38, resilience_score: 35, chokepoint_exposure: ["Turkish Straits", "Strait of Hormuz (LNG)"],                                  top_suppliers: [{ name: "Russia", pct: 33, risk: "CRITICAL" }, { name: "Azerbaijan", pct: 20, risk: "MEDIUM" }, { name: "Iran", pct: 10, risk: "HIGH" }, { name: "Algeria", pct: 8, risk: "MEDIUM" }, { name: "Others", pct: 29, risk: "LOW" }],       scenarios: [{ name: "Russian gas cutoff", impact: "CRITICAL", gdp_loss: "3.5%", duration: "indefinite" }, { name: "Bosphorus closure", impact: "CRITICAL", gdp_loss: "2.8%", duration: "indefinite" }] },
 };
 
+function ScenarioRow({ s }) {
+  const [hovered, setHovered] = useState(false);
+  const color = s.impact === "CRITICAL" ? "#ff0000" : s.impact === "HIGH" ? "#ff4d4d" : "#ffd700";
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? "#0f1a2e" : "#0d1626",
+        borderRadius: 7, padding: "11px 14px", marginBottom: 8,
+        borderLeft: `3px solid ${color}`,
+        border: `1px solid ${hovered ? "#2a3f5f" : "#1f2d45"}`,
+        borderLeft: `3px solid ${color}`,
+        transition: "background 0.15s, border-color 0.15s",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <div style={{ fontWeight: 700, color: hovered ? "#ffffff" : "#e2e8f0" }}>{s.name}</div>
+        <BADGE text={s.impact} color={s.impact === "CRITICAL" || s.impact === "HIGH" ? "red" : "yellow"} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div><span style={{ color: "#4a5568", fontSize: 11 }}>EST. GDP IMPACT </span><span style={{ color: "#ff4d4d", fontWeight: 700 }}>{s.gdp_loss}</span></div>
+        <div><span style={{ color: "#4a5568", fontSize: 11 }}>DURATION </span><span style={{ color: "#ffd700" }}>{s.duration}</span></div>
+      </div>
+    </div>
+  );
+}
+
+function CountryBtn({ label, active, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: active ? "#ff9d00" : hovered ? "#ff9d0022" : "#1f2d45",
+        color: active ? "#0a0f1e" : hovered ? "#ff9d00" : "#9ca3af",
+        border: `1px solid ${active ? "#ff9d00" : hovered ? "#ff9d0044" : "transparent"}`,
+        borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 13,
+        fontWeight: active ? 700 : 400,
+        transition: "background 0.15s, color 0.15s, border-color 0.15s",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 function DonutChart({ suppliers, import_dep }) {
   let angle = -90;
   const r = 42, cx = 60, cy = 60;
@@ -96,10 +145,9 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
 
       <Card>
         <ST icon="🌍" label="Select Country" color="#4db8ff" />
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
           {countries.map(c => (
-            <button key={c} onClick={() => { setCountry(c); setRan(false); setAiAssessment(null); }}
-              style={{ background: country === c ? "#ff9d00" : "#1f2d45", color: country === c ? "#0a0f1e" : "#9ca3af", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: country === c ? 700 : 400 }}>{c}</button>
+            <CountryBtn key={c} label={c} active={country === c} onClick={() => { setCountry(c); setRan(false); setAiAssessment(null); }} />
           ))}
         </div>
         {error && <div style={{ color: "#ff4d4d", marginTop: 10, fontSize: 13 }}>{error}</div>}
@@ -175,18 +223,9 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
           </div>
 
           <Card>
-            <ST icon="💥" label="Disruption Scenarios" color="#ff4d4d" />
+            <ST icon="💥" label="Disruption Scenarios" color="#ff4d4d" sub="Click to explore scenario details" />
             {p.scenarios.map((s, i) => (
-              <div key={i} style={{ background: "#0d1626", borderRadius: 7, padding: "11px 14px", marginBottom: 8, borderLeft: `3px solid ${riskColor(s.impact)}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <div style={{ fontWeight: 700, color: "#e2e8f0" }}>{s.name}</div>
-                  <BADGE text={s.impact} color={s.impact === "CRITICAL" || s.impact === "HIGH" ? "red" : "yellow"} />
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <div><span style={{ color: "#9ca3af", fontSize: 11 }}>EST. GDP IMPACT </span><span style={{ color: "#ff4d4d", fontWeight: 700 }}>{s.gdp_loss}</span></div>
-                  <div><span style={{ color: "#9ca3af", fontSize: 11 }}>DURATION </span><span style={{ color: "#ffd700" }}>{s.duration}</span></div>
-                </div>
-              </div>
+              <ScenarioRow key={i} s={s} />
             ))}
           </Card>
 

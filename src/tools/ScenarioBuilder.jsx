@@ -110,16 +110,33 @@ function SelectBtn({ options, value, onChange, colorFn }) {
         const id = typeof o === "string" ? o : o.id;
         const label = typeof o === "string" ? o : `${o.icon || ""} ${o.label}`;
         const active = value === id;
+        const accent = colorFn ? colorFn(id) : ACCENT;
         return (
-          <button key={id} onClick={() => onChange(id)} style={{
-            background: active ? (colorFn ? colorFn(id) : ACCENT) : "#1f2d45",
-            color: active ? "#0a0f1e" : "#9ca3af",
-            border: "none", borderRadius: 6, padding: "6px 12px",
-            cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 400, whiteSpace: "nowrap",
-          }}>{label}</button>
+          <SelectOption key={id} id={id} label={label} active={active} accent={accent} onChange={onChange} />
         );
       })}
     </div>
+  );
+}
+
+function SelectOption({ id, label, active, accent, onChange }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={() => onChange(id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: active ? accent : hovered ? accent + "22" : "#1f2d45",
+        color: active ? "#0a0f1e" : hovered ? accent : "#9ca3af",
+        border: `1px solid ${active ? accent : hovered ? accent + "44" : "transparent"}`,
+        borderRadius: 6, padding: "6px 12px",
+        cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 400, whiteSpace: "nowrap",
+        transition: "background 0.15s, color 0.15s, border-color 0.15s",
+      }}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -481,7 +498,7 @@ Return ONLY this JSON structure:
 
                 <div style={{ display: "flex", gap: 8 }}>
                   <Btn onClick={confirmAddEvent} disabled={!newEvent.title.trim()} color={ACCENT}>Add Event</Btn>
-                  <Btn onClick={() => setShowAddEvent(false)} color="#1f2d45">Cancel</Btn>
+                  <Btn onClick={() => setShowAddEvent(false)} color="#4a5568" size="sm">Cancel</Btn>
                 </div>
               </div>
             )}
@@ -539,7 +556,7 @@ Return ONLY this JSON structure:
           )}
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Btn onClick={() => setStep(1)} color="#1f2d45">← Back</Btn>
+            <Btn onClick={() => setStep(1)} color="#4a5568" size="sm">← Back</Btn>
             <Btn onClick={() => setStep(3)} disabled={!canAnalyze} color={ACCENT}>Analyze Scenario →</Btn>
           </div>
         </>
@@ -583,7 +600,7 @@ Return ONLY this JSON structure:
                 <Btn onClick={runAnalysis} disabled={loading || !apiKey} color={ACCENT}>
                   {loading ? "⏳ Analyzing Scenario..." : "🧠 Run AI Analysis"}
                 </Btn>
-                <Btn onClick={() => setStep(2)} color="#1f2d45">← Back to Events</Btn>
+                <Btn onClick={() => setStep(2)} color="#4a5568" size="sm">← Back to Events</Btn>
               </div>
             </Card>
           )}
@@ -750,9 +767,9 @@ Return ONLY this JSON structure:
               </Card>
 
               <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
-                <Btn onClick={() => window.print()} color="#1f2d45">🖨 Export / Print</Btn>
-                <Btn onClick={() => { setAnalysis(null); setStep(2); }} color="#1f2d45">🔄 Modify Scenario</Btn>
-                <Btn onClick={() => { setAnalysis(null); setTitle(""); setRegion("Middle East"); setCrisisType("conflict"); setTimeframe("T+7d"); setActors([{ name: "", type: "Nation-State", capability: "HIGH", intent: "" }]); setEvents([]); setStep(1); }} color="#1f2d45">🆕 New Scenario</Btn>
+                <Btn onClick={() => window.print()} color="#4a5568" size="sm">🖨 Export / Print</Btn>
+                <Btn onClick={() => { setAnalysis(null); setStep(2); }} color="#4a5568" size="sm">🔄 Modify Scenario</Btn>
+                <Btn onClick={() => { setAnalysis(null); setTitle(""); setRegion("Middle East"); setCrisisType("conflict"); setTimeframe("T+7d"); setActors([{ name: "", type: "Nation-State", capability: "HIGH", intent: "" }]); setEvents([]); setStep(1); }} color="#4a5568" size="sm">🆕 New Scenario</Btn>
               </div>
             </>
           )}

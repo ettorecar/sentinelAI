@@ -3,19 +3,18 @@ import { BADGE, Card, Input, Btn, ST, PageHeader, MockBadge, LiveBadge } from ".
 import { useApiKey } from "../context/ApiKeyContext";
 
 const LANGUAGES = [
-  { code: "ar", label: "Arabic",   flag: "🇸🇦", region: "MENA"       },
-  { code: "ru", label: "Russian",  flag: "🇷🇺", region: "Eastern Europe" },
-  { code: "zh", label: "Mandarin", flag: "🇨🇳", region: "Asia"       },
-  { code: "fa", label: "Farsi",    flag: "🇮🇷", region: "MENA"       },
-  { code: "uk", label: "Ukrainian",flag: "🇺🇦", region: "Eastern Europe" },
-  { code: "ko", label: "Korean",   flag: "🇰🇷", region: "Asia"       },
-  { code: "tr", label: "Turkish",  flag: "🇹🇷", region: "MENA/Europe" },
-  { code: "fr", label: "French",   flag: "🇫🇷", region: "Europe/Africa" },
+  { code: "ar", label: "Arabic",    flag: "🇸🇦", region: "MENA"           },
+  { code: "ru", label: "Russian",   flag: "🇷🇺", region: "Eastern Europe" },
+  { code: "zh", label: "Mandarin",  flag: "🇨🇳", region: "Asia"           },
+  { code: "fa", label: "Farsi",     flag: "🇮🇷", region: "MENA"           },
+  { code: "uk", label: "Ukrainian", flag: "🇺🇦", region: "Eastern Europe" },
+  { code: "ko", label: "Korean",    flag: "🇰🇷", region: "Asia"           },
+  { code: "tr", label: "Turkish",   flag: "🇹🇷", region: "MENA/Europe"   },
+  { code: "fr", label: "French",    flag: "🇫🇷", region: "Europe/Africa" },
 ];
 
 const CONTEXTS = ["Military / Battlefield", "Intelligence / Intercept", "Diplomatic", "Propaganda / PSYOP", "General"];
 
-// Mock translations for demo (no API key needed for mock mode)
 const MOCK_TRANSLATIONS = {
   ar: { translation: "وحدات العدو تتقدم من الجهة الشمالية. نطلب دعماً جوياً فورياً في الإحداثيات 44.2 شمالاً، 28.7 شرقاً.", analysis: "Military tactical communication. Contains: unit movement direction (north), support request (air), coordinates. Urgency: HIGH.", intent: "Coordination", confidence: 94 },
   ru: { translation: "Противник использует шифрование на частоте 158.4. Группа Альфа — отступить на позицию Б.", analysis: "Tactical intercept. Contains: enemy radio frequency, unit designation (Alpha), movement order (fall back). Urgency: HIGH.", intent: "Tactical Order", confidence: 91 },
@@ -26,6 +25,48 @@ const MOCK_TRANSLATIONS = {
   tr: { translation: "Konvoy Güneydoğu güzergahına yönlendiriliyor. Yakıt ikmali noktası değiştirildi. Koordinatlar şifreli kanaldan gönderildi.", analysis: "Logistics communication. Contains: unit type (convoy), new route (southeast), logistic change (fuel point), security protocol (encrypted channel). Urgency: LOW.", intent: "Logistics Order", confidence: 82 },
   fr: { translation: "Opération Mirage phase trois initiée. Équipes Alpha et Bravo en position. Neutralisation de la cible à 03h00.", analysis: "Special forces operation communication. Contains: operation name (Mirage), phase (3), unit designations (Alpha/Bravo), target action (neutralise), time (03:00). Urgency: HIGH.", intent: "SOCOM Directive", confidence: 90 },
 };
+
+function LangBtn({ lang, active, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: active ? "#4db8ff" : hovered ? "#4db8ff22" : "#1f2d45",
+        color: active ? "#0a0f1e" : hovered ? "#4db8ff" : "#9ca3af",
+        border: `1px solid ${active ? "#4db8ff" : hovered ? "#4db8ff44" : "transparent"}`,
+        borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 12,
+        fontWeight: active ? 700 : 400,
+        transition: "background 0.15s, color 0.15s, border-color 0.15s",
+      }}
+    >
+      {lang.flag} {lang.label}
+    </button>
+  );
+}
+
+function ContextBtn({ label, active, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: active ? "#00ff9d" : hovered ? "#00ff9d22" : "#1f2d45",
+        color: active ? "#0a0f1e" : hovered ? "#00ff9d" : "#9ca3af",
+        border: `1px solid ${active ? "#00ff9d" : hovered ? "#00ff9d44" : "transparent"}`,
+        borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12,
+        fontWeight: active ? 700 : 400,
+        transition: "background 0.15s, color 0.15s, border-color 0.15s",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
 
 export default function Translator() {
   const [apiKey] = useApiKey();
@@ -64,7 +105,6 @@ Return ONLY JSON (no markdown): {
         setResult({ ...parsed, lang, context, sourceText: text, live: true });
       } catch (e) { setError("Error: " + e.message); }
     } else {
-      // Mock mode
       await new Promise(r => setTimeout(r, 900));
       const mock = MOCK_TRANSLATIONS[sourceLang];
       const lang = LANGUAGES.find(l => l.code === sourceLang);
@@ -73,28 +113,22 @@ Return ONLY JSON (no markdown): {
     setLoading(false);
   }
 
-  const urgencyColor = u => u === "CRITICAL" ? "#ff0000" : u === "HIGH" ? "#ff4d4d" : u === "MEDIUM" ? "#ffd700" : "#00ff9d";
-
   return (
     <div>
-      <PageHeader icon="🌐" title="Battlefield Comms Translator" sub="Real-time translation of intercepted military communications." accent="#4db8ff" badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"Mock Data",color:"#ffd700"}]} />
+      <PageHeader icon="🌐" title="Battlefield Comms Translator" sub="Real-time translation and analysis of intercepted military communications." accent="#4db8ff" badges={apiKey ? [{text:"AI Live",color:"#00ff9d"}] : [{text:"Mock Data",color:"#ffd700"}]} />
 
       <Card>
         <ST icon="🗣️" label="Source Language" color="#4db8ff" />
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 16 }}>
           {LANGUAGES.map(l => (
-            <button key={l.code} onClick={() => setSourceLang(l.code)}
-              style={{ background: sourceLang === l.code ? "#4db8ff" : "#1f2d45", color: sourceLang === l.code ? "#0a0f1e" : "#9ca3af", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 12, fontWeight: sourceLang === l.code ? 700 : 400 }}>
-              {l.flag} {l.label}
-            </button>
+            <LangBtn key={l.code} lang={l} active={sourceLang === l.code} onClick={() => setSourceLang(l.code)} />
           ))}
         </div>
 
         <ST icon="🎯" label="Intelligence Context" color="#4db8ff" />
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 16 }}>
           {CONTEXTS.map(c => (
-            <button key={c} onClick={() => setContext(c)}
-              style={{ background: context === c ? "#00ff9d" : "#1f2d45", color: context === c ? "#0a0f1e" : "#9ca3af", border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: context === c ? 700 : 400 }}>{c}</button>
+            <ContextBtn key={c} label={c} active={context === c} onClick={() => setContext(c)} />
           ))}
         </div>
 
@@ -102,56 +136,58 @@ Return ONLY JSON (no markdown): {
           placeholder="Paste intercepted communication, radio transcript, or document..." rows={4} />
 
         {!apiKey && (
-          <div style={{ color: "#ff9d00", fontSize: 13, marginBottom: 12 }}>
+          <div style={{ color: "#ff9d00", fontSize: 13, marginBottom: 12, padding: "8px 12px", background: "#1a0e0022", border: "1px solid #ff9d0033", borderRadius: 6 }}>
             ⚠ Set API key in the banner above to enable AI translation. Currently using mock data.
           </div>
         )}
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
-        <Btn onClick={translate} disabled={loading || !text}>{loading ? "⏳ Translating..." : "🌐 Translate & Analyze"}</Btn>
+        <Btn onClick={translate} disabled={loading || !text}>
+          {loading ? "⏳ Translating..." : "🌐 Translate & Analyze"}
+        </Btn>
       </Card>
 
       {result && (
         <>
-          <Card style={{ borderColor: "#00ff9d" }}>
+          <Card style={{ borderColor: "#00ff9d33" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 20 }}>{result.lang.flag}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 22 }}>{result.lang.flag}</span>
                 <div>
                   <div style={{ fontWeight: 800, color: "#e2e8f0" }}>{result.lang.label} → English</div>
-                  <div style={{ color: "#9ca3af", fontSize: 12 }}>{result.context} · {result.lang.region}</div>
+                  <div style={{ color: "#4a5568", fontSize: 12 }}>{result.context} · {result.lang.region}</div>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                {result.live ? <LiveBadge /> : <><MockBadge /> <span style={{ color: "#9ca3af", fontSize: 11 }}>Set API key to use AI</span></>}
+                {result.live ? <LiveBadge /> : <><MockBadge /><span style={{ color: "#9ca3af", fontSize: 11 }}>Set API key for AI</span></>}
                 <BADGE text={`${result.confidence}% conf.`} color="blue" />
               </div>
             </div>
 
-            <div style={{ background: "#0d1626", borderRadius: 8, padding: 14, marginBottom: 12 }}>
-              <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 6 }}>SOURCE TEXT</div>
-              <div style={{ color: "#9ca3af", fontSize: 13, fontStyle: "italic", lineHeight: 1.5 }}>{result.sourceText}</div>
+            <div style={{ background: "#0d1626", borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>SOURCE TEXT</div>
+              <div style={{ color: "#9ca3af", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{result.sourceText}</div>
             </div>
 
-            <div style={{ background: "#051a0d", border: "1px solid #00ff9d44", borderRadius: 8, padding: 14 }}>
-              <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 6 }}>ENGLISH TRANSLATION</div>
-              <div style={{ color: "#00ff9d", fontSize: 14, lineHeight: 1.6, fontWeight: 500 }}>{result.translation}</div>
+            <div style={{ background: "#051a0d", border: "1px solid #00ff9d33", borderLeft: "3px solid #00ff9d", borderRadius: 8, padding: 14 }}>
+              <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>ENGLISH TRANSLATION</div>
+              <div style={{ color: "#00ff9d", fontSize: 14, lineHeight: 1.7, fontWeight: 500 }}>{result.translation}</div>
             </div>
           </Card>
 
           <Card>
             <ST icon="🔍" label="Intelligence Analysis" color="#ffd700" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: 10 }}>
-                <div style={{ color: "#9ca3af", fontSize: 11 }}>COMMUNICATION INTENT</div>
-                <div style={{ color: "#ffd700", fontWeight: 700, fontSize: 14, marginTop: 4 }}>{result.intent}</div>
+              <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>COMMUNICATION INTENT</div>
+                <div style={{ color: "#ffd700", fontWeight: 700, fontSize: 14 }}>{result.intent}</div>
               </div>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: 10 }}>
-                <div style={{ color: "#9ca3af", fontSize: 11 }}>CONFIDENCE SCORE</div>
-                <div style={{ color: "#4db8ff", fontWeight: 800, fontSize: 18, marginTop: 4 }}>{result.confidence}%</div>
+              <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>CONFIDENCE SCORE</div>
+                <div style={{ color: "#4db8ff", fontWeight: 800, fontSize: 22 }}>{result.confidence}%</div>
               </div>
             </div>
             <div style={{ background: "#0d1626", borderRadius: 8, padding: 14 }}>
-              <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 6 }}>ANALYSIS</div>
+              <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>ANALYSIS</div>
               <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{result.analysis}</div>
             </div>
           </Card>

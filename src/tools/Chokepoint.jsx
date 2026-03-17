@@ -120,18 +120,18 @@ export default function Chokepoint() {
             </div>
           </div>
           {apiKey && (
-            <Btn onClick={() => analyzeChokepoint(sel)} disabled={aiLoading} color="#1f2d45">
+            <Btn onClick={() => analyzeChokepoint(sel)} disabled={aiLoading} color="#ff9d00" size="sm">
               {aiLoading ? "⏳ Analyzing..." : "🤖 AI Geopolitical Analysis"}
             </Btn>
           )}
           {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
           {aiResult && (
-            <div style={{ background: "#0d1626", borderRadius: 6, padding: 12, marginTop: 10, borderLeft: "3px solid #ff9d00" }}>
-              <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+            <div style={{ background: "#0a0c00", border: "1px solid #ff9d0033", borderLeft: "3px solid #ff9d00", borderRadius: 6, padding: 12, marginTop: 10 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
                 <LiveBadge />
-                <span style={{ color: "#9ca3af", fontSize: 11 }}>AI CHOKEPOINT ANALYSIS</span>
+                <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI CHOKEPOINT ANALYSIS · {sel.id}</span>
               </div>
-              <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{aiResult}</div>
+              <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7 }}>{aiResult}</div>
             </div>
           )}
         </Card>
