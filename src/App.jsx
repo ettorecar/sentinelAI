@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { NAV, ENERGY_IDS } from "./constants";
 import { BADGE } from "./components/shared";
+import { ApiKeyProvider, useApiKey } from "./context/ApiKeyContext";
 
 import Home        from "./tools/Home";
 import ThreatMap   from "./tools/ThreatMap";
@@ -18,6 +19,7 @@ import OilInfra    from "./tools/OilInfra";
 import Chokepoint  from "./tools/Chokepoint";
 import EnergyRisk  from "./tools/EnergyRisk";
 import EnergyGrid  from "./tools/EnergyGrid";
+import IntelReport from "./tools/IntelReport";
 
 const PAGES = {
   home:        Home,
@@ -36,9 +38,60 @@ const PAGES = {
   chokepoint:  Chokepoint,
   energyrisk:  EnergyRisk,
   energygrid:  EnergyGrid,
+  intelreport: IntelReport,
 };
 
-export default function App() {
+function ApiKeyBanner() {
+  const [apiKey, setApiKey] = useApiKey();
+  const [draft, setDraft] = useState("");
+  const [show, setShow] = useState(false);
+
+  function apply() {
+    setApiKey(draft.trim());
+    setShow(false);
+  }
+  function clear() {
+    setApiKey("");
+    setDraft("");
+    setShow(false);
+  }
+
+  return (
+    <div style={{ background: apiKey ? "#051a0d" : "#1a0d00", borderBottom: `1px solid ${apiKey ? "#00ff9d44" : "#ff9d0055"}`, padding: "6px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 12 }}>🔑</span>
+      {apiKey ? (
+        <>
+          <span style={{ color: "#00ff9d", fontSize: 12, fontWeight: 700 }}>AI Key active — all tools enabled</span>
+          <BADGE text="AI Live" color="green" />
+          <button onClick={clear} style={{ background: "none", border: "1px solid #333", borderRadius: 4, color: "#9ca3af", fontSize: 11, padding: "2px 8px", cursor: "pointer" }}>Clear</button>
+        </>
+      ) : (
+        <>
+          <span style={{ color: "#ff9d00", fontSize: 12 }}>Enter Anthropic API key to enable AI across all tools</span>
+          {show ? (
+            <>
+              <input
+                type="password"
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && apply()}
+                placeholder="sk-ant-..."
+                autoFocus
+                style={{ background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 4, padding: "4px 10px", color: "#e2e8f0", fontSize: 12, width: 240 }}
+              />
+              <button onClick={apply} style={{ background: "#00ff9d", color: "#0a0f1e", border: "none", borderRadius: 4, padding: "4px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Set</button>
+              <button onClick={() => setShow(false)} style={{ background: "none", border: "1px solid #333", borderRadius: 4, color: "#9ca3af", fontSize: 11, padding: "4px 8px", cursor: "pointer" }}>Cancel</button>
+            </>
+          ) : (
+            <button onClick={() => setShow(true)} style={{ background: "#ff9d00", color: "#0a0f1e", border: "none", borderRadius: 4, padding: "4px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Set Key</button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function AppInner() {
   const [page, setPage] = useState("home");
   const [blink, setBlink] = useState(true);
   useEffect(() => { const t = setInterval(() => setBlink(x => !x), 800); return () => clearInterval(t); }, []);
@@ -53,8 +106,8 @@ export default function App() {
           <button key={n.id} onClick={() => setPage(n.id)}
             style={{
               background: "none", border: "none",
-              borderBottom: page === n.id ? `2px solid ${isEnergy(n.id) ? "#ff9d00" : "#00ff9d"}` : "2px solid transparent",
-              color: page === n.id ? (isEnergy(n.id) ? "#ff9d00" : "#00ff9d") : "#9ca3af",
+              borderBottom: page === n.id ? `2px solid ${isEnergy(n.id) ? "#ff9d00" : n.id === "intelreport" ? "#b47fff" : "#00ff9d"}` : "2px solid transparent",
+              color: page === n.id ? (isEnergy(n.id) ? "#ff9d00" : n.id === "intelreport" ? "#b47fff" : "#00ff9d") : "#9ca3af",
               padding: "11px 9px", cursor: "pointer", fontSize: 11,
               fontWeight: page === n.id ? 700 : 400, whiteSpace: "nowrap",
             }}>
@@ -70,12 +123,21 @@ export default function App() {
             <span style={{ fontSize: 9 }}>🛢️</span>
             <span style={{ color: "#ff9d00", fontSize: 10, fontWeight: 700 }}>ENERGY</span>
           </div>
-          <BADGE text="v0.6" color="gray" />
+          <BADGE text="v0.7" color="gray" />
         </div>
       </nav>
+      <ApiKeyBanner />
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
         <Page setPage={setPage} />
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ApiKeyProvider>
+      <AppInner />
+    </ApiKeyProvider>
   );
 }

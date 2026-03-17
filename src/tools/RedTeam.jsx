@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { BADGE, Card, Input, Btn, ST, LiveBadge } from "../components/shared";
 import { RC } from "../constants";
+import { useApiKey } from "../context/ApiKeyContext";
 
 const actors = ["APT nation-state", "Hacktivist group", "Insider threat", "Criminal syndicate", "Terrorist cell"];
 
 export default function RedTeam() {
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey] = useApiKey();
   const [target, setTarget] = useState("");
   const [context, setContext] = useState("");
   const [actor, setActor] = useState("APT nation-state");
@@ -14,7 +15,7 @@ export default function RedTeam() {
   const [error, setError] = useState("");
 
   async function generate() {
-    if (!apiKey) { setError("Insert your Anthropic API key."); return; }
+    if (!apiKey) { setError("Set the Anthropic API key using the banner above."); return; }
     if (!target) { setError("Specify a target."); return; }
     setError(""); setLoading(true); setResult(null);
     try {
@@ -41,7 +42,6 @@ Return ONLY a JSON object: {"scenario_title":"string","threat_actor":"string","o
       <p style={{ color: "#9ca3af", marginTop: -8, marginBottom: 20 }}>AI generates realistic threat scenarios. <LiveBadge /></p>
 
       <Card>
-        <Input label="🔑 Anthropic API Key" value={apiKey} onChange={setApiKey} placeholder="sk-ant-..." type="password" />
         <Input label="🎯 Target" value={target} onChange={setTarget} placeholder="e.g. Nuclear power plant, pipeline infrastructure" />
         <Input label="📋 Context (optional)" value={context} onChange={setContext} placeholder="e.g. Legacy SCADA, recent layoffs" rows={2} />
         <div style={{ marginBottom: 14 }}>

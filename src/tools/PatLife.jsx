@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BADGE, Card, Input, Btn, ST, LiveBadge } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -31,14 +32,14 @@ const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const slots = ["06–09", "09–12", "12–15", "15–18", "18–21", "21–24"];
 
 export default function PatLife() {
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey] = useApiKey();
   const [subject, setSubject] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function analyze() {
-    if (!apiKey) { setError("Insert your Anthropic API key."); return; }
+    if (!apiKey) { setError("Set the Anthropic API key using the banner above."); return; }
     if (!subject) { setError("Enter a subject identifier."); return; }
     setError(""); setLoading(true); setResult(null);
     try {
@@ -78,7 +79,6 @@ Include 5-7 routine patterns. The heatmap must be a 6×7 matrix (6 time slots ×
       </p>
 
       <Card>
-        <Input label="🔑 Anthropic API Key" value={apiKey} onChange={setApiKey} placeholder="sk-ant-..." type="password" />
         <Input label="🎯 Subject" value={subject} onChange={setSubject} placeholder="Subject Alpha, plate LK-4422, @username, IP 91.x.x.x..." />
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
         <Btn onClick={analyze} disabled={loading}>

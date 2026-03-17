@@ -1,5 +1,17 @@
 import { useState } from "react";
-import { BADGE, Card, ST, MockBadge } from "../components/shared";
+import { BADGE, Card, ST, MockBadge, Btn, LiveBadge } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
+
+async function callClaude(apiKey, prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 700, messages: [{ role: "user", content: prompt }] }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(b => b.text || "").join("");
+}
 
 const rc = r => r === "CRITICAL" ? "#ff0000" : r === "HIGH" ? "#ff4d4d" : r === "MEDIUM" ? "#ffd700" : "#00ff9d";
 const typeIcons = { Refinery: "⚗️", Pipeline: "〰️", Terminal: "⚓" };
@@ -15,8 +27,21 @@ const assets = [
 ];
 
 export default function OilInfra() {
+  const [apiKey] = useApiKey();
   const [sel, setSel] = useState(null);
   const [filter, setFilter] = useState("ALL");
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+
+  async function analyzeAsset(a) {
+    setAiResult(null); setAiError(""); setAiLoading(true);
+    try {
+      const text = await callClaude(apiKey, `You are an energy security analyst. Assess this oil & gas infrastructure threat in 3-4 sentences covering: attack vector analysis, geopolitical context, supply impact, and recommended protective measures. Asset: ${a.name} (${a.country}, Type: ${a.type}, Flow: ${a.barrel}, Risk: ${a.risk}). Incident: ${a.incident}.`);
+      setAiResult(text);
+    } catch (e) { setAiError("Error: " + e.message); }
+    setAiLoading(false);
+  }
   const filtered = filter === "ALL" ? assets : assets.filter(a => a.risk === filter);
 
   return (
@@ -71,6 +96,23 @@ export default function OilInfra() {
               ))}
             </div>
             <div style={{ marginTop: 8, color: "#ffd700", fontSize: 13 }}>⚠️ {sel.incident}</div>
+            <div style={{ marginTop: 10 }}>
+              {apiKey && (
+                <Btn onClick={() => analyzeAsset(sel)} disabled={aiLoading} color="#1f2d45">
+                  {aiLoading ? "⏳ Analyzing..." : "🤖 AI Threat Assessment"}
+                </Btn>
+              )}
+              {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
+              {aiResult && (
+                <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, marginTop: 10, borderLeft: "3px solid #ff9d00" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 5 }}>
+                    <LiveBadge />
+                    <span style={{ color: "#9ca3af", fontSize: 11 }}>AI ASSET THREAT ASSESSMENT</span>
+                  </div>
+                  <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.6 }}>{aiResult}</div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Card>

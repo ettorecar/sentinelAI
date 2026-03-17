@@ -21,13 +21,15 @@ Tool che rientrano in questo layer:
 ### Layer 2 — Personalizzato, richiede API key utente
 Analisi su input specifico dell'utente. La chiave API è fornita dall'utente stesso — zero costi per la piattaforma, zero rischio bot.
 
-Tool che rientrano in questo layer:
-- 🤖 **Red Team Generator** — scenario su target specifico (già live)
-- 📰 **Disinfo Detector** — analisi testo specifico
-- 🧠 **PSYOP Analyzer** — analisi contenuto specifico
-- 🔍 **OSINT Correlator** — correlazione entità specifica
-- 📍 **Pattern of Life** — analisi soggetto specifico
-- 📊 **Energy Risk Analyzer** — scenario paese/disruption custom
+**✅ TUTTI IMPLEMENTATI (v0.7):**
+- 🤖 **Red Team Generator** — scenario su target specifico ✅ AI live
+- 📰 **Disinfo Detector** — analisi testo specifico ✅ AI live
+- 🧠 **PSYOP Analyzer** — analisi contenuto specifico ✅ AI live
+- 🔍 **OSINT Correlator** — correlazione entità specifica ✅ AI live
+- 📍 **Pattern of Life** — analisi soggetto specifico ✅ AI live
+- 📊 **Energy Risk Analyzer** — scenario paese/disruption custom ✅ AI live
+- 📋 **Intelligence Report Generator** — brief multi-dominio ✅ AI live (NUOVO)
+- 🌐 **Translator** — traduzione militare con fallback mock ✅ AI live (NUOVO)
 
 ---
 
@@ -56,6 +58,8 @@ Con aggiornamento ogni 30 minuti:
 
 ## 3. Architettura tecnica target
 
+> **⚠️ Aggiornamento v0.7:** La scelta tecnologica backend è stata aggiornata a **Node.js + Vercel Functions** (serverless, stesso progetto Vercel) invece di Python FastAPI. Questo semplifica il deploy e mantiene lo stack JavaScript uniforme.
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │                  FRONTEND (React/Vite)               │
@@ -66,8 +70,8 @@ Con aggiornamento ogni 30 minuti:
 └──────────────────────┬──────────────────────────────┘
                        │ REST
 ┌──────────────────────▼──────────────────────────────┐
-│              BACKEND (Python FastAPI)                │
-│              Deploy: Railway o Render                │
+│         BACKEND (Node.js — Vercel Functions)         │
+│         Deploy: Vercel (stessa app, cartella api/)   │
 │                                                      │
 │  /api/feed          → restituisce JSON cached dal DB │
 │  /api/analyze/*     → proxy verso Claude API        │
@@ -94,23 +98,32 @@ Con aggiornamento ogni 30 minuti:
 
 ## 4. Implementazione backend — dettaglio
 
-### Struttura progetto FastAPI
+### Struttura progetto Node.js + Vercel Functions
 
 ```
-sentinel-backend/
-├── main.py               # entry point FastAPI
-├── scheduler.py          # APScheduler job ogni 30min
-├── routes/
-│   ├── feed.py           # GET /api/feed
-│   └── analyze.py        # POST /api/analyze/*
-├── services/
-│   ├── claude.py         # wrapper Claude API
-│   └── cache.py          # gestione cache DB
-├── models/
-│   └── feed.py           # schema Pydantic
-├── prompts/
-│   └── shared_feed.py    # prompt per aggiornamento layer 1
-└── requirements.txt
+sentinel/
+├── src/                    # React frontend (invariato)
+├── api/                    # Vercel Functions (Node.js)
+│   ├── feed.js             # GET /api/feed (dati cached)
+│   ├── analyze/
+│   │   ├── redteam.js      # POST /api/analyze/redteam
+│   │   ├── disinfo.js      # POST /api/analyze/disinfo
+│   │   └── ...
+│   └── _lib/
+│       ├── claude.js       # wrapper Claude API
+│       └── cache.js        # Vercel KV / Upstash
+├── vercel.json             # config cron + routes
+└── package.json
+```
+
+### Cron job (Vercel Cron — equivalente APScheduler)
+```json
+// vercel.json
+{
+  "crons": [
+    { "path": "/api/refresh-feed", "schedule": "*/30 * * * *" }
+  ]
+}
 ```
 
 ### Job scheduler — logica principale
@@ -219,14 +232,14 @@ async def analyze_redteam(
 
 ## 5. Roadmap rivista
 
-| Fase | Periodo | Obiettivo |
+| Fase | Stato | Obiettivo |
 |---|---|---|
-| **v0.5 — Ora** | Completato | 13 tool mock, deploy Vercel, piattaforma visibile |
-| **v0.6** | +2-4 settimane | Deploy backend FastAPI + job 30min layer 1 attivo |
-| **v0.7** | +1-2 mesi | Layer 2: tool personalizzati con API key utente via backend |
-| **v0.8** | +2-3 mesi | Dati reali su Maritime (AIS) e Satellite (TLE) |
-| **v0.9** | +3-4 mesi | Login opzionale, salvataggio analisi, history |
-| **v1.0** | +5-6 mesi | Prima demo commerciale, contatti istituzionali |
+| **v0.5** | ✅ Completato | 13 tool mock, deploy Vercel |
+| **v0.6** | ✅ Completato | AI live su tutti Layer 2, refactor modulare |
+| **v0.7** | ✅ Completato | Global API key context, AI su Layer 1, IntelReport, 17 tool |
+| **v0.8** | 🔜 Prossimo | Backend Node.js Vercel Functions + cron feed Layer 1 |
+| **v0.9** | Futuro | Dati reali (AIS, TLE, OTX) |
+| **v1.0** | Futuro | Demo commerciale, contatti istituzionali |
 
 ---
 
@@ -245,29 +258,40 @@ async def analyze_redteam(
 
 ---
 
-## 7. Istruzioni per Claude Code — prossimi passi
+## 7. Istruzioni per Claude Code — prossimi passi (backend Node.js)
 
-Quando inizi a lavorare sul backend, la priorità è:
+Quando inizi a lavorare sul backend (v0.8), la priorità è:
 
-1. **Setup FastAPI** con struttura cartelle come da sezione 4
-2. **Implementare `/api/feed`** con dato mock inizialmente (stesso JSON hardcodato del frontend)
-3. **Collegare il frontend** a `/api/feed` invece dei dati hardcodati
-4. **Aggiungere APScheduler** con il job ogni 30min che chiama Claude
-5. **Sostituire progressivamente** i dati mock tool per tool
+1. **Creare `api/feed.js`** come Vercel Function con dato mock inizialmente
+2. **Creare `api/refresh-feed.js`** per il cron Vercel (ogni 30min → chiama Claude → salva su KV)
+3. **Creare `api/_lib/claude.js`** wrapper Claude API lato server
+4. **Creare `api/_lib/kv.js`** wrapper Vercel KV (Upstash Redis)
+5. **Collegare il frontend**: aggiungere `useFeed()` hook che chiama GET /api/feed
+6. **Sostituire progressivamente** i dati mock nei Layer 1 tool
 
-Il frontend va modificato in modo che i tool Layer 1 facciano:
 ```javascript
-// Prima (mock hardcodato)
-const vessels = [{...}, {...}]
-
-// Dopo (dal backend)
-const { data } = useFeed() // custom hook che chiama GET /api/feed
-const vessels = data?.maritime_anomalies ?? []
+// api/feed.js (Vercel Function)
+import { kv } from '@vercel/kv';
+export default async function handler(req, res) {
+  const data = await kv.get('shared_feed');
+  res.json(data ?? FALLBACK_MOCK_DATA);
+}
 ```
 
-Mantenere sempre un **fallback ai dati mock** nel frontend nel caso il backend non sia raggiungibile — la piattaforma deve sempre essere funzionante visivamente.
+```javascript
+// src/hooks/useFeed.js (frontend)
+export function useFeed() {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    fetch('/api/feed').then(r => r.json()).then(setData);
+  }, []);
+  return data;
+}
+```
+
+Mantenere sempre un **fallback ai dati mock** nel frontend — la piattaforma deve sempre essere funzionante visivamente anche senza backend.
 
 ---
 
-*Ultimo aggiornamento: Marzo 2026 — v0.5*
+*Ultimo aggiornamento: Marzo 2026 — v0.7 — 17 tool, global API key context, Node.js Vercel Functions per backend*
 *Documento: ARCHITECTURE.md*

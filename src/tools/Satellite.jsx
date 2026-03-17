@@ -1,6 +1,18 @@
 import { useState, useEffect } from "react";
-import { BADGE, Card, Input, Btn, ST, MockBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, MockBadge, LiveBadge } from "../components/shared";
 import { RC } from "../constants";
+import { useApiKey } from "../context/ApiKeyContext";
+
+async function callClaude(apiKey, prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 700, messages: [{ role: "user", content: prompt }] }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(b => b.text || "").join("");
+}
 
 const passes = [
   { sat: "SENTINEL-2A",  time: "08:14", dur: "6m", el: "72°", res: "10m",   risk: "HIGH"     },
@@ -12,10 +24,23 @@ const covH = new Set([8, 10, 13, 15, 18]);
 const hours = Array.from({ length: 24 }, (_, i) => i);
 
 export default function Satellite() {
+  const [apiKey] = useApiKey();
   const [zone, setZone] = useState("");
   const [ran, setRan] = useState(false);
   const [tick, setTick] = useState(0);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   useEffect(() => { if (!ran) return; const t = setInterval(() => setTick(x => x + 1), 50); return () => clearInterval(t); }, [ran]);
+
+  async function generateBrief() {
+    setAiResult(null); setAiError(""); setAiLoading(true);
+    try {
+      const text = await callClaude(apiKey, `You are a satellite intelligence analyst. Given the area of interest "${zone || "unspecified coordinates"}", write a brief 3-4 sentence satellite intelligence brief covering: optimal pass windows for today, recommended satellites for the mission type (optical/radar/SAR), key ground features to monitor, and any denial/deception considerations for the area.`);
+      setAiResult(text);
+    } catch (e) { setAiError("Error: " + e.message); }
+    setAiLoading(false);
+  }
 
   const toR = a => a * Math.PI / 180;
   const a1 = (tick * 0.8) % 360;
@@ -61,6 +86,24 @@ export default function Satellite() {
               <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
             </div>
           </Card>
+
+          {apiKey && (
+            <Card>
+              <Btn onClick={generateBrief} disabled={aiLoading} color="#1f2d45">
+                {aiLoading ? "⏳ Generating..." : "🤖 AI Intelligence Brief"}
+              </Btn>
+              {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
+              {aiResult && (
+                <div style={{ background: "#0d1626", borderRadius: 6, padding: 12, marginTop: 10, borderLeft: "3px solid #4db8ff" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                    <LiveBadge />
+                    <span style={{ color: "#9ca3af", fontSize: 11 }}>AI SATELLITE INTEL BRIEF</span>
+                  </div>
+                  <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{aiResult}</div>
+                </div>
+              )}
+            </Card>
+          )}
 
           <Card>
             <ST icon="🗓️" label="Pass Schedule" color="#4db8ff" />

@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
-import { BADGE, Card, MockBadge } from "../components/shared";
+import { BADGE, Card, MockBadge, Btn, LiveBadge } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
+
+async function callClaude(apiKey, prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 800, messages: [{ role: "user", content: prompt }] }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(b => b.text || "").join("");
+}
 
 const hotspots = [
   { id: 1,  label: "Eastern Ukraine",  type: "Kinetic",      level: "CRITICAL", x: 390, y: 118, actors: "APT-1887 + ground forces" },
@@ -23,9 +35,22 @@ const typeColor = t =>
   : "#b47fff";
 
 export default function ThreatMap() {
+  const [apiKey] = useApiKey();
   const [tick, setTick] = useState(0);
   const [sel, setSel] = useState(null);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 1500); return () => clearInterval(t); }, []);
+
+  async function analyzeHotspot(h) {
+    setAiResult(null); setAiError(""); setAiLoading(true);
+    try {
+      const text = await callClaude(apiKey, `You are a senior intelligence analyst. Provide a concise threat assessment for: ${h.label} (Type: ${h.type}, Level: ${h.level}, Actors: ${h.actors}). Return plain text — 3-4 sentences covering: current situation, key actors, immediate risks, and recommended posture.`);
+      setAiResult(text);
+    } catch (e) { setAiError("Error: " + e.message); }
+    setAiLoading(false);
+  }
 
   return (
     <div>
@@ -75,7 +100,7 @@ export default function ThreatMap() {
 
       {sel && (
         <Card style={{ borderLeft: `4px solid ${typeColor(sel.type)}` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 16, color: "#e2e8f0" }}>{sel.label}</div>
               <div style={{ color: "#9ca3af", fontSize: 13, marginTop: 4 }}>Type: <span style={{ color: typeColor(sel.type) }}>{sel.type}</span></div>
@@ -83,6 +108,21 @@ export default function ThreatMap() {
             </div>
             <BADGE text={sel.level} color={sel.level === "CRITICAL" || sel.level === "HIGH" ? "red" : "yellow"} />
           </div>
+          {apiKey && (
+            <Btn onClick={() => analyzeHotspot(sel)} disabled={aiLoading} color="#1f2d45">
+              {aiLoading ? "⏳ Analyzing..." : "🤖 AI Threat Assessment"}
+            </Btn>
+          )}
+          {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
+          {aiResult && (
+            <div style={{ background: "#0d1626", borderRadius: 6, padding: 12, marginTop: 10, borderLeft: "3px solid #00ff9d" }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                <LiveBadge />
+                <span style={{ color: "#9ca3af", fontSize: 11 }}>AI THREAT ASSESSMENT</span>
+              </div>
+              <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{aiResult}</div>
+            </div>
+          )}
         </Card>
       )}
 

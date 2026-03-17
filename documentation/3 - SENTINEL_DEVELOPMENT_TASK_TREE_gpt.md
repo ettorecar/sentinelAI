@@ -3,37 +3,74 @@
 
 Agent‑based development roadmap.
 
+> **Stato aggiornato: Marzo 2026 — v0.7**
+> La piattaforma ha completato le fasi frontend. Il prossimo step è la Fase 1 backend (Node.js + Vercel Functions).
+> Stack backend scelto: **Node.js + Vercel Functions** (non Python FastAPI).
+
 ---
 
-# PHASE 1 — Platform Foundations
+# ✅ FASE 0 — Frontend completo (COMPLETATA v0.7)
+
+Tool implementati (17):
+- [x] Home dashboard con live feed cliccabile
+- [x] Threat Map + AI on-demand per hotspot
+- [x] Red Team Scenario Generator (AI live)
+- [x] OSINT Correlator (AI live)
+- [x] Disinformation Detector (AI live)
+- [x] Maritime Anomaly Tracker + AI on-demand
+- [x] Satellite Pass Planner + AI brief on-demand
+- [x] Pattern-of-Life Analyzer (AI live)
+- [x] PSYOP Content Analyzer (AI live)
+- [x] Bio-Threat Early Warning + AI on-demand
+- [x] Cyber Threat Intelligence + AI actor profile on-demand
+- [x] Multilingual Battlefield Translator (AI live + mock fallback)
+- [x] Oil Infrastructure Monitor + AI on-demand
+- [x] Strategic Chokepoint Monitor + AI on-demand
+- [x] Energy Supply Chain Risk (AI live)
+- [x] Energy Grid Resilience Simulator + AI cascade on-demand
+- [x] **Intelligence Report Generator** (AI live — multi-domain brief + print export)
+
+Infrastruttura AI frontend:
+- [x] Global API Key — React Context (in-memory, no localStorage)
+- [x] ApiKeyBanner in App.jsx (banner persistente, password field)
+- [x] `useApiKey()` hook usato da tutti i tool
+- [x] Messaggio "Set API key in the banner above" in tutti i tool
+
+Da fare (frontend — bassa priorità, pre-backend):
+- [ ] AI Copilot — chat globale trasversale (stand-by)
+- [ ] Scenario Builder — tool nuovo multi-dominio
+- [ ] Splash/login screen per aspetto prodotto
+
+---
+
+# PHASE 1 — Platform Foundations (Node.js Backend)
 
 Backend:
-- Setup FastAPI project
+- Setup Vercel Functions project structure (`api/` folder)
 - API routing
-- Logging
+- Logging (Vercel built-in)
 
 Database:
-- PostgreSQL schema
-- event tables
-- entity tables
+- Vercel KV (Upstash Redis) per cache feed
+- PostgreSQL Supabase per storico (futuro)
 
 Cache:
-- Redis integration
-- caching layer
+- Vercel KV integration
+- caching layer per shared feed
 
 ---
 
-# PHASE 2 — Data Ingestion
+# PHASE 2 — Data Ingestion (Layer 1 Feed)
 
-Collectors:
-- RSS news feeds
-- OSINT sources
-- AIS maritime feeds
+Collectors (Node.js):
+- Cron Vercel ogni 30min → chiama Claude → salva su KV
+- RSS news feeds (futuro)
+- AIS maritime feeds (AISStream.io)
 
 Tasks:
 - data normalization
 - metadata extraction
-- raw storage
+- raw storage su KV
 
 ---
 
@@ -45,8 +82,8 @@ Tasks:
 - event storage
 
 Tools:
-- spaCy
-- transformer NER
+- Claude API (già integrato)
+- futuro: spaCy via microservice
 
 ---
 
@@ -71,13 +108,14 @@ Tasks:
 # PHASE 6 — AI Integration
 
 Tasks:
-- LLM interface
-- LangChain integration
-- AI copilot
+- [x] LLM interface (già completato frontend)
+- LangChain integration (futuro lato Node)
+- AI copilot (stand-by, bassa priorità)
 
 Reports:
-- automated intelligence briefs
-- PDF export
+- [x] automated intelligence briefs (IntelReport tool)
+- [x] PDF export via window.print()
+- [ ] PDF export reale (Puppeteer serverless)
 
 ---
 
@@ -86,7 +124,7 @@ Reports:
 Tasks:
 - narrative analysis
 - predictive models
-- scenario simulations
+- [ ] scenario simulations (Scenario Builder tool — pianificato)
 
 ---
 

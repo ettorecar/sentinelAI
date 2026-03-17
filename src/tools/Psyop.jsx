@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BADGE, Card, Input, Btn, ST, LiveBadge } from "../components/shared";
 import { RC } from "../constants";
+import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -29,14 +30,14 @@ async function callClaude(apiKey, prompt) {
 }
 
 export default function Psyop() {
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey] = useApiKey();
   const [content, setContent] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function analyze() {
-    if (!apiKey) { setError("Insert your Anthropic API key."); return; }
+    if (!apiKey) { setError("Set the Anthropic API key using the banner above."); return; }
     if (!content) { setError("Paste content to analyze."); return; }
     setError(""); setLoading(true); setResult(null);
     try {
@@ -62,7 +63,6 @@ Include 3-5 specific PSYOP techniques from: Fear Appeal, In-group/Out-group pola
       </p>
 
       <Card>
-        <Input label="🔑 Anthropic API Key" value={apiKey} onChange={setApiKey} placeholder="sk-ant-..." type="password" />
         <Input label="📄 Content" value={content} onChange={setContent} placeholder="Paste text or transcript..." rows={5} />
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
         <Btn onClick={analyze} disabled={loading}>

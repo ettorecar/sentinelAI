@@ -1,5 +1,17 @@
 import { useState } from "react";
-import { BADGE, Card, ST, MockBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, ST, MockBadge, Btn, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { useApiKey } from "../context/ApiKeyContext";
+
+async function callClaude(apiKey, prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 900, messages: [{ role: "user", content: prompt }] }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content.map(b => b.text || "").join("");
+}
 
 const actors = [
   { id: "APT-2241", name: "IRON CARDINAL", origin: "East Asia",      target: "Defence, Aerospace",  ttps: ["Spearphishing","LOLBins","Custom RAT"],       active: true,  threat: "CRITICAL", activity: [4,7,3,8,12,9,15]  },
@@ -27,8 +39,22 @@ function MiniBar({ data, color }) {
 }
 
 export default function Cti() {
+  const [apiKey] = useApiKey();
   const [filter, setFilter] = useState("ALL");
+  const [selActor, setSelActor] = useState(null);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   const filtered = filter === "ALL" ? actors : actors.filter(a => a.threat === filter);
+
+  async function analyzeActor(a) {
+    setSelActor(a); setAiResult(null); setAiError(""); setAiLoading(true);
+    try {
+      const text = await callClaude(apiKey, `You are a senior CTI analyst. Provide a threat actor profile assessment in 3-4 sentences for: ${a.name} (ID: ${a.id}, Origin: ${a.origin}, Target sectors: ${a.target}, TTPs: ${a.ttps.join(", ")}, Threat level: ${a.threat}). Cover: current operational posture, likely objectives, key TTPs to watch, and defensive recommendations.`);
+      setAiResult(text);
+    } catch (e) { setAiError("Error: " + e.message); }
+    setAiLoading(false);
+  }
 
   return (
     <div>
@@ -74,12 +100,28 @@ export default function Cti() {
                     <div style={{ color: "#9ca3af", fontSize: 9, textAlign: "right", marginBottom: 1 }}>7d</div>
                     <MiniBar data={a.activity} color={c} />
                   </div>
+                  {apiKey && (
+                    <Btn onClick={() => analyzeActor(a)} disabled={aiLoading && selActor?.id === a.id} color="#1f2d45" style={{ fontSize: 10, padding: "3px 8px" }}>
+                      {aiLoading && selActor?.id === a.id ? "⏳" : "🤖 AI Profile"}
+                    </Btn>
+                  )}
                 </div>
               </div>
             </div>
           );
         })}
       </Card>
+
+      {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginBottom: 10 }}>{aiError}</div>}
+      {aiResult && selActor && (
+        <Card style={{ borderColor: "#00ff9d" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
+            <LiveBadge />
+            <span style={{ color: "#9ca3af", fontSize: 11 }}>AI ACTOR ASSESSMENT — {selActor.name}</span>
+          </div>
+          <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7 }}>{aiResult}</div>
+        </Card>
+      )}
 
       <Card>
         <ST icon="🔎" label="IOC Feed" color="#ff9d00" />
