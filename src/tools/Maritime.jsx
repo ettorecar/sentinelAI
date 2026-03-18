@@ -93,6 +93,7 @@ export default function Maritime() {
         `You are a maritime intelligence analyst. Analyze this AIS anomaly and provide an intelligence assessment in 3-4 sentences covering: likely explanation, risk level, and recommended action. Vessel: ${v.name} (MMSI: ${v.mmsi}, Flag: ${v.flag?.replace(/[\u{1F1E0}-\u{1F1FF}]/gu, "")}, Type: ${v.type}). Anomaly: ${v.anomaly}. Speed: ${v.speed}, Course: ${v.course}. Risk: ${v.risk}.`
       );
       setAiResult(text);
+      try { localStorage.setItem("sentinel_prefill_maritime", text.slice(0, 300)); } catch {}
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }

@@ -243,6 +243,7 @@ export default function Cti() {
         `You are a senior CTI analyst. Provide a threat actor profile assessment in 3-4 sentences for: ${a.name} (ID: ${a.id}, Origin: ${a.origin}, Target sectors: ${a.target}, TTPs: ${a.ttps.join(", ")}, Threat level: ${a.threat}). Cover: current operational posture, likely objectives, key TTPs to watch, and defensive recommendations.`
       );
       setAiResult(text);
+      try { localStorage.setItem("sentinel_prefill_cti", `Actor: ${a.name} (${a.origin}) — ${text.slice(0, 240)}`); } catch {}
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }
