@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Btn, ST, Input, PageHeader, LiveBadge } from "../components/shared";
+import { BADGE, Card, Btn, ST, Input, PageHeader, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis, CopyBtn } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 const DOMAINS = [
@@ -80,6 +80,7 @@ export default function IntelReport() {
   const [classification, setClassification] = useState("RESTRICTED");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const { stamp } = useLastAnalysis("intelreport");
   const [error, setError] = useState("");
 
   function toggleDomain(id) {
@@ -118,7 +119,7 @@ Return ONLY a JSON object (no markdown, no backticks):
 
     try {
       const raw = await callClaude(apiKey, prompt, 2000);
-      setResult(JSON.parse(raw.replace(/```json|```/g, "").trim()));
+      setResult(JSON.parse(raw.replace(/```json|```/g, "").trim())); stamp();
     } catch (e) { setError("Error: " + e.message); }
     setLoading(false);
   }
@@ -174,9 +175,12 @@ Return ONLY a JSON object (no markdown, no backticks):
             ⚠ Set your Anthropic API key in the banner at the top to generate reports.
           </div>
         )}
-        <Btn onClick={generate} disabled={loading || !apiKey} color="#b47fff">
-          {loading ? "⏳ Generating Report..." : "📋 Generate Intelligence Report"}
-        </Btn>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Btn onClick={generate} disabled={loading || !apiKey} color="#b47fff">
+            {loading ? "⏳ Generating Report..." : "📋 Generate Intelligence Report"}
+          </Btn>
+          <LastAnalysisTag toolId="intelreport" />
+        </div>
       </Card>
 
       {result && (
@@ -194,6 +198,7 @@ Return ONLY a JSON object (no markdown, no backticks):
                 <BADGE text={result.classification} color="red" />
                 <BADGE text={`Confidence: ${result.confidence_level}`} color={result.confidence_level === "HIGH" ? "green" : result.confidence_level === "MEDIUM" ? "yellow" : "red"} />
                 <LiveBadge />
+                <ExportBtn data={result} filename={`sentinel-intelreport-${result.date?.replace(/\s/g,"-") || "report"}`} />
               </div>
             </div>
             <div style={{ background: "#0d1626", borderRadius: 8, padding: 14, borderLeft: "3px solid #b47fff" }}>

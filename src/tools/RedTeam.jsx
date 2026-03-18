@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, PageHeader } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { RC } from "../constants";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -57,6 +57,8 @@ export default function RedTeam() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { stamp } = useLastAnalysis("redteam");
+  function handleKey(e) { if (e.ctrlKey && e.key === "Enter") generate(); }
 
   async function generate() {
     if (!apiKey) { setError("Set the Anthropic API key using the banner above."); return; }
@@ -76,6 +78,7 @@ Return ONLY a JSON object: {"scenario_title":"string","threat_actor":"string","o
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
       setResult(JSON.parse(data.content.map(b => b.text || "").join("").replace(/```json|```/g, "").trim()));
+      stamp();
     } catch (e) { setError("Error: " + e.message); }
     setLoading(false);
   }
@@ -85,8 +88,8 @@ Return ONLY a JSON object: {"scenario_title":"string","threat_actor":"string","o
       <PageHeader icon="🤖" title="Red Team Scenario Generator" sub="AI-generated threat scenarios and attack paths for defensive planning." accent="#ff4d4d" dataMode="ai" />
 
       <Card>
-        <Input label="🎯 Target" value={target} onChange={setTarget} placeholder="e.g. Nuclear power plant, pipeline infrastructure" />
-        <Input label="📋 Context (optional)" value={context} onChange={setContext} placeholder="e.g. Legacy SCADA, recent layoffs, public-facing admin panel" rows={2} />
+        <Input label="🎯 Target" value={target} onChange={setTarget} placeholder="e.g. Nuclear power plant, pipeline infrastructure" maxLength={150} onClear={() => setTarget("")} onKeyDown={handleKey} />
+        <Input label="📋 Context (optional)" value={context} onChange={setContext} placeholder="e.g. Legacy SCADA, recent layoffs, public-facing admin panel" rows={2} maxLength={500} onKeyDown={handleKey} hint="Ctrl+Enter per generare" />
         <ST icon="👤" label="Threat Actor" color="#ff4d4d" />
         <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
           {ACTORS.map(a => (
@@ -94,9 +97,12 @@ Return ONLY a JSON object: {"scenario_title":"string","threat_actor":"string","o
           ))}
         </div>
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
-        <Btn onClick={generate} disabled={loading}>
-          {loading ? "⏳ Generating..." : "⚡ Generate Scenario"}
-        </Btn>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Btn onClick={generate} disabled={loading}>
+            {loading ? "⏳ Generating..." : "⚡ Generate Scenario"}
+          </Btn>
+          <LastAnalysisTag toolId="redteam" />
+        </div>
       </Card>
 
       {result && (
@@ -108,7 +114,10 @@ Return ONLY a JSON object: {"scenario_title":"string","threat_actor":"string","o
                 <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>THREAT SCENARIO</div>
                 <div style={{ fontWeight: 900, fontSize: 16, color: "#e2e8f0" }}>{result.scenario_title}</div>
               </div>
-              <BADGE text={result.risk_level} color={result.risk_level === "CRITICAL" || result.risk_level === "HIGH" ? "red" : "yellow"} />
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <ExportBtn data={result} filename={`sentinel-redteam-${target.replace(/\s/g,"-").slice(0,20)}`} />
+                <BADGE text={result.risk_level} color={result.risk_level === "CRITICAL" || result.risk_level === "HIGH" ? "red" : "yellow"} />
+              </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 10 }}>
               <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>

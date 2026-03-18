@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Btn, ST, PageHeader, LiveBadge } from "../components/shared";
+import { BADGE, Card, Btn, ST, PageHeader, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 const ACCENT = "#22d3ee";
@@ -70,6 +70,94 @@ function sevBadge(s) {
 }
 function domainInfo(id) {
   return DOMAINS.find(d => d.id === (id || "").toLowerCase()) || { label: id, icon: "•", color: "#9ca3af" };
+}
+
+const TEMPLATES = [
+  {
+    label: "🚢 Hormuz Blockade",
+    title: "Strait of Hormuz Blockade + Coordinated Cyber Campaign",
+    region: "Middle East", crisisType: "hybrid", timeframe: "T+7d",
+    actors: [
+      { name: "Iran IRGC Navy", type: "Nation-State", capability: "HIGH", intent: "Disrupt global oil exports, force sanctions relief" },
+      { name: "APT-IRGC Cyber Unit", type: "Proxy Force", capability: "HIGH", intent: "Attack Gulf port SCADA systems" },
+    ],
+    events: [
+      { domain: "maritime", title: "Mine-laying operation — northern Hormuz shipping lane", severity: "CRITICAL", timing: "T+0h", description: "IRGC fast boats deploy mines under cover of naval exercise" },
+      { domain: "cyber", title: "SCADA intrusion — Fujairah port control systems", severity: "HIGH", timing: "T+6h", description: "APT crew deploys OT wiper via spearphishing" },
+      { domain: "kinetic", title: "Seizure of Panamanian-flagged tanker", severity: "HIGH", timing: "T+12h", description: "IRGC commandos board and seize vessel mid-strait" },
+      { domain: "diplomatic", title: "Iranian UN envoy delivers ultimatum on sanctions", severity: "MEDIUM", timing: "T+24h" },
+    ],
+  },
+  {
+    label: "🔐 Baltic Cyber + Sabotage",
+    title: "Baltic Sea Infrastructure Sabotage — Hybrid Campaign",
+    region: "Eastern Europe", crisisType: "hybrid", timeframe: "T+30d",
+    actors: [
+      { name: "GRU Unit 29155", type: "Nation-State", capability: "CRITICAL", intent: "Degrade NATO eastern flank logistics" },
+      { name: "EMBER WOLF", type: "Non-State Actor", capability: "HIGH", intent: "Disrupt energy grid and communications" },
+    ],
+    events: [
+      { domain: "cyber", title: "Coordinated attack on Baltic energy grid SCADA", severity: "CRITICAL", timing: "T+0h" },
+      { domain: "maritime", title: "Undersea cable severance — Stockholm-Helsinki link", severity: "HIGH", timing: "T+6h", description: "Attributed to submarine with manipulator arm" },
+      { domain: "disinfo", title: "Coordinated disinformation campaign blaming Estonia", severity: "MEDIUM", timing: "T+12h" },
+      { domain: "kinetic", title: "Explosive device on Nord Balt pipeline junction", severity: "CRITICAL", timing: "T+48h" },
+    ],
+  },
+  {
+    label: "🦠 Bio + Disinfo",
+    title: "Engineered Pandemic — Dual Bio-Disinfo Campaign",
+    region: "Global / Multi-Region", crisisType: "pandemic", timeframe: "T+6m",
+    actors: [
+      { name: "Unknown State Actor", type: "Nation-State", capability: "HIGH", intent: "Create social panic, undermine Western institutions" },
+      { name: "PALE THUNDER Disinfo Cell", type: "Proxy Force", capability: "MEDIUM", intent: "Amplify vaccine hesitancy, delay response" },
+    ],
+    events: [
+      { domain: "bio", title: "Atypical pneumonia cluster — three major airports simultaneously", severity: "HIGH", timing: "T+0h" },
+      { domain: "disinfo", title: "Social media campaign attributing outbreak to NATO biolab", severity: "HIGH", timing: "T+24h" },
+      { domain: "cyber", title: "WHO and CDC websites DDoS'd during press conferences", severity: "MEDIUM", timing: "T+48h" },
+      { domain: "diplomatic", title: "Emergency UN Security Council session blocked by veto", severity: "MEDIUM", timing: "T+7d" },
+    ],
+  },
+  {
+    label: "⚡ Energy Crisis Cascade",
+    title: "European Energy Grid Cascade Failure — Winter Crisis",
+    region: "Eastern Europe", crisisType: "energy", timeframe: "T+30d",
+    actors: [
+      { name: "Gazprom / Russian State", type: "Nation-State", capability: "CRITICAL", intent: "Coerce EU foreign policy via energy leverage" },
+      { name: "EMBER WOLF", type: "Non-State Actor", capability: "HIGH", intent: "Amplify grid stress with cyber attacks" },
+    ],
+    events: [
+      { domain: "energy", title: "Full gas supply cut via TurkStream and Nord Stream (remnant)", severity: "CRITICAL", timing: "T+0h" },
+      { domain: "cyber", title: "Cyber attack on German grid balancing systems", severity: "HIGH", timing: "T+12h" },
+      { domain: "kinetic", title: "Sabotage of LNG terminal in Rotterdam", severity: "HIGH", timing: "T+48h" },
+      { domain: "diplomatic", title: "Emergency EU energy ministers summit — rationing debate", severity: "MEDIUM", timing: "T+72h" },
+      { domain: "economic", title: "Spot gas price +800% — industrial shutdowns begin", severity: "CRITICAL", timing: "T+7d" },
+    ],
+  },
+];
+
+function TemplateCard({ tpl, onLoad }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onClick={() => onLoad(tpl)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? "#1a2a40" : "#0d1626", borderRadius: 8, padding: 14,
+        border: `1px solid ${hovered ? ACCENT + "55" : "#1f2d45"}`,
+        cursor: "pointer", transition: "all 0.15s",
+      }}
+    >
+      <div style={{ fontWeight: 700, color: hovered ? ACCENT : "#e2e8f0", fontSize: 13, marginBottom: 6 }}>{tpl.label}</div>
+      <div style={{ color: "#9ca3af", fontSize: 11, lineHeight: 1.5, marginBottom: 8 }}>{tpl.title}</div>
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+        <span style={{ background: "#1f2d45", color: "#4db8ff", borderRadius: 3, padding: "2px 6px", fontSize: 10 }}>{tpl.region}</span>
+        <span style={{ background: "#1f2d45", color: "#ff9d00", borderRadius: 3, padding: "2px 6px", fontSize: 10 }}>{tpl.actors.length} actors</span>
+        <span style={{ background: "#1f2d45", color: "#00ff9d", borderRadius: 3, padding: "2px 6px", fontSize: 10 }}>{tpl.events.length} events</span>
+      </div>
+    </div>
+  );
 }
 
 function Stepper({ step }) {
@@ -160,6 +248,8 @@ export default function ScenarioBuilder() {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { stamp } = useLastAnalysis("scenariobuilder");
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // ── Actor helpers ──
   function addActor() {
@@ -263,11 +353,23 @@ Return ONLY this JSON structure:
     try {
       const raw = await callClaude(apiKey, prompt, 2800);
       const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-      setAnalysis(parsed);
+      setAnalysis(parsed); stamp();
     } catch (e) {
       setError("Error: " + e.message);
     }
     setLoading(false);
+  }
+
+  function loadTemplate(tpl) {
+    setTitle(tpl.title);
+    setRegion(tpl.region);
+    setCrisisType(tpl.crisisType);
+    setTimeframe(tpl.timeframe);
+    setActors(tpl.actors);
+    setEvents(tpl.events.map((e, i) => ({ ...e, id: Date.now() + i, description: e.description || "" })));
+    setAnalysis(null); setError("");
+    setShowTemplates(false);
+    setStep(1);
   }
 
   // Timeline grouping
@@ -283,6 +385,25 @@ Return ONLY this JSON structure:
   return (
     <div>
       <PageHeader icon="🎯" title="Scenario Builder" sub="Multi-domain crisis scenarios — cascade effects, escalation paths and strategic responses." accent={ACCENT} dataMode="ai" badges={apiKey ? [] : [{text:"API Key Required",color:"#ffd700"}]} />
+
+      {/* Quick-start templates */}
+      {step === 1 && (
+        <div style={{ marginBottom: 14 }}>
+          <button
+            onClick={() => setShowTemplates(v => !v)}
+            style={{ background: "#1f2d45", color: ACCENT, border: `1px solid ${ACCENT}44`, borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}
+          >
+            📋 Quick-Start Templates {showTemplates ? "▲" : "▼"}
+          </button>
+          {showTemplates && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: 8, marginTop: 10 }}>
+              {TEMPLATES.map((tpl, i) => (
+                <TemplateCard key={i} tpl={tpl} onLoad={loadTemplate} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <Stepper step={step} />
 
@@ -596,11 +717,12 @@ Return ONLY this JSON structure:
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                 <Btn onClick={runAnalysis} disabled={loading || !apiKey} color={ACCENT}>
                   {loading ? "⏳ Analyzing Scenario..." : "🧠 Run AI Analysis"}
                 </Btn>
                 <Btn onClick={() => setStep(2)} color="#4a5568" size="sm">← Back to Events</Btn>
+                <LastAnalysisTag toolId="scenariobuilder" />
               </div>
             </Card>
           )}
@@ -625,6 +747,7 @@ Return ONLY this JSON structure:
                     <BADGE text={`THREAT: ${analysis.threat_level}`} color={analysis.threat_level === "CRITICAL" || analysis.threat_level === "HIGH" ? "red" : "yellow"} />
                     <BADGE text={`Confidence: ${analysis.confidence}`} color={analysis.confidence === "HIGH" ? "green" : analysis.confidence === "MEDIUM" ? "yellow" : "red"} />
                     <LiveBadge />
+                    <ExportBtn data={analysis} filename={`sentinel-scenario-${title.replace(/\s/g,"-").slice(0,24) || "scenario"}`} />
                   </div>
                 </div>
                 <div style={{ background: "#0d1626", borderRadius: 8, padding: 14, borderLeft: `3px solid ${ACCENT}` }}>

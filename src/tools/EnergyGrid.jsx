@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BADGE, Card, Btn, ST, PageHeader, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -159,18 +159,29 @@ const GRID_DATA = {
 
 export default function EnergyGrid() {
   const [apiKey] = useApiKey();
-  const [country, setCountry] = useState("Germany");
+  const [country, setCountry] = useState(() => {
+    try { return localStorage.getItem("sentinel-energygrid-country") || "Germany"; } catch { return "Germany"; }
+  });
   const [ran, setRan] = useState(false);
   const [simScenario, setSimScenario] = useState(null);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [simStep, setSimStep] = useState(0); // 0=idle, 1=trigger, 2=cascade, 3=impact
   const d = GRID_DATA[country];
 
   function runSimulation(scenario) {
     setSimScenario(scenario);
     setAiResult(null);
+    setAiError("");
+    setSimStep(1);
   }
+
+  useEffect(() => {
+    if (simStep === 0 || simStep >= 3) return;
+    const t = setTimeout(() => setSimStep(s => s + 1), simStep === 1 ? 1400 : 1800);
+    return () => clearTimeout(t);
+  }, [simStep]);
 
   async function analyzeCascade(scenario) {
     setAiResult(null); setAiError(""); setAiLoading(true);
@@ -192,7 +203,7 @@ export default function EnergyGrid() {
         <ST icon="🌍" label="Select Grid" color="#ff9d00" />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {COUNTRIES.map(c => (
-            <button key={c} onClick={() => { setCountry(c); setRan(false); setSimScenario(null); }}
+            <button key={c} onClick={() => { setCountry(c); setRan(false); setSimScenario(null); setSimStep(0); try { localStorage.setItem("sentinel-energygrid-country", c); } catch {} }}
               style={{ background: country === c ? "#ff9d00" : "#1f2d45", color: country === c ? "#0a0f1e" : "#9ca3af", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: country === c ? 700 : 400 }}>{c}</button>
           ))}
         </div>
@@ -301,54 +312,100 @@ export default function EnergyGrid() {
             </div>
 
             {simScenario && (
-              <div style={{ background: "#1a0a00", border: "1px solid #ff4d4d", borderRadius: 8, padding: 16 }}>
-                <div style={{ fontWeight: 800, color: "#ff4d4d", fontSize: 15, marginBottom: 10 }}>🔴 SIMULATION ACTIVE — {simScenario.trigger}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 12, marginBottom: 14 }}>
-                  <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: "#ff4d4d" }}>{simScenario.blackout_pct}%</div>
-                    <div style={{ color: "#9ca3af", fontSize: 11 }}>Population Affected</div>
-                  </div>
-                  <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: "#ffd700" }}>{simScenario.recovery}</div>
-                    <div style={{ color: "#9ca3af", fontSize: 11 }}>Est. Recovery Time</div>
-                  </div>
-                  <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: "#ff9d00" }}>{simScenario.affected.length}</div>
-                    <div style={{ color: "#9ca3af", fontSize: 11 }}>Zones Impacted</div>
-                  </div>
-                </div>
-                <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>IMPACTED ZONES:</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-                  {simScenario.affected.map((z, i) => <BADGE key={i} text={z} color="red" />)}
-                </div>
-                {apiKey && (
-                  <div style={{ marginBottom: 14 }}>
-                    <Btn onClick={() => analyzeCascade(simScenario)} disabled={aiLoading} color="#ff9d00" size="sm">
-                      {aiLoading ? "⏳ Analyzing..." : "🤖 AI Cascade Analysis"}
-                    </Btn>
-                    {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
-                    {aiResult && (
-                      <div style={{ background: "#0a0c00", border: "1px solid #ff9d0033", borderLeft: "3px solid #ff9d00", borderRadius: 6, padding: 12, marginTop: 10 }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-                          <LiveBadge />
-                          <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI CASCADE ANALYSIS · {country}</span>
+              <div style={{ background: "#1a0a00", border: "1px solid #ff4d4d55", borderRadius: 8, padding: 16 }}>
+                {/* Sim step progress bar */}
+                <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 16 }}>
+                  {[["⚡ Trigger", 1], ["🔗 Cascade", 2], ["📊 Impact", 3]].map(([label, step], i) => {
+                    const done = simStep >= step;
+                    const current = simStep === step;
+                    return (
+                      <div key={step} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : "none" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                            background: done ? "#ff4d4d" : "#1f2d45",
+                            color: done ? "#fff" : "#4a5568",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 12, fontWeight: 700,
+                            boxShadow: current ? "0 0 10px #ff4d4d44" : "none",
+                            border: current && simStep < 3 ? "2px solid #ff4d4d" : "2px solid transparent",
+                            transition: "all 0.3s",
+                          }}>{done ? "✓" : step}</div>
+                          <span style={{ color: done ? "#ff9d00" : "#4a5568", fontSize: 9, fontWeight: done ? 700 : 400, whiteSpace: "nowrap" }}>{label}</span>
                         </div>
-                        <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.7 }}>{aiResult}</div>
+                        {i < 2 && <div style={{ flex: 1, height: 2, background: simStep > step ? "#ff4d4d" : "#1f2d45", marginBottom: 16, transition: "background 0.4s" }} />}
                       </div>
-                    )}
+                    );
+                  })}
+                </div>
+
+                {/* Step 1: Trigger */}
+                {simStep >= 1 && (
+                  <div style={{ marginBottom: 12, animation: simStep === 1 ? "none" : "none" }}>
+                    <div style={{ color: "#ff4d4d", fontWeight: 800, fontSize: 14, marginBottom: 6 }}>🔴 {simStep < 3 ? "TRIGGER DETECTED" : "SIMULATION COMPLETE"} — {simScenario.trigger}</div>
+                    <div style={{ color: "#9ca3af", fontSize: 12 }}>Cascade propagation initiated in <span style={{ color: "#ff9d00", fontWeight: 700 }}>{country}</span> grid.</div>
                   </div>
                 )}
-                {/* Recovery progress bar */}
-                <div style={{ marginTop: 14 }}>
-                  <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6 }}>GRID STABILITY INDEX (post-event)</div>
-                  <div style={{ background: "#1f2d45", borderRadius: 6, height: 14 }}>
-                    <div style={{ background: "#ff4d4d", height: 14, borderRadius: 6, width: `${100 - simScenario.blackout_pct}%`, transition: "width 1s" }} />
+
+                {/* Step 2: Cascade zones going dark */}
+                {simStep >= 2 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ color: "#9ca3af", fontSize: 11, letterSpacing: 1, marginBottom: 6 }}>CASCADE ZONES AFFECTED:</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {simScenario.affected.map((z, i) => (
+                        <BADGE key={i} text={`⚡ ${z}`} color="red" />
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                    <span style={{ color: "#9ca3af", fontSize: 11 }}>Stable: {100 - simScenario.blackout_pct}%</span>
-                    <span style={{ color: "#ff4d4d", fontSize: 11 }}>Disrupted: {simScenario.blackout_pct}%</span>
-                  </div>
-                </div>
+                )}
+
+                {/* Step 3: Full impact */}
+                {simStep >= 3 && (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 120px), 1fr))", gap: 10, marginBottom: 14, marginTop: 14 }}>
+                      <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: "#ff4d4d" }}>{simScenario.blackout_pct}%</div>
+                        <div style={{ color: "#9ca3af", fontSize: 11 }}>Population Affected</div>
+                      </div>
+                      <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#ffd700" }}>{simScenario.recovery}</div>
+                        <div style={{ color: "#9ca3af", fontSize: 11 }}>Est. Recovery Time</div>
+                      </div>
+                      <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: "#ff9d00" }}>{100 - simScenario.blackout_pct}%</div>
+                        <div style={{ color: "#9ca3af", fontSize: 11 }}>Grid Stability</div>
+                      </div>
+                    </div>
+                    {/* Stability bar */}
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={{ color: "#9ca3af", fontSize: 11 }}>GRID STABILITY INDEX</span>
+                        <span style={{ color: "#ff4d4d", fontSize: 11 }}>Disrupted: {simScenario.blackout_pct}%</span>
+                      </div>
+                      <div style={{ background: "#1f2d45", borderRadius: 6, height: 12, overflow: "hidden" }}>
+                        <div style={{ background: "linear-gradient(90deg, #ff4d4d, #ff9d00)", height: 12, borderRadius: 6, width: `${100 - simScenario.blackout_pct}%`, transition: "width 1.2s ease-out" }} />
+                      </div>
+                    </div>
+                    {/* AI analysis */}
+                    {apiKey && (
+                      <div style={{ marginBottom: 6 }}>
+                        <Btn onClick={() => analyzeCascade(simScenario)} disabled={aiLoading} color="#ff9d00" size="sm">
+                          {aiLoading ? "⏳ Analyzing cascade..." : "🤖 AI Cascade Analysis"}
+                        </Btn>
+                        {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
+                        {aiResult && (
+                          <div style={{ background: "#0a0c00", border: "1px solid #ff9d0033", borderLeft: "3px solid #ff9d00", borderRadius: 6, padding: 12, marginTop: 10 }}>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                              <LiveBadge />
+                              <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI CASCADE ANALYSIS · {country}</span>
+                            </div>
+                            <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.7 }}>{aiResult}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </Card>

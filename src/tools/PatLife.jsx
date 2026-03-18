@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, PageHeader } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -18,6 +18,92 @@ const slots = ["06–09","09–12","12–15","15–18","18–21","21–24"];
 
 const expColor = e => e === "HIGH" ? "red" : e === "MEDIUM" ? "yellow" : "green";
 const riskColor = r => r === "CRITICAL" ? "#ff0000" : r === "HIGH" ? "#ff4d4d" : r === "MEDIUM" ? "#ffd700" : "#00ff9d";
+
+// Time-slot color: morning=yellow, midday=orange, evening=red, night=blue
+const slotAccent = i => ["#ffd700","#ff9d00","#ff9d00","#ff4d4d","#ff4d4d","#4db8ff"][i] || "#4db8ff";
+
+function HeatmapCell({ active, slotIdx, day, slot }) {
+  const [hovered, setHovered] = useState(false);
+  const ac = slotAccent(slotIdx);
+  return (
+    <td style={{ padding: 2, position: "relative" }}>
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        title={active ? `Active: ${slot} on ${day}` : `Inactive: ${slot} on ${day}`}
+        style={{
+          width: 34, height: 24, borderRadius: 4, cursor: "default",
+          background: active ? (hovered ? ac + "55" : ac + "33") : hovered ? "#1f2d45" : "#0d1626",
+          border: `1px solid ${active ? (hovered ? ac : ac + "88") : hovered ? "#2a3f5f" : "#1f2d45"}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "background 0.15s, border-color 0.15s",
+          boxShadow: active && hovered ? `0 0 6px ${ac}44` : "none",
+        }}
+      >
+        {active && <div style={{ width: 8, height: 8, borderRadius: "50%", background: ac, boxShadow: `0 0 4px ${ac}` }} />}
+      </div>
+    </td>
+  );
+}
+
+function HeatmapGrid({ heatmap }) {
+  // Row totals (active days per slot)
+  const rowTotals = slots.map((_, si) => days.reduce((s, _, di) => s + (heatmap[si]?.[di] === 1 ? 1 : 0), 0));
+  // Column totals (active slots per day)
+  const colTotals = days.map((_, di) => slots.reduce((s, _, si) => s + (heatmap[si]?.[di] === 1 ? 1 : 0), 0));
+  const maxRow = Math.max(...rowTotals, 1);
+  const maxCol = Math.max(...colTotals, 1);
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr>
+            <th style={{ color: "#4a5568", padding: "2px 8px", fontWeight: 400, textAlign: "left", fontSize: 10, minWidth: 52 }}></th>
+            {days.map((d, di) => (
+              <th key={d} style={{ color: colTotals[di] > 0 ? "#e2e8f0" : "#4a5568", padding: "2px 2px 6px", fontWeight: colTotals[di] > 0 ? 700 : 400, minWidth: 38, textAlign: "center", fontSize: 11 }}>{d}</th>
+            ))}
+            <th style={{ color: "#4a5568", padding: "2px 8px", fontSize: 9, letterSpacing: 1 }}>TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {slots.map((s, si) => (
+            <tr key={s}>
+              <td style={{ color: rowTotals[si] > 0 ? slotAccent(si) : "#4a5568", padding: "2px 8px", fontSize: 10, whiteSpace: "nowrap", fontWeight: rowTotals[si] > 0 ? 700 : 400 }}>{s}</td>
+              {days.map((d, di) => (
+                <HeatmapCell key={di} active={heatmap[si]?.[di] === 1} slotIdx={si} day={d} slot={s} />
+              ))}
+              <td style={{ padding: "2px 8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ height: 8, borderRadius: 2, background: slotAccent(si), width: Math.max(4, (rowTotals[si] / maxRow) * 40) }} />
+                  <span style={{ color: slotAccent(si), fontSize: 10, fontWeight: 700 }}>{rowTotals[si]}</span>
+                </div>
+              </td>
+            </tr>
+          ))}
+          {/* Column totals row */}
+          <tr>
+            <td style={{ color: "#4a5568", padding: "6px 8px 2px", fontSize: 9, letterSpacing: 1 }}>ACTIVE</td>
+            {days.map((_, di) => (
+              <td key={di} style={{ padding: "6px 2px 2px", textAlign: "center" }}>
+                <span style={{ color: colTotals[di] > 0 ? "#e2e8f0" : "#4a5568", fontSize: 10, fontWeight: colTotals[di] > 0 ? 700 : 400 }}>{colTotals[di]}</span>
+              </td>
+            ))}
+            <td />
+          </tr>
+        </tbody>
+      </table>
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 14, marginTop: 10, flexWrap: "wrap" }}>
+        {[["Morning (06–09)", 0],["Midday (09–15)", 1],["Afternoon (15–18)", 3],["Evening (18–21)", 4],["Night (21–24)", 5]].map(([label, idx]) => (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: slotAccent(idx) }} />
+            <span style={{ color: "#4a5568", fontSize: 10 }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function PatternRow({ r }) {
   const [hovered, setHovered] = useState(false);
@@ -74,6 +160,8 @@ export default function PatLife() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { stamp } = useLastAnalysis("patlife");
+  function handleKey(e) { if (e.ctrlKey && e.key === "Enter") analyze(); }
 
   async function analyze() {
     if (!apiKey) { setError("Set the Anthropic API key using the banner above."); return; }
@@ -100,7 +188,7 @@ Return exactly this JSON structure:
 }
 
 Include 5-7 routine patterns. The heatmap must be a 6×7 matrix (6 time slots × 7 days) with 0 or 1 values.`;
-      setResult(await callClaude(apiKey, prompt));
+      setResult(await callClaude(apiKey, prompt)); stamp();
     } catch (e) { setError("Error: " + e.message); }
     setLoading(false);
   }
@@ -110,16 +198,19 @@ Include 5-7 routine patterns. The heatmap must be a 6×7 matrix (6 time slots ×
       <PageHeader icon="📍" title="Pattern-of-Life Analyzer" sub="Spatio-temporal behaviour reconstruction and exposure analysis." accent="#4db8ff" dataMode="ai" />
 
       <Card>
-        <Input label="🎯 Subject Identifier" value={subject} onChange={setSubject}
-          placeholder="Subject Alpha, plate LK-4422, @username, IP 91.x.x.x..." />
+        <Input label="🎯 Subject Identifier" value={subject} onChange={setSubject} placeholder="Subject Alpha, plate LK-4422, @username, IP 91.x.x.x..." maxLength={200} onClear={() => setSubject("")} onKeyDown={handleKey} hint="Ctrl+Enter per avviare analisi" />
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
-        <Btn onClick={analyze} disabled={loading}>
-          {loading ? "⏳ Analyzing..." : "Analyze Pattern-of-Life"}
-        </Btn>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Btn onClick={analyze} disabled={loading}>{loading ? "⏳ Analyzing..." : "Analyze Pattern-of-Life"}</Btn>
+          <LastAnalysisTag toolId="patlife" />
+        </div>
       </Card>
 
       {result && (
         <>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+            <ExportBtn data={result} filename={`sentinel-patlife-${subject.replace(/\s/g,"-").slice(0,20)}`} />
+          </div>
           {/* KPI strip */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 120px), 1fr))", gap: 10, marginBottom: 12 }}>
             {[
@@ -147,42 +238,8 @@ Include 5-7 routine patterns. The heatmap must be a 6×7 matrix (6 time slots ×
           {/* Activity heatmap */}
           {result.heatmap && (
             <Card>
-              <ST icon="🗓️" label="Activity Heatmap" color="#4db8ff" sub="Time slot × day matrix" />
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ color: "#4a5568", padding: "2px 8px", fontWeight: 400, textAlign: "left", fontSize: 10 }}></th>
-                      {days.map(d => (
-                        <th key={d} style={{ color: "#9ca3af", padding: "2px 6px", fontWeight: 400, minWidth: 36, textAlign: "center", fontSize: 11 }}>{d}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {slots.map((s, si) => (
-                      <tr key={s}>
-                        <td style={{ color: "#4a5568", padding: "2px 8px", fontSize: 10, whiteSpace: "nowrap" }}>{s}</td>
-                        {days.map((_, di) => {
-                          const active = result.heatmap[si]?.[di] === 1;
-                          return (
-                            <td key={di} style={{ padding: 2 }}>
-                              <div style={{
-                                width: 32, height: 20,
-                                background: active ? "#ff4d4d22" : "#0d1626",
-                                border: `1px solid ${active ? "#ff4d4d" : "#1f2d45"}`,
-                                borderRadius: 3,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                              }}>
-                                {active && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#ff4d4d" }} />}
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ST icon="🗓️" label="Activity Heatmap" color="#4db8ff" sub="Time slot × day — hover for details" />
+              <HeatmapGrid heatmap={result.heatmap} />
             </Card>
           )}
 

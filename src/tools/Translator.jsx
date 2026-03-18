@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, PageHeader, MockBadge, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, MockBadge, LiveBadge, LastAnalysisTag, useLastAnalysis, ExportBtn } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 const LANGUAGES = [
@@ -68,6 +68,17 @@ function ContextBtn({ label, active, onClick }) {
   );
 }
 
+const HIST_KEY = "sentinel_translator_history";
+const MAX_HIST = 5;
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HIST_KEY) || "[]"); }
+  catch { return []; }
+}
+function saveHistory(entries) {
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(entries)); } catch {}
+}
+
 export default function Translator() {
   const [apiKey] = useApiKey();
   const [text, setText] = useState("");
@@ -76,6 +87,24 @@ export default function Translator() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState(() => loadHistory());
+  const [showHistory, setShowHistory] = useState(false);
+  const { stamp } = useLastAnalysis("translator");
+  function handleKey(e) { if (e.ctrlKey && e.key === "Enter") translate(); }
+
+  function pushHistory(entry) {
+    const newHist = [entry, ...history].slice(0, MAX_HIST);
+    setHistory(newHist);
+    saveHistory(newHist);
+  }
+
+  function recallHistory(h) {
+    setText(h.sourceText);
+    setSourceLang(h.lang?.code || sourceLang);
+    setContext(h.context);
+    setResult(h);
+    setShowHistory(false);
+  }
 
   async function translate() {
     if (!text) { setError("Enter text to translate."); return; }
@@ -102,13 +131,15 @@ Return ONLY JSON (no markdown): {
         const data = await res.json();
         if (data.error) throw new Error(data.error.message);
         const parsed = JSON.parse(data.content.map(b => b.text || "").join("").replace(/```json|```/g, "").trim());
-        setResult({ ...parsed, lang, context, sourceText: text, live: true });
+        const r = { ...parsed, lang, context, sourceText: text, live: true, ts: Date.now() };
+        setResult(r); stamp(); pushHistory(r);
       } catch (e) { setError("Error: " + e.message); }
     } else {
       await new Promise(r => setTimeout(r, 900));
       const mock = MOCK_TRANSLATIONS[sourceLang];
       const lang = LANGUAGES.find(l => l.code === sourceLang);
-      setResult({ ...mock, lang, context, sourceText: text, live: false });
+      const r = { ...mock, lang, context, sourceText: text, live: false, ts: Date.now() };
+      setResult(r); stamp(); pushHistory(r);
     }
     setLoading(false);
   }
@@ -133,7 +164,8 @@ Return ONLY JSON (no markdown): {
         </div>
 
         <Input label="📡 Intercepted Text / Audio Transcript" value={text} onChange={setText}
-          placeholder="Paste intercepted communication, radio transcript, or document..." rows={4} />
+          placeholder="Paste intercepted communication, radio transcript, or document..." rows={4}
+          maxLength={3000} onClear={() => setText("")} onKeyDown={handleKey} hint="Ctrl+Enter to translate" />
 
         {!apiKey && (
           <div style={{ color: "#ff9d00", fontSize: 13, marginBottom: 12, padding: "8px 12px", background: "#1a0e0022", border: "1px solid #ff9d0033", borderRadius: 6 }}>
@@ -141,10 +173,62 @@ Return ONLY JSON (no markdown): {
           </div>
         )}
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
-        <Btn onClick={translate} disabled={loading || !text}>
-          {loading ? "⏳ Translating..." : "🌐 Translate & Analyze"}
-        </Btn>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Btn onClick={translate} disabled={loading || !text}>
+            {loading ? "⏳ Translating..." : "🌐 Translate & Analyze"}
+          </Btn>
+          <LastAnalysisTag toolId="translator" />
+        </div>
       </Card>
+
+      {/* History */}
+      {history.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <button
+            onClick={() => setShowHistory(v => !v)}
+            style={{ background: "transparent", color: "#4a5568", border: "1px solid #1f2d45", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 6 }}
+          >
+            🕐 Recent translations ({history.length}) {showHistory ? "▲" : "▼"}
+          </button>
+          {showHistory && (
+            <div style={{ marginTop: 8, background: "#0a1220", borderRadius: 8, overflow: "hidden", border: "1px solid #1f2d45" }}>
+              {history.map((h, i) => (
+                <div
+                  key={i}
+                  onClick={() => recallHistory(h)}
+                  style={{
+                    padding: "10px 14px", cursor: "pointer", borderBottom: i < history.length - 1 ? "1px solid #1f2d45" : "none",
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#141e30"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <span style={{ fontSize: 14 }}>{h.lang?.flag}</span>
+                      <span style={{ color: "#9ca3af", fontSize: 11 }}>{h.lang?.label} → EN</span>
+                      <span style={{ color: "#4a5568", fontSize: 10 }}>{h.context}</span>
+                    </div>
+                    <span style={{ color: "#4a5568", fontSize: 10 }}>
+                      {h.ts ? new Date(h.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                    </span>
+                  </div>
+                  <div style={{ color: "#4a5568", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "90%" }}>
+                    {h.sourceText?.slice(0, 80)}{h.sourceText?.length > 80 ? "…" : ""}
+                  </div>
+                  <div style={{ color: "#4db8ff", fontSize: 11, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "90%" }}>
+                    ↳ {h.translation?.slice(0, 80)}{h.translation?.length > 80 ? "…" : ""}
+                  </div>
+                </div>
+              ))}
+              <div style={{ padding: "6px 14px", borderTop: "1px solid #1f2d45", display: "flex", justifyContent: "flex-end" }}>
+                <button onClick={() => { setHistory([]); saveHistory([]); setShowHistory(false); }}
+                  style={{ background: "none", border: "none", color: "#4a5568", fontSize: 10, cursor: "pointer" }}>Clear history</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {result && (
         <>
@@ -160,6 +244,7 @@ Return ONLY JSON (no markdown): {
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 {result.live ? <LiveBadge /> : <><MockBadge /><span style={{ color: "#9ca3af", fontSize: 11 }}>Set API key for AI</span></>}
                 <BADGE text={`${result.confidence}% conf.`} color="blue" />
+                <ExportBtn data={result} filename={`sentinel-translation-${result.lang?.code || "xx"}`} />
               </div>
             </div>
 
