@@ -4,15 +4,20 @@ import "leaflet/dist/leaflet.css";
 import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
-async function callClaude(apiKey, prompt) {
+async function callClaudeText(apiKey, prompt, maxTokens = 700) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 700, messages: [{ role: "user", content: prompt }] }),
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
   return data.content.map(b => b.text || "").join("");
+}
+
+async function callClaudeJSON(apiKey, prompt, maxTokens = 1200) {
+  const text = await callClaudeText(apiKey, prompt, maxTokens);
+  return JSON.parse(text.replace(/```json|```/g, "").trim());
 }
 
 // E3 — lat/lon + R₀ added to alert data
@@ -25,6 +30,16 @@ const ALERTS = [
 
 const lc = level => level === "CRITICAL" ? "#ff0000" : level === "HIGH" ? "#ff4d4d" : level === "MEDIUM" ? "#ffd700" : "#00ff9d";
 const lb = level => level === "CRITICAL" || level === "HIGH" ? "red" : level === "MEDIUM" ? "yellow" : "green";
+
+function tabStyle(active, color = "#00ff9d") {
+  return {
+    padding: "6px 14px", borderRadius: "5px 5px 0 0", fontSize: 12, fontWeight: active ? 700 : 500,
+    cursor: "pointer", border: "none", outline: "none", background: "transparent",
+    color: active ? color : "#4a5568",
+    borderBottom: active ? `2px solid ${color}` : "2px solid transparent",
+    transition: "color 0.15s, border-color 0.15s",
+  };
+}
 
 function ConfidenceBar({ value, color }) {
   return (
@@ -64,6 +79,137 @@ function R0Gauge({ r0 }) {
         {["R₀=0", "1.0", "2.5", "5.0"].map(l => (
           <span key={l} style={{ color: "#2d3f55", fontSize: 8 }}>{l}</span>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// NEW: 5-axis pathogen risk radar
+const PATHO_DIMS = [
+  { key: "transmissibility",        label: "Transmissibility" },
+  { key: "lethality",               label: "Lethality" },
+  { key: "zoonotic_risk",           label: "Zoonotic Risk" },
+  { key: "detection_difficulty",    label: "Detection Diff." },
+  { key: "weaponization_potential", label: "Weaponization" },
+];
+
+function PathogenRadar({ profile }) {
+  if (!profile) return null;
+  const n = PATHO_DIMS.length;
+  const cx = 100, cy = 100, R = 72;
+  const angle = i => (i / n) * 2 * Math.PI - Math.PI / 2;
+  const pt = (ang, r) => [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
+  const values = PATHO_DIMS.map(d => (profile[d.key] ?? 0) / 100);
+  const polyPts = values.map((v, i) => pt(angle(i), R * v).join(",")).join(" ");
+
+  return (
+    <svg viewBox="0 0 200 200" style={{ width: "100%", maxWidth: 200, height: "auto" }}>
+      {[0.25, 0.5, 0.75, 1.0].map((ring, ri) => (
+        <polygon key={ri}
+          points={PATHO_DIMS.map((_, i) => pt(angle(i), R * ring).join(",")).join(" ")}
+          fill="none" stroke={ri === 3 ? "#1f2d45" : "#111d2e"}
+          strokeWidth={ri === 3 ? "1" : "0.6"} />
+      ))}
+      {[25, 50, 75].map(v => (
+        <text key={v} x={cx + 3} y={cy - (v / 100) * R + 3}
+          fill="#2d3f55" fontSize="6" textAnchor="start">{v}</text>
+      ))}
+      {PATHO_DIMS.map((_, i) => {
+        const [x, y] = pt(angle(i), R);
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#1f2d45" strokeWidth="0.8" />;
+      })}
+      <polygon points={polyPts} fill="#00ff9d1a" stroke="#00ff9d" strokeWidth="1.5" />
+      {values.map((v, i) => {
+        const [x, y] = pt(angle(i), R * v);
+        return <circle key={i} cx={x} cy={y} r="3" fill="#00ff9d" />;
+      })}
+      {PATHO_DIMS.map((d, i) => {
+        const [x, y] = pt(angle(i), R + 16);
+        return (
+          <text key={i} x={x} y={y} textAnchor="middle" dominantBaseline="middle"
+            fill="#9ca3af" fontSize="7" fontWeight="600">{d.label}</text>
+        );
+      })}
+      <circle cx={cx} cy={cy} r="3" fill="#00ff9d" opacity="0.5" />
+    </svg>
+  );
+}
+
+// NEW: Risk factor list
+function RiskFactorList({ items }) {
+  if (!items?.length) return null;
+  const levelColor = l => l === "HIGH" ? "#ff4d4d" : l === "MEDIUM" ? "#ffd700" : "#00ff9d";
+  return (
+    <div>
+      {items.map((rf, i) => (
+        <div key={i} style={{
+          background: "#0d1626", borderRadius: 6, padding: "9px 12px", marginBottom: 7,
+          border: "1px solid #1f2d45", borderLeft: `3px solid ${levelColor(rf.level)}`,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 600 }}>{rf.factor}</span>
+            <span style={{ color: levelColor(rf.level), fontSize: 10, fontWeight: 700 }}>{rf.level}</span>
+          </div>
+          <div style={{ color: "#9ca3af", fontSize: 11, lineHeight: 1.5 }}>{rf.desc}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// NEW: Countermeasures grid
+function CountermeasuresGrid({ items }) {
+  if (!items?.length) return null;
+  const priorityColor = p => p === "IMMEDIATE" ? "#ff4d4d" : p === "SHORT-TERM" ? "#ffd700" : "#4db8ff";
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 8 }}>
+      {items.map((cm, i) => (
+        <div key={i} style={{
+          background: "#0a1628", borderRadius: 7, padding: "10px 12px",
+          border: "1px solid #1f2d45", borderTop: `2px solid ${priorityColor(cm.priority)}`,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+            <span style={{ color: priorityColor(cm.priority), fontSize: 9, fontWeight: 700, letterSpacing: 1 }}>{cm.priority}</span>
+            {cm.agency && <span style={{ color: "#4a5568", fontSize: 9 }}>{cm.agency}</span>}
+          </div>
+          <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{cm.action}</div>
+          {cm.timeline && <div style={{ color: "#4a5568", fontSize: 10, marginTop: 5 }}>{cm.timeline}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// NEW: Outbreak projection card with visual indicators
+function OutbreakProjectionCard({ proj }) {
+  if (!proj) return null;
+  const containColor = proj.containment_prob >= 70 ? "#00ff9d" : proj.containment_prob >= 40 ? "#ffd700" : "#ff4d4d";
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: 10 }}>
+      <div style={{ background: "#0a1628", borderRadius: 7, padding: "10px 12px" }}>
+        <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 1, marginBottom: 6 }}>PROJECTED PEAK</div>
+        <div style={{ color: "#ffd700", fontSize: 22, fontWeight: 900, lineHeight: 1 }}>
+          W{proj.peak_week}
+        </div>
+        <div style={{ color: "#4a5568", fontSize: 10, marginTop: 3 }}>weeks from onset</div>
+      </div>
+      <div style={{ background: "#0a1628", borderRadius: 7, padding: "10px 12px" }}>
+        <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 1, marginBottom: 6 }}>AFFECTED POPULATION</div>
+        <div style={{ color: "#ff4d4d", fontSize: 22, fontWeight: 900, lineHeight: 1 }}>
+          {proj.affected_pct}%
+        </div>
+        <div style={{ background: "#1f2d45", borderRadius: 2, height: 4, marginTop: 6 }}>
+          <div style={{ background: "#ff4d4d", height: 4, borderRadius: 2, width: `${proj.affected_pct}%`, transition: "width 0.5s" }} />
+        </div>
+      </div>
+      <div style={{ background: "#0a1628", borderRadius: 7, padding: "10px 12px" }}>
+        <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 1, marginBottom: 6 }}>CONTAINMENT PROB.</div>
+        <div style={{ color: containColor, fontSize: 22, fontWeight: 900, lineHeight: 1 }}>
+          {proj.containment_prob}%
+        </div>
+        <div style={{ background: "#1f2d45", borderRadius: 2, height: 4, marginTop: 6 }}>
+          <div style={{ background: containColor, height: 4, borderRadius: 2, width: `${proj.containment_prob}%`, transition: "width 0.5s" }} />
+        </div>
       </div>
     </div>
   );
@@ -113,7 +259,6 @@ function AlertRow({ a, selected, onSelect }) {
           <div style={{ marginBottom: 10 }}>
             <ConfidenceBar value={a.confidence} color={color} />
           </div>
-          {/* E3 — R₀ gauge in expanded row */}
           <R0Gauge r0={a.r0} />
         </div>
       )}
@@ -220,8 +365,10 @@ export default function BioThreat() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [tab, setTab] = useState("map");
 
   function selectAlert(a) {
+    if (!a) { setSel(null); return; }
     setSel(sel?.id === a.id ? null : a);
     setAiResult(null);
     setAiError("");
@@ -230,13 +377,27 @@ export default function BioThreat() {
   async function analyzeAlert(a) {
     setAiResult(null); setAiError(""); setAiLoading(true);
     try {
-      const text = await callClaude(apiKey,
-        `You are a biosurveillance intelligence analyst. Assess this epidemiological signal in 3-4 sentences covering: likely pathogen profile, transmission risk, weaponization potential, and recommended health security posture. Signal: ${a.id} — ${a.region}: ${a.signal} (Type: ${a.type}, Confidence: ${a.confidence}%, Level: ${a.level}, R₀ estimate: ${a.r0}).`
+      const result = await callClaudeJSON(apiKey,
+        `You are a biosurveillance intelligence analyst. Assess this epidemiological signal in detail. Return ONLY a JSON object (no markdown, no backticks, no commentary).
+
+Signal: ${a.id} — ${a.region}: ${a.signal} (Type: ${a.type}, Confidence: ${a.confidence}%, Level: ${a.level}, R₀ estimate: ${a.r0})
+
+Return exactly:
+{"assessment":"3-4 sentence analysis covering pathogen profile, transmission risk, and health security posture","pathogen_profile":{"transmissibility":number_0_to_100,"lethality":number_0_to_100,"zoonotic_risk":number_0_to_100,"detection_difficulty":number_0_to_100,"weaponization_potential":number_0_to_100},"risk_factors":[{"factor":"string","level":"HIGH|MEDIUM|LOW","desc":"string"}],"countermeasures":[{"action":"string","priority":"IMMEDIATE|SHORT-TERM|LONG-TERM","agency":"string","timeline":"string"}],"outbreak_projection":{"peak_week":number,"affected_pct":number_0_to_100,"containment_prob":number_0_to_100}}
+
+Include 3-4 risk_factors and 3-4 countermeasures.`
       );
-      setAiResult(text);
+      setAiResult(result); setTab("assessment");
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }
+
+  const TABS = [
+    { id: "map", label: "Global Map" },
+    { id: "signals", label: "Active Signals" },
+    { id: "timeline", label: "Timeline" },
+    ...(aiResult ? [{ id: "assessment", label: "AI Assessment" }] : []),
+  ];
 
   return (
     <div>
@@ -255,56 +416,112 @@ export default function BioThreat() {
         { label: "Sources",       value: "230+", color: "#00ff9d" },
       ]} />
 
-      {/* E3 — SVG world map */}
-      <Card>
-        <ST icon="🌍" label="Global Biosurveillance Map" color="#00ff9d"
-          sub="Click alert dots or list rows to expand · pulsing = active signal" style={{ marginBottom: 10 }} />
-        <BioWorldMap alerts={ALERTS} selected={sel} onSelect={selectAlert} />
-        <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-          {[["CRITICAL", "#ff0000"], ["HIGH", "#ff4d4d"], ["MEDIUM", "#ffd700"]].map(([l, c]) => (
-            <div key={l} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: c }} />
-              <span style={{ color: "#4a5568", fontSize: 10 }}>{l}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <Card>
-        <ST icon="🚨" label="Active Signals" color="#ff4d4d" sub="Ranked by threat level · click to expand" />
-        {ALERTS.map(a => (
-          <AlertRow key={a.id} a={a} selected={sel?.id === a.id} onSelect={() => selectAlert(a)} />
+      <div style={{ display: "flex", borderBottom: "1px solid #1f2d45", marginBottom: 14, gap: 2, flexWrap: "wrap" }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={tabStyle(tab === t.id)}>{t.label}</button>
         ))}
+      </div>
 
-        {sel && apiKey && (
-          <div style={{ marginTop: 4, paddingLeft: 3 }}>
-            <Btn onClick={() => analyzeAlert(sel)} disabled={aiLoading} color="#00ff9d" size="sm">
-              {aiLoading ? "⏳ Analyzing..." : "🤖 AI Bio Assessment"}
-            </Btn>
+      {tab === "map" && (
+        <Card>
+          <ST icon="🌍" label="Global Biosurveillance Map" color="#00ff9d"
+            sub="Click alert dots to expand · signal radius = threat level" style={{ marginBottom: 10 }} />
+          <BioWorldMap alerts={ALERTS} selected={sel} onSelect={selectAlert} />
+          <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+            {[["CRITICAL", "#ff0000"], ["HIGH", "#ff4d4d"], ["MEDIUM", "#ffd700"]].map(([l, c]) => (
+              <div key={l} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: c }} />
+                <span style={{ color: "#4a5568", fontSize: 10 }}>{l}</span>
+              </div>
+            ))}
           </div>
-        )}
-        {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
-      </Card>
-
-      {aiResult && (
-        <Card style={{ borderColor: "#00ff9d33", borderLeft: "3px solid #00ff9d" }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-            <LiveBadge />
-            <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>
-              AI BIOSURVEILLANCE ASSESSMENT · {sel?.id}
-            </span>
-          </div>
-          <div style={{ color: "#4a5568", fontSize: 11, marginBottom: 10 }}>
-            {sel?.region} — {sel?.signal}
-          </div>
-          <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7 }}>{aiResult}</div>
         </Card>
       )}
 
-      {/* E3 — 7-day timeline */}
-      <Card>
-        <AlertTimeline alerts={ALERTS} />
-      </Card>
+      {tab === "signals" && (
+        <Card>
+          <ST icon="🚨" label="Active Signals" color="#ff4d4d" sub="Ranked by threat level · click to expand" />
+          {ALERTS.map(a => (
+            <AlertRow key={a.id} a={a} selected={sel?.id === a.id} onSelect={() => selectAlert(a)} />
+          ))}
+          {sel && apiKey && (
+            <div style={{ marginTop: 4, paddingLeft: 3 }}>
+              <Btn onClick={() => analyzeAlert(sel)} disabled={aiLoading} color="#00ff9d" size="sm">
+                {aiLoading ? "⏳ Analyzing..." : "🤖 AI Structured Assessment"}
+              </Btn>
+            </div>
+          )}
+          {!sel && (
+            <div style={{ color: "#4a5568", fontSize: 12, padding: "8px 0" }}>Select an alert above, then run AI assessment.</div>
+          )}
+          {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
+        </Card>
+      )}
+
+      {tab === "timeline" && (
+        <Card>
+          <AlertTimeline alerts={ALERTS} />
+        </Card>
+      )}
+
+      {tab === "assessment" && aiResult && (
+        <>
+          {/* Assessment header */}
+          <Card style={{ borderColor: "#00ff9d33", borderLeft: "3px solid #00ff9d" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+              <LiveBadge />
+              <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>
+                AI BIOSURVEILLANCE ASSESSMENT · {sel?.id}
+              </span>
+            </div>
+            <div style={{ color: "#4a5568", fontSize: 11, marginBottom: 10 }}>
+              {sel?.region} — {sel?.signal}
+            </div>
+            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7 }}>{aiResult.assessment}</div>
+          </Card>
+
+          {/* Pathogen radar + outbreak projection */}
+          <Card>
+            <ST icon="🧬" label="Pathogen Risk Profile" color="#00ff9d"
+              sub="5-axis threat assessment" style={{ marginBottom: 14 }} />
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div style={{ flexShrink: 0 }}>
+                <PathogenRadar profile={aiResult.pathogen_profile} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 10px", marginTop: 4 }}>
+                  {PATHO_DIMS.map(d => (
+                    <div key={d.key} style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
+                      <span style={{ color: "#4a5568", fontSize: 9 }}>{d.label}</span>
+                      <span style={{ color: "#00ff9d", fontSize: 9, fontWeight: 700 }}>{aiResult.pathogen_profile?.[d.key] ?? "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 10 }}>OUTBREAK PROJECTION</div>
+                <OutbreakProjectionCard proj={aiResult.outbreak_projection} />
+              </div>
+            </div>
+          </Card>
+
+          {/* Risk factors */}
+          {aiResult.risk_factors?.length > 0 && (
+            <Card>
+              <ST icon="⚠️" label="Risk Factors" color="#ffd700"
+                sub={`${aiResult.risk_factors.length} factors identified`} style={{ marginBottom: 12 }} />
+              <RiskFactorList items={aiResult.risk_factors} />
+            </Card>
+          )}
+
+          {/* Countermeasures */}
+          {aiResult.countermeasures?.length > 0 && (
+            <Card>
+              <ST icon="🏥" label="Recommended Countermeasures" color="#4db8ff"
+                sub="Prioritized health security actions" style={{ marginBottom: 12 }} />
+              <CountermeasuresGrid items={aiResult.countermeasures} />
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }

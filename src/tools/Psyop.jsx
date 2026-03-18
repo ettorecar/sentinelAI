@@ -7,11 +7,21 @@ async function callClaude(apiKey, prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1400, messages: [{ role: "user", content: prompt }] }),
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1600, messages: [{ role: "user", content: prompt }] }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
   return JSON.parse(data.content.map(b => b.text || "").join("").replace(/```json|```/g, "").trim());
+}
+
+function tabStyle(active, color = "#b47fff") {
+  return {
+    padding: "6px 14px", borderRadius: "5px 5px 0 0", fontSize: 12, fontWeight: active ? 700 : 500,
+    cursor: "pointer", border: "none", outline: "none", background: "transparent",
+    color: active ? color : "#4a5568",
+    borderBottom: active ? `2px solid ${color}` : "2px solid transparent",
+    transition: "color 0.15s, border-color 0.15s",
+  };
 }
 
 function TechniqueItem({ t }) {
@@ -66,7 +76,6 @@ function RadarChart({ dims }) {
 
   return (
     <svg viewBox="0 0 200 200" style={{ width: "100%", maxWidth: 200, height: "auto" }}>
-      {/* Concentric rings */}
       {[0.25, 0.5, 0.75, 1.0].map((ring, ri) => (
         <polygon key={ri}
           points={PSYOP_DIMS.map((_, i) => pt(angle(i), R * ring).join(",")).join(" ")}
@@ -75,24 +84,19 @@ function RadarChart({ dims }) {
           strokeWidth={ri === 3 ? "1" : "0.6"}
         />
       ))}
-      {/* Ring value labels */}
       {[25, 50, 75].map(v => (
         <text key={v} x={cx + 3} y={cy - (v / 100) * R + 3}
           fill="#2d3f55" fontSize="6" textAnchor="start">{v}</text>
       ))}
-      {/* Axis lines */}
       {PSYOP_DIMS.map((_, i) => {
         const [x, y] = pt(angle(i), R);
         return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#1f2d45" strokeWidth="0.8" />;
       })}
-      {/* Data fill polygon */}
       <polygon points={polyPts} fill="#b47fff22" stroke="#b47fff" strokeWidth="1.5" />
-      {/* Data dots */}
       {values.map((v, i) => {
         const [x, y] = pt(angle(i), R * v);
         return <circle key={i} cx={x} cy={y} r="3" fill="#b47fff" />;
       })}
-      {/* Axis labels */}
       {PSYOP_DIMS.map((d, i) => {
         const [x, y] = pt(angle(i), R + 15);
         return (
@@ -102,7 +106,6 @@ function RadarChart({ dims }) {
           </text>
         );
       })}
-      {/* Center dot */}
       <circle cx={cx} cy={cy} r="3" fill="#b47fff" opacity="0.5" />
     </svg>
   );
@@ -130,12 +133,172 @@ function DemographicBars({ demographics }) {
   );
 }
 
+// NEW: Vulnerability arc gauge
+function VulnerabilityGauge({ value }) {
+  if (value === undefined || value === null) return null;
+  const W = 160, H = 96;
+  const cx = W / 2, cy = H - 10;
+  const R = 68;
+  const startAngle = Math.PI;
+  const endAngle = 2 * Math.PI;
+  const totalArc = endAngle - startAngle;
+  const filled = (value / 100) * totalArc;
+
+  const arcPt = (ang) => [
+    cx + R * Math.cos(ang),
+    cy + R * Math.sin(ang),
+  ];
+
+  const [sx, sy] = arcPt(startAngle);
+  const [ex, ey] = arcPt(startAngle + filled);
+  const [bx, by] = arcPt(endAngle);
+
+  const bgArcD = `M ${sx},${sy} A ${R},${R} 0 1 1 ${bx},${by}`;
+  const fgArcD = filled > 0
+    ? `M ${sx},${sy} A ${R},${R} 0 ${filled > Math.PI ? 1 : 0} 1 ${ex},${ey}`
+    : "";
+
+  const color = value >= 75 ? "#ff4d4d" : value >= 45 ? "#ffd700" : "#00ff9d";
+  const label = value >= 75 ? "HIGH" : value >= 45 ? "MEDIUM" : "LOW";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>VULNERABILITY INDEX</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: W, height: H }}>
+        <path d={bgArcD} fill="none" stroke="#1f2d45" strokeWidth="10" strokeLinecap="round" />
+        {fgArcD && (
+          <path d={fgArcD} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 4px ${color}80)` }} />
+        )}
+        <text x={cx} y={cy - 14} textAnchor="middle" fill={color} fontSize="24" fontWeight="900">{value}</text>
+        <text x={cx} y={cy + 4} textAnchor="middle" fill={color} fontSize="9" fontWeight="700">{label}</text>
+        <text x={cx} y={cy + 16} textAnchor="middle" fill="#4a5568" fontSize="8">VULNERABILITY</text>
+        <text x={cx - R - 4} y={cy + 4} textAnchor="middle" fill="#2d3f55" fontSize="8">0</text>
+        <text x={cx + R + 4} y={cy + 4} textAnchor="middle" fill="#2d3f55" fontSize="8">100</text>
+      </svg>
+    </div>
+  );
+}
+
+// NEW: Message lifecycle phase chart
+function MessageLifecycleChart({ phases }) {
+  if (!phases?.length) return null;
+  const PHASE_COLORS = {
+    "Inception":     "#4db8ff",
+    "Amplification": "#ffd700",
+    "Saturation":    "#ff4d4d",
+    "Decay":         "#4a5568",
+  };
+
+  const totalDays = phases.reduce((s, p) => s + (p.duration_days || 1), 0);
+  const W = 380, H = 60;
+  let xCursor = 0;
+
+  return (
+    <div>
+      <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>MESSAGE LIFECYCLE — PHASE INTENSITY</div>
+      <div style={{ overflowX: "auto" }}>
+        <svg viewBox={`0 0 ${W} ${H + 28}`} style={{ width: "100%", minWidth: 280, height: H + 28 }}>
+          {/* Guide lines */}
+          {[0, 50, 100].map(v => (
+            <line key={v} x1={0} y1={H - (v / 100) * H} x2={W} y2={H - (v / 100) * H}
+              stroke="#1f2d45" strokeWidth="0.4" />
+          ))}
+
+          {phases.map((phase, i) => {
+            const pw = (phase.duration_days / totalDays) * W;
+            const ph = (phase.intensity / 100) * H;
+            const color = PHASE_COLORS[phase.phase] || "#4db8ff";
+            const x = xCursor;
+            xCursor += pw;
+
+            return (
+              <g key={i}>
+                <rect x={x} y={H - ph} width={pw} height={ph}
+                  fill={color} opacity="0.25" />
+                <rect x={x} y={H - ph} width={pw} height={2}
+                  fill={color} opacity="0.9" />
+                {/* Phase label */}
+                <text x={x + pw / 2} y={H + 12}
+                  textAnchor="middle" fill={color} fontSize="7.5" fontWeight="700">
+                  {phase.phase}
+                </text>
+                <text x={x + pw / 2} y={H + 22}
+                  textAnchor="middle" fill="#4a5568" fontSize="6.5">
+                  {phase.duration_days}d
+                </text>
+                {/* Intensity label inside bar if tall enough */}
+                {ph > 18 && (
+                  <text x={x + pw / 2} y={H - ph + 12}
+                    textAnchor="middle" fill={color} fontSize="8" fontWeight="700">
+                    {phase.intensity}%
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 4 }}>
+        {phases.map(p => (
+          <div key={p.phase} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: PHASE_COLORS[p.phase] || "#4db8ff" }} />
+            <span style={{ color: "#9ca3af", fontSize: 10 }}>{p.phase}</span>
+            <span style={{ color: PHASE_COLORS[p.phase] || "#4db8ff", fontSize: 10, fontWeight: 700 }}>{p.intensity}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// NEW: Counter-PSYOP measures panel
+function CountermeasuresPanel({ items }) {
+  if (!items?.length) return (
+    <div style={{ color: "#4a5568", fontSize: 13, textAlign: "center", padding: "24px 0" }}>
+      No countermeasures in analysis results.
+    </div>
+  );
+  const priorityColor = p => p === "HIGH" ? "#ff4d4d" : p === "MEDIUM" ? "#ffd700" : "#4db8ff";
+  const typeIcon = t => ({
+    "prebunking": "🛡️",
+    "inoculation": "💉",
+    "counter-narrative": "💬",
+    "platform-action": "📱",
+  }[t] || "⚡");
+
+  return (
+    <div>
+      {items.map((item, i) => (
+        <div key={i} style={{
+          background: "#0d1626", borderRadius: 7, padding: "10px 12px", marginBottom: 8,
+          border: "1px solid #1f2d45", borderLeft: `3px solid ${priorityColor(item.priority)}`,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ fontSize: 14 }}>{typeIcon(item.type)}</span>
+              <span style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 700 }}>
+                {(item.type || "").toUpperCase().replace("-", " ")}
+              </span>
+            </div>
+            <span style={{ color: priorityColor(item.priority), fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>
+              {item.priority}
+            </span>
+          </div>
+          <div style={{ color: "#9ca3af", fontSize: 12, lineHeight: 1.6 }}>{item.action}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Psyop() {
   const [apiKey] = useApiKey();
   const [content, setContent] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState("detection");
   const { stamp } = useLastAnalysis("psyop");
   function handleKey(e) { if (e.ctrlKey && e.key === "Enter") analyze(); }
 
@@ -150,13 +313,21 @@ Content to analyze:
 ${content}
 
 Return exactly this JSON structure:
-{"detected":true|false,"confidence":number_0_to_100,"target_effect":"string describing intended psychological effect on audience","origin":"string e.g. State-sponsored influence op, Hacktivist collective, Commercial propaganda, Unknown","techniques":[{"name":"string","desc":"string explaining the technique","severity":"HIGH|MEDIUM|LOW","val":number_0_to_100}],"dimensions":{"fear":0-100,"outrage":0-100,"polarization":0-100,"confusion":0-100,"trust_erosion":0-100,"social_proof":0-100},"demographics":[{"group":"string describing target segment","intensity":0-100}]}
+{"detected":true|false,"confidence":number_0_to_100,"target_effect":"string describing intended psychological effect on audience","origin":"string e.g. State-sponsored influence op, Hacktivist collective, Commercial propaganda, Unknown","techniques":[{"name":"string","desc":"string explaining the technique","severity":"HIGH|MEDIUM|LOW","val":number_0_to_100}],"dimensions":{"fear":0-100,"outrage":0-100,"polarization":0-100,"confusion":0-100,"trust_erosion":0-100,"social_proof":0-100},"demographics":[{"group":"string describing target segment","intensity":0-100}],"vulnerability_index":number_0_to_100,"message_lifecycle":[{"phase":"Inception|Amplification|Saturation|Decay","intensity":number_0_to_100,"duration_days":number}],"countermeasures":[{"action":"string describing a specific counter-PSYOP action","type":"prebunking|inoculation|counter-narrative|platform-action","priority":"HIGH|MEDIUM|LOW"}]}
 
-Include 3-5 PSYOP techniques. dimensions reflects the 6 psychological axes activated by the operation. demographics lists 3-4 distinct audience segments with their estimated susceptibility level.`;
-      setResult(await callClaude(apiKey, prompt)); stamp();
+Include 3-5 techniques, 3-4 demographics, all 4 lifecycle phases in order, and 3-4 countermeasures. vulnerability_index is a composite 0-100 score of how susceptible the target audience is to this operation.`;
+      setResult(await callClaude(apiKey, prompt)); stamp(); setTab("detection");
     } catch (e) { setError("Error: " + e.message); }
     setLoading(false);
   }
+
+  const TABS = [
+    { id: "detection", label: "Detection" },
+    { id: "techniques", label: "Techniques" },
+    { id: "radar", label: "Dimensions" },
+    { id: "lifecycle", label: "Lifecycle" },
+    { id: "counter", label: "Countermeasures" },
+  ];
 
   return (
     <div>
@@ -173,38 +344,56 @@ Include 3-5 PSYOP techniques. dimensions reflects the 6 psychological axes activ
 
       {result && (
         <>
-          <Card style={{ borderColor: result.detected ? "#ff4d4d55" : "#00ff9d55", borderLeft: `3px solid ${result.detected ? "#ff4d4d" : "#00ff9d"}` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-              <div>
-                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 5 }}>PSYOP DETECTION</div>
-                <div style={{ fontWeight: 900, fontSize: 18, color: result.detected ? "#ff4d4d" : "#00ff9d" }}>
-                  {result.detected ? "PSYOP DETECTED" : "NO PSYOP DETECTED"}
+          {/* Tab navigation */}
+          <div style={{ display: "flex", borderBottom: "1px solid #1f2d45", marginBottom: 14, gap: 2, flexWrap: "wrap" }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={tabStyle(tab === t.id)}>{t.label}</button>
+            ))}
+          </div>
+
+          {tab === "detection" && (
+            <Card style={{ borderColor: result.detected ? "#ff4d4d55" : "#00ff9d55", borderLeft: `3px solid ${result.detected ? "#ff4d4d" : "#00ff9d"}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                <div>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 5 }}>PSYOP DETECTION</div>
+                  <div style={{ fontWeight: 900, fontSize: 18, color: result.detected ? "#ff4d4d" : "#00ff9d" }}>
+                    {result.detected ? "PSYOP DETECTED" : "NO PSYOP DETECTED"}
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+                  <ExportBtn data={result} filename="sentinel-psyop" />
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>CONFIDENCE</div>
+                    <div style={{ color: "#ffd700", fontWeight: 800, fontSize: 26, lineHeight: 1 }}>{result.confidence}%</div>
+                  </div>
                 </div>
               </div>
-              <ExportBtn data={result} filename="sentinel-psyop" />
-              <div style={{ textAlign: "right" }}>
-                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>CONFIDENCE</div>
-                <div style={{ color: "#ffd700", fontWeight: 800, fontSize: 26, lineHeight: 1 }}>{result.confidence}%</div>
-              </div>
-            </div>
 
-            <div style={{ background: "#0d1626", borderRadius: 3, height: 6, marginBottom: 12 }}>
-              <div style={{ background: result.detected ? "#ff4d4d" : "#00ff9d", height: 6, borderRadius: 3, width: `${result.confidence}%`, transition: "width 0.4s" }} />
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10 }}>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
-                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>TARGET EFFECT</div>
-                <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{result.target_effect}</div>
+              <div style={{ background: "#0d1626", borderRadius: 3, height: 6, marginBottom: 12 }}>
+                <div style={{ background: result.detected ? "#ff4d4d" : "#00ff9d", height: 6, borderRadius: 3, width: `${result.confidence}%`, transition: "width 0.4s" }} />
               </div>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
-                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>ATTRIBUTED ORIGIN</div>
-                <div style={{ color: "#ffd700", fontSize: 12, lineHeight: 1.5 }}>{result.origin}</div>
-              </div>
-            </div>
-          </Card>
 
-          {result.techniques?.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10, marginBottom: 14 }}>
+                <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>TARGET EFFECT</div>
+                  <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{result.target_effect}</div>
+                </div>
+                <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>ATTRIBUTED ORIGIN</div>
+                  <div style={{ color: "#ffd700", fontSize: 12, lineHeight: 1.5 }}>{result.origin}</div>
+                </div>
+              </div>
+
+              {/* Vulnerability gauge inline */}
+              {result.vulnerability_index !== undefined && (
+                <div style={{ borderTop: "1px solid #1f2d45", paddingTop: 14 }}>
+                  <VulnerabilityGauge value={result.vulnerability_index} />
+                </div>
+              )}
+            </Card>
+          )}
+
+          {tab === "techniques" && result.techniques?.length > 0 && (
             <Card>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <ST icon="🎭" label="PSYOP Techniques" color="#ff4d4d" sub={`${result.techniques.length} techniques identified`} />
@@ -216,8 +405,7 @@ Include 3-5 PSYOP techniques. dimensions reflects the 6 psychological axes activ
             </Card>
           )}
 
-          {/* E2 — radar + demographic bars */}
-          {result.dimensions && (
+          {tab === "radar" && result.dimensions && (
             <Card>
               <ST icon="🎯" label="Psychological Axes & Target Demographics" color="#b47fff"
                 sub="6-axis influence radar · audience segmentation" style={{ marginBottom: 14 }} />
@@ -227,7 +415,6 @@ Include 3-5 PSYOP techniques. dimensions reflects the 6 psychological axes activ
                     PSYOP DIMENSIONS RADAR
                   </div>
                   <RadarChart dims={result.dimensions} />
-                  {/* Dimension values legend */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 10px", marginTop: 4 }}>
                     {PSYOP_DIMS.map(d => (
                       <div key={d.key} style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
@@ -241,6 +428,25 @@ Include 3-5 PSYOP techniques. dimensions reflects the 6 psychological axes activ
                   <DemographicBars demographics={result.demographics} />
                 </div>
               </div>
+            </Card>
+          )}
+
+          {tab === "lifecycle" && (
+            <Card>
+              <ST icon="📈" label="Message Lifecycle Analysis" color="#b47fff"
+                sub="Propagation phases · intensity over time" style={{ marginBottom: 14 }} />
+              <MessageLifecycleChart phases={result.message_lifecycle} />
+              {!result.message_lifecycle?.length && (
+                <div style={{ color: "#4a5568", fontSize: 12 }}>No lifecycle data available.</div>
+              )}
+            </Card>
+          )}
+
+          {tab === "counter" && (
+            <Card>
+              <ST icon="🛡️" label="Counter-PSYOP Strategies" color="#00ff9d"
+                sub="AI-generated defensive measures by type and priority" style={{ marginBottom: 14 }} />
+              <CountermeasuresPanel items={result.countermeasures} />
             </Card>
           )}
         </>
