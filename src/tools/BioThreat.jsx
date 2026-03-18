@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { MapContainer, TileLayer, CircleMarker, useMapEvents } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -119,64 +121,49 @@ function AlertRow({ a, selected, onSelect }) {
   );
 }
 
-// E3 — SVG world map with simplified continent polygons (equirectangular, 400×200)
-// Coordinates: x = (lon+180)/360*400, y = (90-lat)/180*200
-const WORLD_POLYS = [
-  // North America
-  "11,22 44,42 56,56 67,67 78,76 100,81 111,87 114,91 107,90 102,83 133,72 142,48",
-  // South America
-  "109,89 126,94 147,111 161,99 161,128 154,145 124,147 111,133",
-  // Europe
-  "189,33 194,28 211,33 231,39 236,42 231,60 189,60",
-  // Africa
-  "181,59 257,59 257,139 224,139 181,83",
-  // Asia
-  "228,22 283,17 361,28 361,94 311,94 278,89 244,72 228,61",
-  // Oceania
-  "326,120 372,120 370,142 339,142 326,128",
-  // Greenland
-  "142,11 180,11 180,33 142,33",
-];
+function MapClickHandler({ onDeselect }) {
+  useMapEvents({ click: onDeselect });
+  return null;
+}
 
 function BioWorldMap({ alerts, selected, onSelect }) {
-  const W = 400, H = 200;
-  const proj = (lon, lat) => ({ x: (lon + 180) / 360 * W, y: (90 - lat) / 180 * H });
-
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", borderRadius: 8, border: "1px solid #1f2d45", display: "block" }}>
-      <rect width={W} height={H} fill="#050c1a" />
-      {/* Lat/lon grid */}
-      {[-60, -30, 0, 30, 60].map(lat => (
-        <line key={`la${lat}`} x1={0} y1={(90 - lat) / 180 * H} x2={W} y2={(90 - lat) / 180 * H} stroke="#0c1a2e" strokeWidth="0.5" />
-      ))}
-      {[-120, -60, 0, 60, 120].map(lon => (
-        <line key={`lo${lon}`} x1={(lon + 180) / 360 * W} y1={0} x2={(lon + 180) / 360 * W} y2={H} stroke="#0c1a2e" strokeWidth="0.5" />
-      ))}
-      {/* Landmasses */}
-      {WORLD_POLYS.map((pts, i) => (
-        <polygon key={i} points={pts} fill="#0e1e36" stroke="#1a3050" strokeWidth="0.8" />
-      ))}
-      {/* Alert dots with pulse */}
-      {alerts.map(a => {
-        const { x, y } = proj(a.lon, a.lat);
-        const color = lc(a.level);
-        const isSel = selected?.id === a.id;
-        return (
-          <g key={a.id} onClick={() => onSelect(a)} style={{ cursor: "pointer" }}>
-            <circle cx={x} cy={y} r={isSel ? 9 : 6} fill="none" stroke={color} strokeWidth="1" opacity="0.3">
-              <animate attributeName="r" values={`${isSel ? 7 : 5};${isSel ? 14 : 10};${isSel ? 7 : 5}`} dur="2s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite" />
-            </circle>
-            <circle cx={x} cy={y} r={isSel ? 4.5 : 3} fill={color} opacity={isSel ? 1 : 0.85} />
-            {isSel && (
-              <text x={x + 6} y={y - 4} fill={color} fontSize="6" fontWeight="700">{a.id}</text>
-            )}
-          </g>
-        );
-      })}
-      {/* Map label */}
-      <text x={4} y={H - 4} fill="#1a2f4a" fontSize="7" fontFamily="monospace">BIOSURVEILLANCE GLOBAL MONITOR</text>
-    </svg>
+    <div style={{ borderRadius: 8, overflow: "hidden", border: "1px solid #1f2d45" }}>
+      <MapContainer
+        center={[20, 15]}
+        zoom={2}
+        minZoom={1}
+        maxZoom={8}
+        style={{ height: 340, background: "#050c1a" }}
+        attributionControl={false}
+      >
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          subdomains="abcd"
+          maxZoom={8}
+        />
+        <MapClickHandler onDeselect={() => onSelect(null)} />
+        {alerts.map(a => {
+          const color = lc(a.level);
+          const isSel = selected?.id === a.id;
+          return (
+            <CircleMarker
+              key={a.id}
+              center={[a.lat, a.lon]}
+              radius={isSel ? 10 : a.level === "CRITICAL" ? 8 : a.level === "HIGH" ? 6 : 5}
+              pathOptions={{
+                color,
+                fillColor: color,
+                fillOpacity: isSel ? 0.9 : 0.7,
+                weight: isSel ? 2 : 1,
+                opacity: 1,
+              }}
+              eventHandlers={{ click: (e) => { e.originalEvent.stopPropagation(); onSelect(a); } }}
+            />
+          );
+        })}
+      </MapContainer>
+    </div>
   );
 }
 
