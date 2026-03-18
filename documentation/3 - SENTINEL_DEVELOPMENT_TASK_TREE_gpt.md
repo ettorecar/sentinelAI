@@ -11,7 +11,7 @@ Agent‑based development roadmap.
 
 # ✅ FASE 0 — Frontend completo (COMPLETATA v0.8)
 
-Tool implementati (19 totali = 18 intel + Workspace):
+Tool implementati (20 totali = 19 intel + Workspace):
 - [x] Home dashboard con live feed cliccabile
 - [x] Threat Map + AI on-demand per hotspot + prefill export per IntelReport
 - [x] Red Team Scenario Generator — MITRE ATT&CK heatmap 11 tattiche + kill chain animata 7 fasi
@@ -28,6 +28,7 @@ Tool implementati (19 totali = 18 intel + Workspace):
 - [x] Strategic Chokepoint Monitor + AI on-demand
 - [x] Energy Supply Chain Risk — radial network SVG + grouped bar compare
 - [x] Energy Grid Resilience Simulator + AI cascade on-demand
+- [x] **Airspace Monitor** — Leaflet map, 8 zone ristrette (conflitto), 8 rotte monitorate con polyline originale/deviata, 6 NOTAMs attivi, AI on-demand route assessment
 - [x] **Intelligence Report Generator** — tabbed output 4 tab + 3 KPI cards + "Import from →" prefill dropdown
 - [x] **Scenario Builder** (AI live — wizard 3 step: setup, domain events, cascade/escalation analysis)
 - [x] **Workspace** — session log di tutte le analisi, export JSON, storage inspector
@@ -39,7 +40,7 @@ UX e navigazione (Blocco G):
 - [x] Breadcrumb `← Home` + tool name con accent color
 
 Live feed e session (Blocco H):
-- [x] FEED_POOL 17 voci — alert iniettato ogni ~90s nella notification bell
+- [x] FEED_POOL 20 voci — alert iniettato ogni ~90s nella notification bell
 - [x] NotificationBell ora stateful (liveNotifs prop da AppInner)
 - [x] Workspace: session log con timestamp relativo + excerpt analisi + link diretto al tool
 - [x] Export Session JSON: scarica tutte le chiavi `sentinel_*` localStorage come JSON strutturato
@@ -82,6 +83,7 @@ Collectors (Node.js):
 - Cron Vercel ogni 30min → chiama Claude → salva su KV
 - RSS news feeds (futuro)
 - AIS maritime feeds (AISStream.io)
+- Airspace feeds (OpenSky Network API, FAA NOTAM API, EuroControl, ICAO)
 
 Tasks:
 - data normalization

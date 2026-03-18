@@ -38,7 +38,7 @@ Il valore differenziale rispetto ai competitor è l'**integrazione nativa di AI 
 
 ## 3. Stato attuale — v0.8 (Marzo 2026)
 
-La piattaforma è una **React SPA modulare** con **19 tool** implementati (+ Workspace).
+La piattaforma è una **React SPA modulare** con **20 tool** implementati (+ Workspace).
 Frontend-only (no backend). API key Claude inserita dall'utente tramite banner globale (in-memory, non persistita).
 
 ### Tool implementati
@@ -60,15 +60,16 @@ Frontend-only (no backend). API key Claude inserita dall'utente tramite banner g
 | 13 | 🚢 **Strategic Chokepoint Monitor** | Mock + AI on-demand | ✅ AI geopolitical analysis | Energy |
 | 14 | 📊 **Energy Supply Chain Risk** | ✅ AI live | ✅ Radial network + grouped bar + compare | Energy |
 | 15 | ⚡ **Energy Grid Resilience Simulator** | Mock + AI on-demand | ✅ AI cascade analysis | Energy |
-| 16 | 📋 **Intelligence Report Generator** | ✅ AI live | ✅ Tabbed output + 3 KPI + import prefill | Report |
-| 17 | 🎯 **Scenario Builder** | ✅ AI live | ✅ Wizard 3-step, cascade/escalation | Report |
-| 18 | 🗂️ **Workspace** | Session locale | — Session log + export JSON | Session |
-| 19 | 🏠 **Home Dashboard** | Live feed cliccabile | — | — |
+| 16 | ✈️ **Airspace Monitor** | Mock + AI on-demand | ✅ Leaflet map + NOTAMs + rerouted corridors | Core |
+| 17 | 📋 **Intelligence Report Generator** | ✅ AI live | ✅ Tabbed output + 3 KPI + import prefill | Report |
+| 18 | 🎯 **Scenario Builder** | ✅ AI live | ✅ Wizard 3-step, cascade/escalation | Report |
+| 19 | 🗂️ **Workspace** | Session locale | — Session log + export JSON | Session |
+| 20 | 🏠 **Home Dashboard** | Live feed cliccabile | — | — |
 
 ### Architettura AI attuale
 - **Global API Key:** React Context (in-memory, no localStorage). Banner fisso in alto con campo password. Tutti i tool leggono la chiave dal context via `useApiKey()`.
 - **Layer 2 tools** (usano input utente): RedTeam, OSINT, Disinfo, PatLife, PSYOP, EnergyRisk, IntelReport, ScenarioBuilder — generazione AI completa
-- **Layer 1 tools** (dati mock + AI on-demand): ThreatMap, Maritime, Satellite, BioThreat, CTI, OilInfra, Chokepoint, EnergyGrid — pulsante "🤖 AI Analysis" sul dettaglio selezionato
+- **Layer 1 tools** (dati mock + AI on-demand): ThreatMap, Maritime, Satellite, BioThreat, CTI, OilInfra, Chokepoint, EnergyGrid, AirRoutes — pulsante "🤖 AI Analysis" sul dettaglio selezionato
 
 ### Aggiunte UX v0.8 (Blocchi E/F/G/H)
 - **Blocco G:** URL hash routing (`#threatmap` etc), tasto `?` shortcut help, nav hamburger <860px, breadcrumb con `← Home`
@@ -96,7 +97,7 @@ Frontend-only (no backend). API key Claude inserita dall'utente tramite banner g
 - [x] **Blocco H** — Live alert feed ~90s, Workspace session log, IntelReport prefill import, Export Session JSON
 - [x] Tool: Scenario Builder (wizard 3-step, cascade/escalation)
 - [x] SplashScreen con input API key
-- [x] 19 tool totali (18 intel + Workspace)
+- [x] 20 tool totali (19 intel + Workspace)
 
 ### ⏳ Da fare prima del backend (frontend-only)
 - [ ] **AI Copilot** — chat globale trasversale a tutti i tool (stand-by, bassa priorità)
@@ -117,6 +118,7 @@ Frontend-only (no backend). API key Claude inserita dall'utente tramite banner g
 - CTI: AlienVault OTX, MISP feed
 - Oil/Energy: EIA API
 - Chokepoint: MarineTraffic API
+- Airspace: OpenSky Network API, FAA NOTAM API, EuroControl, ICAO
 
 ### 🔜 Fase 4 — Prodotto commerciale v1.0
 - Autenticazione JWT
@@ -159,6 +161,7 @@ sentinel/
 │       ├── EnergyRisk.jsx
 │       ├── EnergyGrid.jsx
 │       ├── IntelReport.jsx
+│       ├── AirRoutes.jsx
 │       ├── ScenarioBuilder.jsx
 │       └── Workspace.jsx
 └── package.json
@@ -195,4 +198,4 @@ Fornire in apertura:
 
 ---
 
-*Ultimo aggiornamento: Marzo 2026 — v0.8 — 19 tool (Core + Energy + Report + Session)*
+*Ultimo aggiornamento: Marzo 2026 — v0.8 — 20 tool (Core + Energy + Report + Session)*
