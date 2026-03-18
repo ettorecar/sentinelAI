@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { BADGE, Card, Btn, ST, Pulse, Divider } from "../components/shared";
 import { NAV, TOOL_DESC, ENERGY_IDS } from "../constants";
+import { useApiKey } from "../context/ApiKeyContext";
 
 // Per-tool data mode (used in ToolCard indicator dot)
 const TOOL_DATA_MODE = {
@@ -51,6 +52,7 @@ function useFavorites() {
 }
 
 export default function Home({ setPage }) {
+  const [apiKey] = useApiKey();
   const [tick, setTick] = useState(0);
   const [utc, setUtc] = useState(() => new Date().toISOString().slice(11, 16) + " UTC");
   const [favs, toggleFav] = useFavorites();
@@ -95,10 +97,10 @@ export default function Home({ setPage }) {
           <div style={{ background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 8, padding: "12px 16px", minWidth: 160, flexShrink: 0 }}>
             <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 3, marginBottom: 8 }}>SYSTEM STATUS</div>
             {[
-              ["AI Engine",    "#00ff9d", "ONLINE"],
-              ["Threat Feed",  "#00ff9d", "LIVE"],
-              ["Energy Mod.",  "#ff9d00", "ACTIVE"],
-              ["Last sync",    "#4a5568", utc],
+              ["AI Engine",   apiKey ? "#00ff9d" : "#ff4d4d", apiKey ? "ONLINE" : "NO KEY"],
+              ["Threat Feed", "#00ff9d", "LIVE"],
+              ["Energy Mod.", "#ff9d00", "ACTIVE"],
+              ["Last sync",   "#4a5568", utc],
             ].map(([label, color, val]) => (
               <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
                 <span style={{ color: "#4a5568", fontSize: 10 }}>{label}</span>

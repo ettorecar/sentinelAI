@@ -246,9 +246,9 @@ function NotificationBell({ setPage, notifs }) {
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 99 }} onClick={() => setOpen(false)} />
           <div style={{
-            position: "absolute", top: "calc(100% + 6px)", right: 0,
+            position: "fixed", top: 46, right: 4,
             background: "#0b111e", border: "1px solid #1f2d45",
-            borderRadius: 10, width: 310, zIndex: 100,
+            borderRadius: 10, width: 310, zIndex: 200,
             boxShadow: "0 12px 40px #000a",
           }}>
             <div style={{ padding: "10px 14px", borderBottom: "1px solid #1f2d45", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
