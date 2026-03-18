@@ -36,9 +36,24 @@ const TYPE_COLOR = {
   "Oil Infra": "#ff9d00", "Chokepoint": "#ff9d00", "Energy": "#ff9d00",
 };
 
+function useFavorites() {
+  const [favs, setFavs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("sentinel-favs") || "[]"); } catch { return []; }
+  });
+  function toggle(id) {
+    setFavs(prev => {
+      const next = prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id];
+      try { localStorage.setItem("sentinel-favs", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+  return [favs, toggle];
+}
+
 export default function Home({ setPage }) {
   const [tick, setTick] = useState(0);
   const [utc, setUtc] = useState(() => new Date().toISOString().slice(11, 16) + " UTC");
+  const [favs, toggleFav] = useFavorites();
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 2000); return () => clearInterval(t); }, []);
   useEffect(() => { const t = setInterval(() => setUtc(new Date().toISOString().slice(11, 16) + " UTC"), 10000); return () => clearInterval(t); }, []);
 
@@ -250,6 +265,21 @@ export default function Home({ setPage }) {
         </div>
       </div>
 
+      {/* ── Pinned tools ─────────────────────────────────────────── */}
+      {favs.length > 0 && (() => {
+        const pinnedTools = NAV.slice(1).filter(t => favs.includes(t.id));
+        return (
+          <>
+            <Divider label="⭐ PINNED" />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 14 }}>
+              {pinnedTools.map(t => (
+                <ToolCard key={t.id} t={t} accent={toolAccent(t.id)} setPage={setPage} isFav={true} onToggleFav={toggleFav} />
+              ))}
+            </div>
+          </>
+        );
+      })()}
+
       {/* ── Core tools grid ──────────────────────────────────────── */}
       <Divider label="CORE TOOLS" />
 
@@ -257,7 +287,7 @@ export default function Home({ setPage }) {
         {tools.filter(t => !isEnergy(t.id) && !isReport(t.id) && !isScenario(t.id)).map(t => {
           const accent = toolAccent(t.id);
           return (
-            <ToolCard key={t.id} t={t} accent={accent} setPage={setPage} />
+            <ToolCard key={t.id} t={t} accent={accent} setPage={setPage} isFav={favs.includes(t.id)} onToggleFav={toggleFav} />
           );
         })}
       </div>
@@ -265,7 +295,7 @@ export default function Home({ setPage }) {
   );
 }
 
-function ToolCard({ t, accent, setPage }) {
+function ToolCard({ t, accent, setPage, isFav, onToggleFav }) {
   const [hovered, setHovered] = useState(false);
   const m = MODE_DOT[TOOL_DATA_MODE[t.id]];
   return (
@@ -279,9 +309,23 @@ function ToolCard({ t, accent, setPage }) {
         borderTop: `2px solid ${hovered ? accent : "#1f2d45"}`,
         borderRadius: 8, padding: 13, cursor: "pointer",
         transition: "background 0.15s, border-color 0.15s",
-        display: "flex", flexDirection: "column",
+        display: "flex", flexDirection: "column", position: "relative",
       }}
     >
+      {onToggleFav && (
+        <button
+          onClick={e => { e.stopPropagation(); onToggleFav(t.id); }}
+          title={isFav ? "Remove from pinned" : "Pin tool"}
+          style={{
+            position: "absolute", top: 7, right: 7,
+            background: "none", border: "none", cursor: "pointer",
+            fontSize: 12, opacity: isFav ? 1 : (hovered ? 0.5 : 0.15),
+            color: isFav ? "#ffd700" : "#9ca3af",
+            transition: "opacity 0.15s",
+            padding: 2, lineHeight: 1,
+          }}
+        >★</button>
+      )}
       <div style={{ fontSize: 20, marginBottom: 6 }}>{t.icon}</div>
       <div style={{ fontWeight: 700, color: hovered ? accent : "#e2e8f0", fontSize: 12, marginBottom: 4, transition: "color 0.15s" }}>{t.label}</div>
       <div style={{ color: "#4a5568", fontSize: 11, lineHeight: 1.4, flex: 1 }}>{TOOL_DESC[t.id]}</div>

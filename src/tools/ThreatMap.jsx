@@ -78,8 +78,12 @@ export default function ThreatMap() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [scanY, setScanY] = useState(0);
-  const [filterType, setFilterType] = useState("ALL");
-  const [filterLevel, setFilterLevel] = useState("ALL");
+  const [filterType, setFilterType] = useState(() => {
+    try { return localStorage.getItem("sentinel-threatmap-type") || "ALL"; } catch { return "ALL"; }
+  });
+  const [filterLevel, setFilterLevel] = useState(() => {
+    try { return localStorage.getItem("sentinel-threatmap-level") || "ALL"; } catch { return "ALL"; }
+  });
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 1500); return () => clearInterval(t); }, []);
   useEffect(() => { const t = setInterval(() => setScanY(y => (y + 6) % 384), 40); return () => clearInterval(t); }, []);
 
@@ -216,7 +220,7 @@ export default function ThreatMap() {
             {TYPE_FILTERS.map(f => {
               const active = filterType === f.id;
               return (
-                <button key={f.id} onClick={() => { setFilterType(f.id); setSel(null); }} style={{
+                <button key={f.id} onClick={() => { setFilterType(f.id); setSel(null); try { localStorage.setItem("sentinel-threatmap-type", f.id); } catch {} }} style={{
                   background: active ? f.color : "#1f2d45",
                   color: active ? "#0a0f1e" : "#9ca3af",
                   border: `1px solid ${active ? f.color : "transparent"}`,
@@ -232,7 +236,7 @@ export default function ThreatMap() {
               const active = filterLevel === f;
               const fc = f === "CRITICAL" ? "#ff4d4d" : f === "HIGH" ? "#ff9d00" : f === "MEDIUM" ? "#ffd700" : "#9ca3af";
               return (
-                <button key={f} onClick={() => { setFilterLevel(f); setSel(null); }} style={{
+                <button key={f} onClick={() => { setFilterLevel(f); setSel(null); try { localStorage.setItem("sentinel-threatmap-level", f); } catch {} }} style={{
                   background: active ? fc : "#1f2d45",
                   color: active ? "#0a0f1e" : "#9ca3af",
                   border: `1px solid ${active ? fc : "transparent"}`,

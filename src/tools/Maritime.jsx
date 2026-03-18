@@ -45,7 +45,6 @@ function VesselCard({ v, selected, onClick }) {
         borderRadius: 8,
         padding: "11px 14px",
         cursor: "pointer",
-        borderLeft: `3px solid ${active ? accent : accent + "66"}`,
         border: `1px solid ${selected ? accent + "55" : hovered ? "#2a3f5f" : "#1f2d45"}`,
         borderLeft: `3px solid ${accent}`,
         display: "flex",

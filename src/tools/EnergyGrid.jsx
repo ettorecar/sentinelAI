@@ -159,7 +159,9 @@ const GRID_DATA = {
 
 export default function EnergyGrid() {
   const [apiKey] = useApiKey();
-  const [country, setCountry] = useState("Germany");
+  const [country, setCountry] = useState(() => {
+    try { return localStorage.getItem("sentinel-energygrid-country") || "Germany"; } catch { return "Germany"; }
+  });
   const [ran, setRan] = useState(false);
   const [simScenario, setSimScenario] = useState(null);
   const [aiResult, setAiResult] = useState(null);
@@ -201,7 +203,7 @@ export default function EnergyGrid() {
         <ST icon="🌍" label="Select Grid" color="#ff9d00" />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {COUNTRIES.map(c => (
-            <button key={c} onClick={() => { setCountry(c); setRan(false); setSimScenario(null); setSimStep(0); }}
+            <button key={c} onClick={() => { setCountry(c); setRan(false); setSimScenario(null); setSimStep(0); try { localStorage.setItem("sentinel-energygrid-country", c); } catch {} }}
               style={{ background: country === c ? "#ff9d00" : "#1f2d45", color: country === c ? "#0a0f1e" : "#9ca3af", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: country === c ? 700 : 400 }}>{c}</button>
           ))}
         </div>
