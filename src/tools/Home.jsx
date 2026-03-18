@@ -10,6 +10,7 @@ const TOOL_DATA_MODE = {
   threatmap: "hybrid", maritime: "hybrid", biothreat: "hybrid",
   chokepoint: "hybrid", energygrid: "hybrid", oilinfra: "hybrid",
   satellite: "hybrid", energyrisk: "hybrid", cti: "hybrid", translator: "hybrid",
+  airroutes: "hybrid",
 };
 const MODE_DOT = {
   ai:     { dot: "●", color: "#00ff9d", label: "AI" },
@@ -64,8 +65,10 @@ export default function Home({ setPage }) {
   const isReport = id => id === "intelreport";
   const isScenario = id => id === "scenariobuilder";
 
+  const isAirroutes = id => id === "airroutes";
   function toolAccent(id) {
     if (isEnergy(id)) return "#ff9d00";
+    if (isAirroutes(id)) return "#38bdf8";
     if (isReport(id)) return "#b47fff";
     if (isScenario(id)) return "#22d3ee";
     return "#00ff9d";
@@ -86,7 +89,7 @@ export default function Home({ setPage }) {
               <span style={{ color: "#00ff9d", marginLeft: 2 }}>.</span>
             </h1>
             <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-              <BADGE text="18 Tools" color="green" />
+              <BADGE text="19 Tools" color="green" />
               <BADGE text="AI Powered" color="blue" />
               <BADGE text="OSINT" color="blue" />
               <BADGE text="Energy Module" color="orange" />

@@ -21,6 +21,7 @@ import Chokepoint      from "./tools/Chokepoint";
 import EnergyRisk      from "./tools/EnergyRisk";
 import EnergyGrid      from "./tools/EnergyGrid";
 import IntelReport     from "./tools/IntelReport";
+import AirRoutes       from "./tools/AirRoutes";
 import ScenarioBuilder from "./tools/ScenarioBuilder";
 import Workspace       from "./tools/Workspace";
 
@@ -41,6 +42,7 @@ const PAGES = {
   chokepoint:     Chokepoint,
   energyrisk:     EnergyRisk,
   energygrid:     EnergyGrid,
+  airroutes:      AirRoutes,
   intelreport:    IntelReport,
   scenariobuilder: ScenarioBuilder,
   workspace:      Workspace,
@@ -48,6 +50,7 @@ const PAGES = {
 
 function navAccent(id) {
   if (ENERGY_IDS.includes(id)) return "#ff9d00";
+  if (id === "airroutes")      return "#38bdf8";
   if (id === "intelreport")    return "#b47fff";
   if (id === "scenariobuilder") return "#22d3ee";
   return "#00ff9d";
@@ -124,7 +127,7 @@ function ApiKeyBanner() {
           <span style={{ color: "#00ff9d", fontSize: 11, fontWeight: 600 }}>AI ACTIVE</span>
           <span style={{ color: "#2d4a3e", fontSize: 11 }}>·</span>
           <span style={{ color: "#4a5568", fontSize: 11 }}>
-            {`sk-ant-...${apiKey.slice(-6)}`} · 18 moduli operativi
+            {`sk-ant-...${apiKey.slice(-6)}`} · 19 moduli operativi
           </span>
           <button onClick={clear} style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 10, padding: "2px 8px", cursor: "pointer", marginLeft: "auto" }}>
             Disconnect
@@ -200,6 +203,9 @@ const FEED_POOL = [
   { msg: "Bio-signal: unexplained pneumonia cluster — Central Asia",  level: "HIGH",     page: "biothreat" },
   { msg: "Maritime: submarine cable repair vessel off Morocco coast", level: "MEDIUM",   page: "maritime"  },
   { msg: "Pattern of life break: HVT subject absent 72h",            level: "HIGH",     page: "patlife"   },
+  { msg: "NOTAM: Yemen FIR closure extended — drone threat escalation", level: "CRITICAL", page: "airroutes" },
+  { msg: "Airspace reroute: 12 flights diverted from Eastern Iran corridor", level: "HIGH",  page: "airroutes" },
+  { msg: "Sudan FIR: Khartoum airport closure confirmed — all ops suspended", level: "CRITICAL", page: "airroutes" },
 ];
 
 const NOTIF_LC = { CRITICAL: "#ff4d4d", HIGH: "#ff9d00", MEDIUM: "#ffd700" };
@@ -599,7 +605,7 @@ function AppInner() {
       <nav style={{
         background: "#0b111e", borderBottom: "1px solid #131f33",
         padding: "0 4px", display: "flex", alignItems: "stretch",
-        overflowX: narrow ? "visible" : "auto", scrollbarWidth: "none",
+        flexWrap: narrow ? "nowrap" : "wrap",
       }}>
         {narrow ? (
           <>
