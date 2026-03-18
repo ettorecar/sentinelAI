@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { MapContainer, TileLayer, CircleMarker, useMapEvents } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -18,22 +20,27 @@ const rb = r => r === "CRITICAL" || r === "HIGH" ? "red" : r === "MEDIUM" ? "yel
 const typeIcons = { Refinery: "⚗️", Pipeline: "〰️", Terminal: "⚓" };
 
 const ASSETS = [
-  { id: "OG-001", name: "Abqaiq Processing Facility",         country: "Saudi Arabia",    type: "Refinery", risk: "CRITICAL", mx: 430, my: 185, incident: "Drone swarm threat detected in perimeter",         lastEvt: "14/03", barrel: "7.0Mb/d" },
-  { id: "OG-002", name: "Druzhba Pipeline — Western Segment", country: "Russia/EU",       type: "Pipeline", risk: "HIGH",     mx: 358, my: 108, incident: "Unexplained pressure anomaly, 3rd segment",        lastEvt: "13/03", barrel: "1.2Mb/d" },
-  { id: "OG-003", name: "Ras Tanura Marine Terminal",         country: "Saudi Arabia",    type: "Terminal", risk: "HIGH",     mx: 435, my: 180, incident: "Suspicious vessel loitering 12nm offshore",        lastEvt: "12/03", barrel: "6.5Mb/d" },
-  { id: "OG-004", name: "Kharg Island Terminal",              country: "Iran",            type: "Terminal", risk: "MEDIUM",   mx: 438, my: 172, incident: "Elevated military activity nearby",                lastEvt: "11/03", barrel: "2.5Mb/d" },
-  { id: "OG-005", name: "Nord Stream Monitoring Zone",        country: "Baltic Sea",      type: "Pipeline", risk: "HIGH",     mx: 335, my: 97,  incident: "Seismic anomaly detected near route",              lastEvt: "10/03", barrel: "0Mb/d"   },
-  { id: "OG-006", name: "Kirkuk-Ceyhan Pipeline",             country: "Iraq/Turkey",     type: "Pipeline", risk: "MEDIUM",   mx: 388, my: 148, incident: "Armed group activity near pumping station",        lastEvt: "09/03", barrel: "0.6Mb/d" },
-  { id: "OG-007", name: "Sumed Pipeline",                     country: "Egypt",           type: "Pipeline", risk: "LOW",      mx: 368, my: 175, incident: "Routine maintenance in progress",                  lastEvt: "08/03", barrel: "2.3Mb/d" },
-  { id: "OG-008", name: "Haradh Gas Processing Plant",        country: "Saudi Arabia",    type: "Refinery", risk: "HIGH",     mx: 428, my: 190, incident: "Cyber intrusion detected in SCADA systems",        lastEvt: "07/03", barrel: "1.6Mb/d" },
-  { id: "OG-009", name: "Azerbaijan BTC Pipeline",            country: "Azerbaijan/Turkey",type:"Pipeline", risk: "MEDIUM",   mx: 415, my: 143, incident: "PKK-linked threat on Turkish segment assessed",     lastEvt: "06/03", barrel: "1.2Mb/d" },
-  { id: "OG-010", name: "Basra Oil Terminal",                 country: "Iraq",            type: "Terminal", risk: "MEDIUM",   mx: 443, my: 180, incident: "Rocket fire reported near facility perimeter",      lastEvt: "05/03", barrel: "3.8Mb/d" },
-  { id: "OG-011", name: "Trans-Arabian Pipeline",             country: "Saudi Arabia",    type: "Pipeline", risk: "LOW",      mx: 385, my: 170, incident: "No active incidents — routine monitoring",          lastEvt: "04/03", barrel: "0.5Mb/d" },
-  { id: "OG-012", name: "El Sharara Oil Field",               country: "Libya",           type: "Refinery", risk: "HIGH",     mx: 326, my: 193, incident: "Militia group blockade threat reported",            lastEvt: "03/03", barrel: "0.3Mb/d" },
-  { id: "OG-013", name: "TurkStream Pipeline",                country: "Russia/Turkey",   type: "Pipeline", risk: "HIGH",     mx: 375, my: 140, incident: "Undersea sabotage threat assessed as credible",     lastEvt: "02/03", barrel: "0.8Mb/d" },
-  { id: "OG-014", name: "Buzios Offshore Field",              country: "Brazil",          type: "Terminal", risk: "LOW",      mx: 200, my: 278, incident: "Hurricane season monitoring — no current threat",   lastEvt: "01/03", barrel: "2.0Mb/d" },
-  { id: "OG-015", name: "Tengiz Oil Field",                   country: "Kazakhstan",      type: "Refinery", risk: "MEDIUM",   mx: 472, my: 118, incident: "CPC export route disruption — tanker queue build-up",lastEvt: "28/02", barrel: "1.5Mb/d" },
+  { id: "OG-001", name: "Abqaiq Processing Facility",         country: "Saudi Arabia",     type: "Refinery", risk: "CRITICAL", lat:  25.9, lon:  49.7, incident: "Drone swarm threat detected in perimeter",          lastEvt: "14/03", barrel: "7.0Mb/d" },
+  { id: "OG-002", name: "Druzhba Pipeline — Western Segment", country: "Russia/EU",        type: "Pipeline", risk: "HIGH",     lat:  51.0, lon:  24.0, incident: "Unexplained pressure anomaly, 3rd segment",         lastEvt: "13/03", barrel: "1.2Mb/d" },
+  { id: "OG-003", name: "Ras Tanura Marine Terminal",         country: "Saudi Arabia",     type: "Terminal", risk: "HIGH",     lat:  26.6, lon:  50.1, incident: "Suspicious vessel loitering 12nm offshore",         lastEvt: "12/03", barrel: "6.5Mb/d" },
+  { id: "OG-004", name: "Kharg Island Terminal",              country: "Iran",             type: "Terminal", risk: "MEDIUM",   lat:  29.2, lon:  50.3, incident: "Elevated military activity nearby",                 lastEvt: "11/03", barrel: "2.5Mb/d" },
+  { id: "OG-005", name: "Nord Stream Monitoring Zone",        country: "Baltic Sea",       type: "Pipeline", risk: "HIGH",     lat:  55.5, lon:  15.0, incident: "Seismic anomaly detected near route",               lastEvt: "10/03", barrel: "0Mb/d"   },
+  { id: "OG-006", name: "Kirkuk-Ceyhan Pipeline",             country: "Iraq/Turkey",      type: "Pipeline", risk: "MEDIUM",   lat:  36.5, lon:  43.0, incident: "Armed group activity near pumping station",         lastEvt: "09/03", barrel: "0.6Mb/d" },
+  { id: "OG-007", name: "Sumed Pipeline",                     country: "Egypt",            type: "Pipeline", risk: "LOW",      lat:  30.0, lon:  32.5, incident: "Routine maintenance in progress",                   lastEvt: "08/03", barrel: "2.3Mb/d" },
+  { id: "OG-008", name: "Haradh Gas Processing Plant",        country: "Saudi Arabia",     type: "Refinery", risk: "HIGH",     lat:  24.0, lon:  49.0, incident: "Cyber intrusion detected in SCADA systems",         lastEvt: "07/03", barrel: "1.6Mb/d" },
+  { id: "OG-009", name: "Azerbaijan BTC Pipeline",            country: "Azerbaijan/Turkey",type: "Pipeline", risk: "MEDIUM",   lat:  40.4, lon:  47.0, incident: "PKK-linked threat on Turkish segment assessed",      lastEvt: "06/03", barrel: "1.2Mb/d" },
+  { id: "OG-010", name: "Basra Oil Terminal",                 country: "Iraq",             type: "Terminal", risk: "MEDIUM",   lat:  29.5, lon:  48.5, incident: "Rocket fire reported near facility perimeter",       lastEvt: "05/03", barrel: "3.8Mb/d" },
+  { id: "OG-011", name: "Trans-Arabian Pipeline",             country: "Saudi Arabia",     type: "Pipeline", risk: "LOW",      lat:  26.5, lon:  42.5, incident: "No active incidents — routine monitoring",           lastEvt: "04/03", barrel: "0.5Mb/d" },
+  { id: "OG-012", name: "El Sharara Oil Field",               country: "Libya",            type: "Refinery", risk: "HIGH",     lat:  27.9, lon:  10.5, incident: "Militia group blockade threat reported",             lastEvt: "03/03", barrel: "0.3Mb/d" },
+  { id: "OG-013", name: "TurkStream Pipeline",                country: "Russia/Turkey",    type: "Pipeline", risk: "HIGH",     lat:  41.5, lon:  32.5, incident: "Undersea sabotage threat assessed as credible",      lastEvt: "02/03", barrel: "0.8Mb/d" },
+  { id: "OG-014", name: "Buzios Offshore Field",              country: "Brazil",           type: "Terminal", risk: "LOW",      lat: -23.0, lon: -40.0, incident: "Hurricane season monitoring — no current threat",    lastEvt: "01/03", barrel: "2.0Mb/d" },
+  { id: "OG-015", name: "Tengiz Oil Field",                   country: "Kazakhstan",       type: "Refinery", risk: "MEDIUM",   lat:  45.5, lon:  53.0, incident: "CPC export route disruption — tanker queue build-up", lastEvt: "28/02", barrel: "1.5Mb/d" },
 ];
+
+function MapClickHandler({ onDeselect }) {
+  useMapEvents({ click: onDeselect });
+  return null;
+}
 
 function FilterBtn({ label, active, onClick }) {
   const [hovered, setHovered] = useState(false);
@@ -97,11 +104,6 @@ export default function OilInfra() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
-  const [pipeOff, setPipeOff] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setPipeOff(d => (d + 1) % 24), 80);
-    return () => clearInterval(t);
-  }, []);
 
   async function analyzeAsset(a) {
     setAiResult(null); setAiError(""); setAiLoading(true);
@@ -138,62 +140,38 @@ export default function OilInfra() {
           <div style={{ fontWeight: 700, color: "#ff9d00", fontSize: 13 }}>🗺️ Global Asset Map</div>
           <span style={{ color: "#4a5568", fontSize: 10 }}>Click asset to inspect</span>
         </div>
-        <svg viewBox="0 0 700 320" style={{ width: "100%", background: "#050d1a", display: "block" }}>
-          {[70,130,200,270].map(y => <line key={y} x1={0} y1={y} x2={700} y2={y} stroke="#0d2040" strokeWidth="1" />)}
-          {[0,140,280,420,560,700].map(x => <line key={x} x1={x} y1={0} x2={x} y2={320} stroke="#0d2040" strokeWidth="1" />)}
-          <path d="M 60 80 Q 80 60 120 65 Q 150 60 175 80 Q 185 100 180 130 Q 170 160 155 180 Q 140 200 120 210 Q 100 195 85 175 Q 65 150 55 120 Q 48 95 60 80Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 145 220 Q 165 215 180 230 Q 190 250 185 280 Q 178 310 165 318 Q 150 320 138 308 Q 125 290 125 260 Q 125 238 145 220Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 295 70 Q 330 60 365 70 Q 385 80 390 100 Q 385 115 365 118 Q 340 122 315 115 Q 295 105 290 90 Q 288 78 295 70Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 295 130 Q 330 125 360 135 Q 375 155 372 185 Q 368 220 355 248 Q 338 268 318 265 Q 298 260 288 238 Q 278 210 280 180 Q 282 152 295 130Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 400 65 Q 470 55 540 65 Q 600 70 650 85 Q 685 100 695 125 Q 690 150 665 160 Q 630 168 590 162 Q 545 155 500 148 Q 455 140 420 128 Q 395 115 390 95 Q 390 78 400 65Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 600 255 Q 640 250 670 263 Q 685 280 678 300 Q 665 315 640 315 Q 615 312 605 295 Q 596 277 600 255Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          {/* Country / region labels */}
-          {[
-            ["RUSSIA",        352, 83],
-            ["SAUDI ARABIA",  422, 205],
-            ["IRAN",          452, 165],
-            ["IRAQ",          415, 170],
-            ["LIBYA",         308, 198],
-            ["KAZAKHSTAN",    472, 108],
-            ["BRAZIL",        193, 270],
-          ].map(([label, x, y]) => (
-            <text key={label} x={x} y={y} textAnchor="middle" fill="#1a2d45" fontSize="7" fontWeight="600" letterSpacing="0.8">{label}</text>
-          ))}
-          {/* Pipeline network — animated */}
-          {[
-            "M 358 108 Q 368 128 388 148",
-            "M 388 148 Q 406 158 418 168",
-            "M 428 180 Q 408 176 388 148",
-            "M 388 148 Q 382 144 375 140",
-            "M 375 140 Q 368 140 358 138",
-            "M 415 143 Q 400 145 388 148",
-            "M 428 180 Q 418 184 412 188 Q 406 192 402 196",
-            "M 472 118 Q 460 130 445 143 Q 430 155 418 168",
-            "M 200 278 Q 200 270 200 265",
-          ].map((d, i) => (
-            <path key={i} d={d} fill="none" stroke="#ff9d00" strokeWidth="1.5"
-              strokeDasharray="6 4" strokeDashoffset={-pipeOff} opacity="0.45" />
-          ))}
-          {/* Shipping / tanker lanes */}
-          <path d="M 428 188 Q 442 198 455 208 Q 462 215 468 225" fill="none" stroke="#4db8ff" strokeWidth="1" strokeDasharray="4 5" opacity="0.25" />
-          {ASSETS.map((a) => {
-            const isSelected = sel?.id === a.id;
+        <MapContainer
+          center={[30, 38]}
+          zoom={3}
+          minZoom={2}
+          maxZoom={10}
+          style={{ height: 360, background: "#050d1a" }}
+          attributionControl={false}
+        >
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            subdomains="abcd"
+            maxZoom={10}
+          />
+          <MapClickHandler onDeselect={() => { setSel(null); setAiResult(null); }} />
+          {ASSETS.map(a => {
             const color = rc(a.risk);
+            const isSel = sel?.id === a.id;
             return (
-              <g key={a.id} onClick={() => selectAsset(a)} style={{ cursor: "pointer" }}>
-                {a.risk === "CRITICAL" && <circle cx={a.mx} cy={a.my} r={18} fill="none" stroke="#ff0000" strokeWidth="0.8" opacity="0.35" />}
-                <circle cx={a.mx} cy={a.my} r={isSelected ? 11 : 8} fill={color} opacity={0.9} />
-                <circle cx={a.mx} cy={a.my} r={isSelected ? 16 : 12} fill="none" stroke={color} strokeWidth="1" opacity="0.3" />
-                <text x={a.mx + 14} y={a.my + 4} fill={isSelected ? "#e2e8f0" : "#6b7a8d"} fontSize={isSelected ? 9 : 8} fontWeight={isSelected ? "700" : "400"}>
-                  {a.name.split(" ")[0]}
-                </text>
-              </g>
+              <CircleMarker
+                key={a.id}
+                center={[a.lat, a.lon]}
+                radius={isSel ? 11 : a.risk === "CRITICAL" ? 9 : a.risk === "HIGH" ? 7 : 5}
+                pathOptions={{
+                  color, fillColor: color,
+                  fillOpacity: isSel ? 0.9 : 0.8,
+                  weight: isSel ? 2 : 1,
+                }}
+                eventHandlers={{ click: (e) => { e.originalEvent.stopPropagation(); selectAsset(a); } }}
+              />
             );
           })}
-          {[["Critical","#ff0000",10],["High","#ff4d4d",70],["Medium","#ffd700",125],["Low","#00ff9d",180]].map(([l,c,x]) => (
-            <g key={l}><circle cx={x+8} cy={308} r={5} fill={c} /><text x={x+17} y={312} fill="#6b7a8d" fontSize="8">{l}</text></g>
-          ))}
-        </svg>
+        </MapContainer>
 
         {/* Selected asset detail */}
         {sel && (
