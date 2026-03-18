@@ -66,9 +66,37 @@ export default function Chokepoint() {
           <path d="M 293 128 Q 330 123 360 133 Q 375 153 372 183 Q 368 218 355 246 Q 338 266 318 263 Q 298 258 288 236 Q 278 208 280 178 Q 282 150 293 128Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
           <path d="M 398 63 Q 468 53 538 63 Q 598 68 648 83 Q 683 98 693 123 Q 688 148 663 158 Q 628 166 588 160 Q 543 153 498 146 Q 453 138 418 126 Q 393 113 388 93 Q 388 76 398 63Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
           <path d="M 598 253 Q 638 248 668 261 Q 683 278 676 298 Q 663 313 638 313 Q 613 310 603 293 Q 594 275 598 253Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 455 188 Q 430 200 405 218" fill="none" stroke="#ff9d00" strokeWidth="1" strokeDasharray="4" opacity="0.4" />
-          <path d="M 405 218 Q 390 200 375 178" fill="none" stroke="#ff9d00" strokeWidth="1" strokeDasharray="4" opacity="0.4" />
-          <path d="M 455 188 Q 520 200 590 215" fill="none" stroke="#ff9d00" strokeWidth="1" strokeDasharray="4" opacity="0.4" />
+          {/* ── Global shipping lane network ── */}
+          {/* Main E-W artery: Panama → Gibraltar → Suez → Bab → Hormuz → Malacca → Luzon */}
+          <path d="M 168 200 Q 230 178 298 153 Q 338 162 375 178 Q 390 200 405 218 Q 432 202 455 188 Q 525 208 590 215 Q 616 198 638 180"
+            fill="none" stroke="#4db8ff" strokeWidth="2" strokeDasharray="8 4" opacity="0.5"
+            style={{ animation: "sentinelDash 5s linear infinite" }} />
+          {/* North Atlantic: Gibraltar → Europe */}
+          <path d="M 298 153 Q 265 140 225 128 Q 185 118 148 118 Q 110 122 80 135 Q 55 148 40 158"
+            fill="none" stroke="#00cfff" strokeWidth="1.2" strokeDasharray="6 5" opacity="0.35"
+            style={{ animation: "sentinelDash 6s linear infinite" }} />
+          {/* Trans-Pacific approach to Panama */}
+          <path d="M 0 185 Q 55 185 100 185 Q 135 190 168 200"
+            fill="none" stroke="#4db8ff" strokeWidth="1" strokeDasharray="5 5" opacity="0.25" />
+          {/* Far East outbound */}
+          <path d="M 638 180 Q 660 172 690 162"
+            fill="none" stroke="#4db8ff" strokeWidth="1" strokeDasharray="5 5" opacity="0.22" />
+          {/* Sub-Africa bypass via Cape of Good Hope */}
+          <path d="M 298 153 Q 300 198 314 242 Q 325 285 368 288 Q 415 278 452 252 Q 480 232 505 224 Q 548 218 590 215"
+            fill="none" stroke="#6070a8" strokeWidth="1.2" strokeDasharray="5 6" opacity="0.3" />
+          {/* Indian Ocean cross-route */}
+          <path d="M 455 188 Q 460 210 462 230 Q 465 248 476 258 Q 510 268 548 260 Q 572 250 590 235 Q 592 225 590 215"
+            fill="none" stroke="#3a6080" strokeWidth="1" strokeDasharray="4 6" opacity="0.25" />
+          {/* Baltic / Nordic route → Danish Straits → North Sea */}
+          <path d="M 322 88 Q 310 105 302 122 Q 300 138 298 153"
+            fill="none" stroke="#3a6a80" strokeWidth="1" strokeDasharray="4 5" opacity="0.28" />
+          {/* Black Sea route → Turkish Straits */}
+          <path d="M 365 138 Q 382 128 400 118 Q 415 112 430 108"
+            fill="none" stroke="#3a6a80" strokeWidth="1" strokeDasharray="4 5" opacity="0.25" />
+          {/* Lane traffic labels */}
+          <text x={295} y={175} fill="#2a4060" fontSize="7" textAnchor="middle">MED ROUTE</text>
+          <text x={500} y={202} fill="#2a4060" fontSize="7" textAnchor="middle">INDIAN OCEAN</text>
+          <text x={200} y={145} fill="#2a4060" fontSize="7" textAnchor="middle">N.ATLANTIC</text>
           {chokepoints.map((cp, i) => {
             const c = riskColor(cp.risk);
             const pulse = (tick + i * 3) % 10;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -97,6 +97,11 @@ export default function OilInfra() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [pipeOff, setPipeOff] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setPipeOff(d => (d + 1) % 24), 80);
+    return () => clearInterval(t);
+  }, []);
 
   async function analyzeAsset(a) {
     setAiResult(null); setAiError(""); setAiLoading(true);
@@ -142,9 +147,35 @@ export default function OilInfra() {
           <path d="M 295 130 Q 330 125 360 135 Q 375 155 372 185 Q 368 220 355 248 Q 338 268 318 265 Q 298 260 288 238 Q 278 210 280 180 Q 282 152 295 130Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
           <path d="M 400 65 Q 470 55 540 65 Q 600 70 650 85 Q 685 100 695 125 Q 690 150 665 160 Q 630 168 590 162 Q 545 155 500 148 Q 455 140 420 128 Q 395 115 390 95 Q 390 78 400 65Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
           <path d="M 600 255 Q 640 250 670 263 Q 685 280 678 300 Q 665 315 640 315 Q 615 312 605 295 Q 596 277 600 255Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          {/* Pipeline routes */}
-          <path d="M 358 108 Q 370 130 388 148" fill="none" stroke="#ff9d00" strokeWidth="1.5" strokeDasharray="5" opacity="0.4" />
-          <path d="M 368 175 Q 380 178 388 148" fill="none" stroke="#ff9d00" strokeWidth="1.5" strokeDasharray="5" opacity="0.4" />
+          {/* Country / region labels */}
+          {[
+            ["RUSSIA",        352, 83],
+            ["SAUDI ARABIA",  422, 205],
+            ["IRAN",          452, 165],
+            ["IRAQ",          415, 170],
+            ["LIBYA",         308, 198],
+            ["KAZAKHSTAN",    472, 108],
+            ["BRAZIL",        193, 270],
+          ].map(([label, x, y]) => (
+            <text key={label} x={x} y={y} textAnchor="middle" fill="#1a2d45" fontSize="7" fontWeight="600" letterSpacing="0.8">{label}</text>
+          ))}
+          {/* Pipeline network — animated */}
+          {[
+            "M 358 108 Q 368 128 388 148",
+            "M 388 148 Q 406 158 418 168",
+            "M 428 180 Q 408 176 388 148",
+            "M 388 148 Q 382 144 375 140",
+            "M 375 140 Q 368 140 358 138",
+            "M 415 143 Q 400 145 388 148",
+            "M 428 180 Q 418 184 412 188 Q 406 192 402 196",
+            "M 472 118 Q 460 130 445 143 Q 430 155 418 168",
+            "M 200 278 Q 200 270 200 265",
+          ].map((d, i) => (
+            <path key={i} d={d} fill="none" stroke="#ff9d00" strokeWidth="1.5"
+              strokeDasharray="6 4" strokeDashoffset={-pipeOff} opacity="0.45" />
+          ))}
+          {/* Shipping / tanker lanes */}
+          <path d="M 428 188 Q 442 198 455 208 Q 462 215 468 225" fill="none" stroke="#4db8ff" strokeWidth="1" strokeDasharray="4 5" opacity="0.25" />
           {ASSETS.map((a) => {
             const isSelected = sel?.id === a.id;
             const color = rc(a.risk);

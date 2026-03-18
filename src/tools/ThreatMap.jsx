@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BADGE, Card, PageHeader, StatBar, Btn, LiveBadge, Pulse } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -84,14 +84,50 @@ export default function ThreatMap() {
   const [filterLevel, setFilterLevel] = useState(() => {
     try { return localStorage.getItem("sentinel-threatmap-level") || "ALL"; } catch { return "ALL"; }
   });
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [grabbing, setGrabbing] = useState(false);
+  const svgRef = useRef(null);
+  const isDragging = useRef(false);
+  const dragStart = useRef(null);
+  const hasDragged = useRef(false);
+
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 1500); return () => clearInterval(t); }, []);
   useEffect(() => { const t = setInterval(() => setScanY(y => (y + 6) % 384), 40); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const onWheel = e => {
+      e.preventDefault();
+      const f = e.deltaY > 0 ? 0.85 : 1.18;
+      setZoom(z => Math.min(5, Math.max(0.6, z * f)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  function handleMouseDown(e) {
+    if (e.button !== 0) return;
+    isDragging.current = true;
+    hasDragged.current = false;
+    setGrabbing(true);
+    dragStart.current = { mx: e.clientX, my: e.clientY, px: pan.x, py: pan.y };
+  }
+  function handleMouseMove(e) {
+    if (!isDragging.current || !dragStart.current) return;
+    const dx = e.clientX - dragStart.current.mx;
+    const dy = e.clientY - dragStart.current.my;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasDragged.current = true;
+    setPan({ x: dragStart.current.px + dx, y: dragStart.current.py + dy });
+  }
+  function handleMouseUp() { isDragging.current = false; setGrabbing(false); }
 
   const visible = hotspots.filter(h =>
     matchType(h.type, filterType) && (filterLevel === "ALL" || h.level === filterLevel)
   );
 
   function selectHotspot(h) {
+    if (hasDragged.current) return;
     if (!visible.find(v => v.id === h.id)) return;
     setSel(sel?.id === h.id ? null : h);
     setAiResult(null); setAiError("");
@@ -132,9 +168,15 @@ export default function ThreatMap() {
         <div style={{ background: "#0d1626", borderBottom: "1px solid #1f2d45", padding: "8px 14px", display: "flex", alignItems: "center", gap: 8 }}>
           <Pulse color="#ff4d4d" size={7} />
           <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>LIVE THREAT OVERLAY</span>
-          <span style={{ marginLeft: "auto", color: "#3a4a5c", fontSize: 10 }}>Click hotspot for details</span>
+          <span style={{ marginLeft: "auto", color: "#3a4a5c", fontSize: 10 }}>Scroll zoom · drag pan</span>
+          <div style={{ display: "flex", gap: 3, marginLeft: 8 }}>
+            {[["＋", () => setZoom(z => Math.min(5, z * 1.3))], ["－", () => setZoom(z => Math.max(0.6, z * 0.77))], ["RST", () => { setZoom(1); setPan({ x: 0, y: 0 }); }]].map(([l, fn]) => (
+              <button key={l} onClick={fn} style={{ background: "#1f2d45", border: "none", borderRadius: 3, color: "#9ca3af", fontSize: l === "RST" ? 8 : 13, width: l === "RST" ? 30 : 22, height: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>{l}</button>
+            ))}
+          </div>
         </div>
-        <svg viewBox="0 0 780 380" style={{ width: "100%", background: "#050d1a", display: "block" }}>
+        <svg ref={svgRef} viewBox="0 0 780 380" style={{ width: "100%", background: "#050d1a", display: "block", cursor: grabbing ? "grabbing" : "grab", userSelect: "none" }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+          <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
           {[60, 130, 200, 270, 340].map(y => <line key={y} x1={0} y1={y} x2={780} y2={y} stroke="#0d2040" strokeWidth="1" />)}
           {[0, 130, 260, 390, 520, 650, 780].map(x => <line key={x} x1={x} y1={0} x2={x} y2={380} stroke="#0d2040" strokeWidth="1" />)}
           {/* Continents */}
@@ -167,7 +209,8 @@ export default function ThreatMap() {
               </g>
             );
           })}
-          {/* Legend */}
+          </g>
+          {/* Legend — fixed, outside transform */}
           {[["Kinetic", "#ff4d4d", 18], ["Cyber", "#4db8ff", 88], ["Maritime", "#00cfff", 153], ["Bio", "#00ff9d", 213], ["Hybrid", "#b47fff", 268]].map(([l, c, x]) => (
             <g key={l}>
               <circle cx={x} cy={368} r={4} fill={c} opacity="0.8" />
