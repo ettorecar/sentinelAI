@@ -52,6 +52,7 @@ Possible sources:
 - AIS maritime feeds
 - Cyber threat feeds
 - Energy market feeds
+- Airspace feeds (OpenSky Network, FAA NOTAM, EuroControl, ICAO)
 - Open-source intelligence datasets
 
 ---

@@ -17,6 +17,7 @@ Tool che rientrano in questo layer:
 - 🦠 **Bio-Threat Warning** — segnali epidemiologici attivi
 - 🔐 **Cyber Threat Intel** — threat actor profiles e IOC feed
 - 🌊 **Maritime Tracker** — anomalie AIS aggregate
+- ✈️ **Airspace Monitor** — chiusure spazi aerei per conflitto, NOTAMs, rotte deviate
 
 ### Layer 2 — Personalizzato, richiede API key utente
 Analisi su input specifico dell'utente. La chiave API è fornita dall'utente stesso — zero costi per la piattaforma, zero rischio bot.
@@ -255,6 +256,8 @@ async def analyze_redteam(
 | Oil/Energy | EIA API (US Energy Info) | Gratuito |
 | Chokepoint | MarineTraffic API | A pagamento (valutare) |
 | Geopolitica | ACLED API (conflict data) | Gratuito per ricerca |
+| Airspace | OpenSky Network API | Gratuito (real-time flights) |
+| Airspace NOTAMs | FAA NOTAM API, EuroControl, ICAO | Gratuito |
 
 ---
 
