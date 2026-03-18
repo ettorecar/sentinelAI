@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, PageHeader } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -74,6 +74,8 @@ export default function PatLife() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { stamp } = useLastAnalysis("patlife");
+  function handleKey(e) { if (e.ctrlKey && e.key === "Enter") analyze(); }
 
   async function analyze() {
     if (!apiKey) { setError("Set the Anthropic API key using the banner above."); return; }
@@ -100,7 +102,7 @@ Return exactly this JSON structure:
 }
 
 Include 5-7 routine patterns. The heatmap must be a 6×7 matrix (6 time slots × 7 days) with 0 or 1 values.`;
-      setResult(await callClaude(apiKey, prompt));
+      setResult(await callClaude(apiKey, prompt)); stamp();
     } catch (e) { setError("Error: " + e.message); }
     setLoading(false);
   }
@@ -110,16 +112,19 @@ Include 5-7 routine patterns. The heatmap must be a 6×7 matrix (6 time slots ×
       <PageHeader icon="📍" title="Pattern-of-Life Analyzer" sub="Spatio-temporal behaviour reconstruction and exposure analysis." accent="#4db8ff" dataMode="ai" />
 
       <Card>
-        <Input label="🎯 Subject Identifier" value={subject} onChange={setSubject}
-          placeholder="Subject Alpha, plate LK-4422, @username, IP 91.x.x.x..." />
+        <Input label="🎯 Subject Identifier" value={subject} onChange={setSubject} placeholder="Subject Alpha, plate LK-4422, @username, IP 91.x.x.x..." maxLength={200} onClear={() => setSubject("")} onKeyDown={handleKey} hint="Ctrl+Enter per avviare analisi" />
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
-        <Btn onClick={analyze} disabled={loading}>
-          {loading ? "⏳ Analyzing..." : "Analyze Pattern-of-Life"}
-        </Btn>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Btn onClick={analyze} disabled={loading}>{loading ? "⏳ Analyzing..." : "Analyze Pattern-of-Life"}</Btn>
+          <LastAnalysisTag toolId="patlife" />
+        </div>
       </Card>
 
       {result && (
         <>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+            <ExportBtn data={result} filename={`sentinel-patlife-${subject.replace(/\s/g,"-").slice(0,20)}`} />
+          </div>
           {/* KPI strip */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 120px), 1fr))", gap: 10, marginBottom: 12 }}>
             {[

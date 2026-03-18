@@ -20,6 +20,10 @@ const chokepoints = [
   { id: "CP-04", name: "Suez Canal",          location: "Egypt",                 mx: 375, my: 178, risk: "MEDIUM",   flow: "5.5Mb/d", pct: "5%",  tension: "Moderate", threats: ["Diversion due to Houthi threat", "Congestion incidents"],                            altRoute: "Cape of Good Hope or SUMED pipeline",                  history: [7, 7, 6, 6, 5, 5, 6] },
   { id: "CP-05", name: "Turkish Straits",     location: "Bosphorus/Dardanelles", mx: 365, my: 138, risk: "MEDIUM",   flow: "2.4Mb/d", pct: "2%",  tension: "Moderate", threats: ["Russian Black Sea fleet movements", "Sanctions complications"],                      altRoute: "Trans-Anatolian Pipeline (TANAP)",                     history: [3, 3, 2, 2, 2, 2, 2] },
   { id: "CP-06", name: "Danish Straits",      location: "North Sea",             mx: 322, my: 88,  risk: "LOW",      flow: "1.5Mb/d", pct: "1%",  tension: "Low",      threats: ["Occasional Russian submarine activity"],                                              altRoute: "Pipeline alternatives available",                      history: [1, 1, 2, 1, 1, 2, 1] },
+  { id: "CP-07", name: "Strait of Gibraltar", location: "Atlantic / Med",        mx: 298, my: 153, risk: "LOW",      flow: "1.8Mb/d", pct: "2%",  tension: "Low",      threats: ["Occasional migrant crisis spillover", "Russian sub activity"],                            altRoute: "North Africa overland pipelines",                      history: [2, 2, 1, 2, 2, 1, 2] },
+  { id: "CP-08", name: "Cape of Good Hope",   location: "South Africa",          mx: 325, my: 285, risk: "LOW",      flow: "3.2Mb/d", pct: "3%",  tension: "Low",      threats: ["Weather-driven routing disruptions", "Piracy uptick near Cape"],                         altRoute: "Suez Canal (normal route)",                            history: [2, 3, 3, 4, 4, 5, 6] },
+  { id: "CP-09", name: "Panama Canal",        location: "Central America",       mx: 168, my: 200, risk: "MEDIUM",   flow: "1.0Mb/d", pct: "1%",  tension: "Moderate", threats: ["Water shortage reducing daily transits", "US-China geopolitical pressure", "Cartel activity near locks"], altRoute: "Suez Canal or US land bridge",              history: [1, 1, 1, 1, 1, 1, 1] },
+  { id: "CP-10", name: "Luzon Strait",        location: "Philippines / Taiwan",  mx: 638, my: 180, risk: "HIGH",     flow: "2.0Mb/d", pct: "2%",  tension: "Elevated", threats: ["PLA Navy exercises", "Taiwan Strait tensions spillover", "Submarine cable vulnerability"], altRoute: "Lombok Strait (+2 days transit)",               history: [1, 2, 2, 3, 3, 4, 5] },
 ];
 
 export default function Chokepoint() {
@@ -45,10 +49,10 @@ export default function Chokepoint() {
       <PageHeader icon="🚢" title="Strategic Chokepoint Monitor" sub="Global maritime energy chokepoints — flow, tension and disruption risk." accent="#ff9d00" dataMode={apiKey ? "hybrid" : "mock"} />
 
       <StatBar stats={[
-        { label: "Total Flow",         value: "55Mb/d", color: "#ff9d00" },
-        { label: "Critical",           value: "2",      color: "#ff4d4d" },
-        { label: "Extreme Tension",    value: "2",      color: "#ff4d4d" },
-        { label: "Rerouting Events",   value: "3",      color: "#ffd700" },
+        { label: "Monitored",          value: String(chokepoints.length),                                               color: "#ff9d00" },
+        { label: "Critical",           value: String(chokepoints.filter(c => c.risk === "CRITICAL").length),            color: "#ff4d4d" },
+        { label: "Extreme Tension",    value: String(chokepoints.filter(c => c.tension === "Extreme").length),          color: "#ff4d4d" },
+        { label: "Rerouting Events",   value: "3",                                                                      color: "#ffd700" },
       ]} />
 
       <Card style={{ padding: 0, overflow: "hidden" }}>

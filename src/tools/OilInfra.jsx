@@ -18,13 +18,21 @@ const rb = r => r === "CRITICAL" || r === "HIGH" ? "red" : r === "MEDIUM" ? "yel
 const typeIcons = { Refinery: "⚗️", Pipeline: "〰️", Terminal: "⚓" };
 
 const ASSETS = [
-  { id: "OG-001", name: "Abqaiq Processing Facility",        country: "Saudi Arabia", type: "Refinery", risk: "CRITICAL", mx: 430, my: 185, incident: "Drone swarm threat detected in perimeter",     lastEvt: "14/03", barrel: "7.0Mb/d" },
-  { id: "OG-002", name: "Druzhba Pipeline — Western Segment", country: "Russia/EU",    type: "Pipeline", risk: "HIGH",     mx: 358, my: 108, incident: "Unexplained pressure anomaly, 3rd segment",  lastEvt: "13/03", barrel: "1.2Mb/d" },
-  { id: "OG-003", name: "Ras Tanura Marine Terminal",         country: "Saudi Arabia", type: "Terminal", risk: "HIGH",     mx: 435, my: 180, incident: "Suspicious vessel loitering 12nm offshore",   lastEvt: "12/03", barrel: "6.5Mb/d" },
-  { id: "OG-004", name: "Kharg Island Terminal",              country: "Iran",         type: "Terminal", risk: "MEDIUM",   mx: 438, my: 172, incident: "Elevated military activity nearby",           lastEvt: "11/03", barrel: "2.5Mb/d" },
-  { id: "OG-005", name: "Nord Stream Monitoring Zone",        country: "Baltic Sea",   type: "Pipeline", risk: "HIGH",     mx: 335, my: 97,  incident: "Seismic anomaly detected near route",        lastEvt: "10/03", barrel: "0Mb/d"   },
-  { id: "OG-006", name: "Kirkuk-Ceyhan Pipeline",             country: "Iraq/Turkey",  type: "Pipeline", risk: "MEDIUM",   mx: 388, my: 148, incident: "Armed group activity near pumping station",   lastEvt: "09/03", barrel: "0.6Mb/d" },
-  { id: "OG-007", name: "Sumed Pipeline",                     country: "Egypt",        type: "Pipeline", risk: "LOW",      mx: 368, my: 175, incident: "Routine maintenance in progress",             lastEvt: "08/03", barrel: "2.3Mb/d" },
+  { id: "OG-001", name: "Abqaiq Processing Facility",         country: "Saudi Arabia",    type: "Refinery", risk: "CRITICAL", mx: 430, my: 185, incident: "Drone swarm threat detected in perimeter",         lastEvt: "14/03", barrel: "7.0Mb/d" },
+  { id: "OG-002", name: "Druzhba Pipeline — Western Segment", country: "Russia/EU",       type: "Pipeline", risk: "HIGH",     mx: 358, my: 108, incident: "Unexplained pressure anomaly, 3rd segment",        lastEvt: "13/03", barrel: "1.2Mb/d" },
+  { id: "OG-003", name: "Ras Tanura Marine Terminal",         country: "Saudi Arabia",    type: "Terminal", risk: "HIGH",     mx: 435, my: 180, incident: "Suspicious vessel loitering 12nm offshore",        lastEvt: "12/03", barrel: "6.5Mb/d" },
+  { id: "OG-004", name: "Kharg Island Terminal",              country: "Iran",            type: "Terminal", risk: "MEDIUM",   mx: 438, my: 172, incident: "Elevated military activity nearby",                lastEvt: "11/03", barrel: "2.5Mb/d" },
+  { id: "OG-005", name: "Nord Stream Monitoring Zone",        country: "Baltic Sea",      type: "Pipeline", risk: "HIGH",     mx: 335, my: 97,  incident: "Seismic anomaly detected near route",              lastEvt: "10/03", barrel: "0Mb/d"   },
+  { id: "OG-006", name: "Kirkuk-Ceyhan Pipeline",             country: "Iraq/Turkey",     type: "Pipeline", risk: "MEDIUM",   mx: 388, my: 148, incident: "Armed group activity near pumping station",        lastEvt: "09/03", barrel: "0.6Mb/d" },
+  { id: "OG-007", name: "Sumed Pipeline",                     country: "Egypt",           type: "Pipeline", risk: "LOW",      mx: 368, my: 175, incident: "Routine maintenance in progress",                  lastEvt: "08/03", barrel: "2.3Mb/d" },
+  { id: "OG-008", name: "Haradh Gas Processing Plant",        country: "Saudi Arabia",    type: "Refinery", risk: "HIGH",     mx: 428, my: 190, incident: "Cyber intrusion detected in SCADA systems",        lastEvt: "07/03", barrel: "1.6Mb/d" },
+  { id: "OG-009", name: "Azerbaijan BTC Pipeline",            country: "Azerbaijan/Turkey",type:"Pipeline", risk: "MEDIUM",   mx: 415, my: 143, incident: "PKK-linked threat on Turkish segment assessed",     lastEvt: "06/03", barrel: "1.2Mb/d" },
+  { id: "OG-010", name: "Basra Oil Terminal",                 country: "Iraq",            type: "Terminal", risk: "MEDIUM",   mx: 443, my: 180, incident: "Rocket fire reported near facility perimeter",      lastEvt: "05/03", barrel: "3.8Mb/d" },
+  { id: "OG-011", name: "Trans-Arabian Pipeline",             country: "Saudi Arabia",    type: "Pipeline", risk: "LOW",      mx: 385, my: 170, incident: "No active incidents — routine monitoring",          lastEvt: "04/03", barrel: "0.5Mb/d" },
+  { id: "OG-012", name: "El Sharara Oil Field",               country: "Libya",           type: "Refinery", risk: "HIGH",     mx: 326, my: 193, incident: "Militia group blockade threat reported",            lastEvt: "03/03", barrel: "0.3Mb/d" },
+  { id: "OG-013", name: "TurkStream Pipeline",                country: "Russia/Turkey",   type: "Pipeline", risk: "HIGH",     mx: 375, my: 140, incident: "Undersea sabotage threat assessed as credible",     lastEvt: "02/03", barrel: "0.8Mb/d" },
+  { id: "OG-014", name: "Buzios Offshore Field",              country: "Brazil",          type: "Terminal", risk: "LOW",      mx: 200, my: 278, incident: "Hurricane season monitoring — no current threat",   lastEvt: "01/03", barrel: "2.0Mb/d" },
+  { id: "OG-015", name: "Tengiz Oil Field",                   country: "Kazakhstan",      type: "Refinery", risk: "MEDIUM",   mx: 472, my: 118, incident: "CPC export route disruption — tanker queue build-up",lastEvt: "28/02", barrel: "1.5Mb/d" },
 ];
 
 function FilterBtn({ label, active, onClick }) {

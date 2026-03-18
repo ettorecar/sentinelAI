@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Btn, ST, PageHeader, LiveBadge } from "../components/shared";
+import { BADGE, Card, Btn, ST, PageHeader, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 const ACCENT = "#22d3ee";
@@ -160,6 +160,7 @@ export default function ScenarioBuilder() {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { stamp } = useLastAnalysis("scenariobuilder");
 
   // ── Actor helpers ──
   function addActor() {
@@ -263,7 +264,7 @@ Return ONLY this JSON structure:
     try {
       const raw = await callClaude(apiKey, prompt, 2800);
       const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-      setAnalysis(parsed);
+      setAnalysis(parsed); stamp();
     } catch (e) {
       setError("Error: " + e.message);
     }
@@ -596,11 +597,12 @@ Return ONLY this JSON structure:
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                 <Btn onClick={runAnalysis} disabled={loading || !apiKey} color={ACCENT}>
                   {loading ? "⏳ Analyzing Scenario..." : "🧠 Run AI Analysis"}
                 </Btn>
                 <Btn onClick={() => setStep(2)} color="#4a5568" size="sm">← Back to Events</Btn>
+                <LastAnalysisTag toolId="scenariobuilder" />
               </div>
             </Card>
           )}
@@ -625,6 +627,7 @@ Return ONLY this JSON structure:
                     <BADGE text={`THREAT: ${analysis.threat_level}`} color={analysis.threat_level === "CRITICAL" || analysis.threat_level === "HIGH" ? "red" : "yellow"} />
                     <BADGE text={`Confidence: ${analysis.confidence}`} color={analysis.confidence === "HIGH" ? "green" : analysis.confidence === "MEDIUM" ? "yellow" : "red"} />
                     <LiveBadge />
+                    <ExportBtn data={analysis} filename={`sentinel-scenario-${title.replace(/\s/g,"-").slice(0,24) || "scenario"}`} />
                   </div>
                 </div>
                 <div style={{ background: "#0d1626", borderRadius: 8, padding: 14, borderLeft: `3px solid ${ACCENT}` }}>

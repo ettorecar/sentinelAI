@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, riskColor } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, riskColor, CopyBtn } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -14,17 +14,34 @@ async function callClaude(apiKey, prompt) {
 }
 
 const actors = [
-  { id: "APT-2241", name: "IRON CARDINAL", origin: "East Asia",      target: "Defence, Aerospace",  ttps: ["Spearphishing","LOLBins","Custom RAT"],    active: true,  threat: "CRITICAL", activity: [4,7,3,8,12,9,15] },
-  { id: "APT-1887", name: "EMBER WOLF",    origin: "Eastern Europe", target: "Energy, Government",  ttps: ["Supply chain","ICS exploit","Wiper"],       active: true,  threat: "HIGH",     activity: [8,6,10,7,9,11,8] },
-  { id: "APT-0934", name: "SILENT MANTIS", origin: "Middle East",    target: "Financial, Telco",    ttps: ["Zero-days","DNS hijack","Cred theft"],      active: false, threat: "MEDIUM",   activity: [2,3,2,1,3,2,2]   },
-  { id: "APT-3312", name: "PALE THUNDER",  origin: "Unknown",        target: "Maritime, Ports",     ttps: ["AIS spoofing","GNSS jam","Port intrusion"], active: true,  threat: "HIGH",     activity: [5,3,6,8,5,9,11]  },
+  { id: "APT-2241", name: "IRON CARDINAL",  origin: "East Asia",      target: "Defence, Aerospace",         ttps: ["Spearphishing","LOLBins","Custom RAT"],       active: true,  threat: "CRITICAL", activity: [4,7,3,8,12,9,15] },
+  { id: "APT-1887", name: "EMBER WOLF",     origin: "Eastern Europe", target: "Energy, Government",         ttps: ["Supply chain","ICS exploit","Wiper"],         active: true,  threat: "HIGH",     activity: [8,6,10,7,9,11,8] },
+  { id: "APT-0934", name: "SILENT MANTIS",  origin: "Middle East",    target: "Financial, Telco",           ttps: ["Zero-days","DNS hijack","Cred theft"],        active: false, threat: "MEDIUM",   activity: [2,3,2,1,3,2,2]   },
+  { id: "APT-3312", name: "PALE THUNDER",   origin: "Unknown",        target: "Maritime, Ports",            ttps: ["AIS spoofing","GNSS jam","Port intrusion"],   active: true,  threat: "HIGH",     activity: [5,3,6,8,5,9,11]  },
+  { id: "APT-5566", name: "VENOM SPIDER",   origin: "North Korea",    target: "Crypto exchanges, Banks",    ttps: ["SWIFT fraud","Crypto theft","Phishing kit"],  active: true,  threat: "HIGH",     activity: [6,4,7,5,8,6,10]  },
+  { id: "APT-7781", name: "CRIMSON TIDE",   origin: "Russia",         target: "SIGINT, Military comms",     ttps: ["MITM","SATCOM intercept","Firmware implant"], active: true,  threat: "CRITICAL", activity: [3,5,4,6,8,7,12]  },
+  { id: "APT-2290", name: "JADE SERPENT",   origin: "China",          target: "Semiconductor, IP theft",    ttps: ["Watering hole","VPN exploit","Insider threat"],active: true,  threat: "HIGH",     activity: [7,9,8,10,6,11,9] },
+  { id: "APT-4401", name: "GHOST JACKAL",   origin: "Iran",           target: "OT/SCADA, Energy sector",   ttps: ["PLC exploit","Air-gap jump","USB drop"],      active: false, threat: "HIGH",     activity: [1,2,0,1,2,1,3]   },
+  { id: "APT-6623", name: "COBALT LYNX",    origin: "Belarus",        target: "NGOs, Dissident groups",    ttps: ["Spyware","Signal exploit","Social eng"],      active: true,  threat: "MEDIUM",   activity: [3,2,4,3,2,3,5]   },
+  { id: "APT-8834", name: "PHANTOM CRANE",  origin: "Unknown",        target: "Critical infrastructure",   ttps: ["0-day exploit","Ransomware","Data exfil"],   active: true,  threat: "CRITICAL", activity: [0,0,0,0,2,8,15]  },
 ];
 
 const iocs = [
-  { type: "IP",     value: "185.220.xxx.xxx",         actor: "EMBER WOLF",    date: "14/03" },
-  { type: "Domain", value: "update-cdn-secure[.]net", actor: "IRON CARDINAL", date: "13/03" },
-  { type: "Hash",   value: "a1b2c3d4...",              actor: "PALE THUNDER",  date: "12/03" },
-  { type: "IP",     value: "91.108.xxx.xxx",           actor: "EMBER WOLF",    date: "12/03" },
+  { type: "IP",     value: "185.220.xxx.xxx",            actor: "EMBER WOLF",    date: "14/03" },
+  { type: "Domain", value: "update-cdn-secure[.]net",    actor: "IRON CARDINAL", date: "13/03" },
+  { type: "Hash",   value: "a1b2c3d4e5f6...",            actor: "PALE THUNDER",  date: "12/03" },
+  { type: "IP",     value: "91.108.xxx.xxx",             actor: "EMBER WOLF",    date: "12/03" },
+  { type: "Hash",   value: "b3e7f2a19c4d...",            actor: "CRIMSON TIDE",  date: "14/03" },
+  { type: "Domain", value: "cdn-delivery-net[.]ru",      actor: "VENOM SPIDER",  date: "14/03" },
+  { type: "IP",     value: "45.142.xxx.xxx",             actor: "JADE SERPENT",  date: "13/03" },
+  { type: "URL",    value: "hxxps://docs-share[.]io/p",  actor: "EMBER WOLF",    date: "13/03" },
+  { type: "Hash",   value: "9f1d8e2b7a3c...",            actor: "IRON CARDINAL", date: "12/03" },
+  { type: "Domain", value: "secure-update[.]biz",        actor: "PHANTOM CRANE", date: "12/03" },
+  { type: "IP",     value: "194.165.xxx.xxx",            actor: "GHOST JACKAL",  date: "11/03" },
+  { type: "Hash",   value: "c4a9b7d38e1f...",            actor: "COBALT LYNX",   date: "11/03" },
+  { type: "Domain", value: "api-gateway-cloud[.]net",    actor: "IRON CARDINAL", date: "10/03" },
+  { type: "IP",     value: "103.75.xxx.xxx",             actor: "JADE SERPENT",  date: "10/03" },
+  { type: "Hash",   value: "7e2c5f9a4b8d...",            actor: "VENOM SPIDER",  date: "09/03" },
 ];
 
 const FILTERS = ["ALL", "CRITICAL", "HIGH", "MEDIUM"];
@@ -74,14 +91,14 @@ export default function Cti() {
         accent="#4db8ff"
         dataMode={apiKey ? "hybrid" : "mock"}
         classification="TS/SCI"
-        badges={[{ text: "38 Actors", color: "#4db8ff" }, { text: "47 IOCs 24h", color: "#ff9d00" }]}
+        badges={[{ text: `${actors.length} Actors`, color: "#4db8ff" }, { text: `${iocs.length} IOCs 24h`, color: "#ff9d00" }]}
       />
 
       <StatBar stats={[
-        { label: "Tracked Actors", value: "38",  color: "#4db8ff" },
-        { label: "Campaigns",      value: "12",  color: "#b47fff" },
-        { label: "IOCs 24h",       value: "47",  color: "#ff9d00" },
-        { label: "Critical",       value: "3",   color: "#ff4d4d" },
+        { label: "Tracked Actors", value: String(actors.length),                                  color: "#4db8ff" },
+        { label: "Campaigns",      value: "12",                                                   color: "#b47fff" },
+        { label: "IOCs 24h",       value: String(iocs.length),                                    color: "#ff9d00" },
+        { label: "Critical",       value: String(actors.filter(a => a.threat === "CRITICAL").length), color: "#ff4d4d" },
       ]} />
 
       <Card>
@@ -219,7 +236,12 @@ function IocRow({ r }) {
       style={{ borderBottom: "1px solid #0d1626", cursor: "default", transition: "background 0.15s" }}
     >
       <td style={{ padding: "7px 10px" }}><BADGE text={r.type} color="#4db8ff" /></td>
-      <td style={{ padding: "7px 10px", fontFamily: "monospace", color: "#ff4d4d", fontSize: 11 }}>{r.value}</td>
+      <td style={{ padding: "7px 10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontFamily: "monospace", color: "#ff4d4d", fontSize: 11 }}>{r.value}</span>
+          <CopyBtn text={r.value} size="xs" />
+        </div>
+      </td>
       <td style={{ padding: "7px 10px", color: "#ffd700", fontSize: 12 }}>{r.actor}</td>
       <td style={{ padding: "7px 10px", color: "#3a4a5c", fontSize: 11 }}>{r.date}</td>
     </tr>

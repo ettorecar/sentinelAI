@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, PageHeader, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -112,21 +112,24 @@ Return exactly this JSON structure:
 }
 
 Include 4-6 realistic connections and 3-4 intelligence notes. Make connections plausible for this type of entity.`;
-      setResult(await callClaude(apiKey, prompt));
+      setResult(await callClaude(apiKey, prompt)); stamp();
     } catch (e) { setError("Error: " + e.message); }
     setLoading(false);
   }
+  const { stamp } = useLastAnalysis("osint");
+  function handleKey(e) { if (e.ctrlKey && e.key === "Enter") run(); }
 
   return (
     <div>
       <PageHeader icon="🔍" title="OSINT Correlation Engine" sub="Entity correlation graphs from open-source intelligence." accent="#00ff9d" dataMode="ai" />
 
       <Card>
-        <Input label="🔎 Entity" value={query} onChange={setQuery} placeholder="Person name, company, vessel, domain, IP address, username..." />
+        <Input label="🔎 Entity" value={query} onChange={setQuery} placeholder="Person name, company, vessel, domain, IP address, username..." maxLength={200} onClear={() => setQuery("")} onKeyDown={handleKey} hint="Ctrl+Enter per avviare correlazione" />
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
-        <Btn onClick={run} disabled={loading}>
-          {loading ? "⏳ Correlating..." : "Run OSINT Correlation"}
-        </Btn>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Btn onClick={run} disabled={loading}>{loading ? "⏳ Correlating..." : "Run OSINT Correlation"}</Btn>
+          <LastAnalysisTag toolId="osint" />
+        </div>
       </Card>
 
       {result && (() => {
@@ -142,6 +145,7 @@ Include 4-6 realistic connections and 3-4 intelligence notes. Make connections p
                   <div style={{ fontWeight: 900, fontSize: 17, color: "#e2e8f0" }}>{result.entity}</div>
                   <div style={{ color: "#4a5568", fontSize: 12, marginTop: 3 }}>{result.entity_type}</div>
                 </div>
+                <ExportBtn data={result} filename={`sentinel-osint-${result.entity?.replace(/\s/g,"-").slice(0,20)}`} />
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
                   <BADGE text={result.risk_level} color={riskBadge(result.risk_level)} />
                   <div style={{ color: "#4a5568", fontSize: 11 }}>

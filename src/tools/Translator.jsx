@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, PageHeader, MockBadge, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, MockBadge, LiveBadge, LastAnalysisTag, useLastAnalysis, ExportBtn } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 const LANGUAGES = [
@@ -76,6 +76,8 @@ export default function Translator() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { stamp } = useLastAnalysis("translator");
+  function handleKey(e) { if (e.ctrlKey && e.key === "Enter") translate(); }
 
   async function translate() {
     if (!text) { setError("Enter text to translate."); return; }
@@ -102,13 +104,13 @@ Return ONLY JSON (no markdown): {
         const data = await res.json();
         if (data.error) throw new Error(data.error.message);
         const parsed = JSON.parse(data.content.map(b => b.text || "").join("").replace(/```json|```/g, "").trim());
-        setResult({ ...parsed, lang, context, sourceText: text, live: true });
+        setResult({ ...parsed, lang, context, sourceText: text, live: true }); stamp();
       } catch (e) { setError("Error: " + e.message); }
     } else {
       await new Promise(r => setTimeout(r, 900));
       const mock = MOCK_TRANSLATIONS[sourceLang];
       const lang = LANGUAGES.find(l => l.code === sourceLang);
-      setResult({ ...mock, lang, context, sourceText: text, live: false });
+      setResult({ ...mock, lang, context, sourceText: text, live: false }); stamp();
     }
     setLoading(false);
   }
@@ -133,7 +135,8 @@ Return ONLY JSON (no markdown): {
         </div>
 
         <Input label="📡 Intercepted Text / Audio Transcript" value={text} onChange={setText}
-          placeholder="Paste intercepted communication, radio transcript, or document..." rows={4} />
+          placeholder="Paste intercepted communication, radio transcript, or document..." rows={4}
+          maxLength={3000} onClear={() => setText("")} onKeyDown={handleKey} hint="Ctrl+Enter to translate" />
 
         {!apiKey && (
           <div style={{ color: "#ff9d00", fontSize: 13, marginBottom: 12, padding: "8px 12px", background: "#1a0e0022", border: "1px solid #ff9d0033", borderRadius: 6 }}>
@@ -141,9 +144,12 @@ Return ONLY JSON (no markdown): {
           </div>
         )}
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
-        <Btn onClick={translate} disabled={loading || !text}>
-          {loading ? "⏳ Translating..." : "🌐 Translate & Analyze"}
-        </Btn>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Btn onClick={translate} disabled={loading || !text}>
+            {loading ? "⏳ Translating..." : "🌐 Translate & Analyze"}
+          </Btn>
+          <LastAnalysisTag toolId="translator" />
+        </div>
       </Card>
 
       {result && (
@@ -160,6 +166,7 @@ Return ONLY JSON (no markdown): {
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 {result.live ? <LiveBadge /> : <><MockBadge /><span style={{ color: "#9ca3af", fontSize: 11 }}>Set API key for AI</span></>}
                 <BADGE text={`${result.confidence}% conf.`} color="blue" />
+                <ExportBtn data={result} filename={`sentinel-translation-${result.lang?.code || "xx"}`} />
               </div>
             </div>
 

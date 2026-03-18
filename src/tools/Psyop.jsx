@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, Input, Btn, ST, PageHeader, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { RC } from "../constants";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -53,6 +53,8 @@ export default function Psyop() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { stamp } = useLastAnalysis("psyop");
+  function handleKey(e) { if (e.ctrlKey && e.key === "Enter") analyze(); }
 
   async function analyze() {
     if (!apiKey) { setError("Set the Anthropic API key using the banner above."); return; }
@@ -68,7 +70,7 @@ Return exactly this JSON structure:
 {"detected":true|false,"confidence":number_0_to_100,"target_effect":"string describing intended psychological effect on audience","origin":"string e.g. State-sponsored influence op, Hacktivist collective, Commercial propaganda, Unknown","techniques":[{"name":"string","desc":"string explaining the technique","severity":"HIGH|MEDIUM|LOW","val":number_0_to_100}]}
 
 Include 3-5 specific PSYOP techniques from: Fear Appeal, In-group/Out-group polarisation, False Urgency, Authority Spoofing, Bandwagon Effect, Loaded Language, Scapegoating, Manufactured Consensus, Repetition/Hammering, Dehumanisation.`;
-      setResult(await callClaude(apiKey, prompt));
+      setResult(await callClaude(apiKey, prompt)); stamp();
     } catch (e) { setError("Error: " + e.message); }
     setLoading(false);
   }
@@ -78,11 +80,12 @@ Include 3-5 specific PSYOP techniques from: Fear Appeal, In-group/Out-group pola
       <PageHeader icon="🧠" title="PSYOP Content Analyzer" sub="Identify psychological operation techniques in media and influence campaigns." accent="#b47fff" dataMode="ai" />
 
       <Card>
-        <Input label="📄 Content" value={content} onChange={setContent} placeholder="Paste text, article, broadcast transcript..." rows={5} />
+        <Input label="📄 Content" value={content} onChange={setContent} placeholder="Paste text, article, broadcast transcript..." rows={5} maxLength={3000} onKeyDown={handleKey} hint="Ctrl+Enter per analizzare" />
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
-        <Btn onClick={analyze} disabled={loading}>
-          {loading ? "⏳ Analyzing..." : "Analyze for PSYOP"}
-        </Btn>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Btn onClick={analyze} disabled={loading}>{loading ? "⏳ Analyzing..." : "Analyze for PSYOP"}</Btn>
+          <LastAnalysisTag toolId="psyop" />
+        </div>
       </Card>
 
       {result && (
@@ -95,6 +98,7 @@ Include 3-5 specific PSYOP techniques from: Fear Appeal, In-group/Out-group pola
                   {result.detected ? "PSYOP DETECTED" : "NO PSYOP DETECTED"}
                 </div>
               </div>
+              <ExportBtn data={result} filename="sentinel-psyop" />
               <div style={{ textAlign: "right" }}>
                 <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>CONFIDENCE</div>
                 <div style={{ color: "#ffd700", fontWeight: 800, fontSize: 26, lineHeight: 1 }}>{result.confidence}%</div>

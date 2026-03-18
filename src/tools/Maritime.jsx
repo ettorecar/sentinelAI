@@ -14,11 +14,18 @@ async function callClaude(apiKey, prompt) {
 }
 
 const VESSELS = [
-  { mmsi: "247123456", name: "ADRIATICA SUN", flag: "🇮🇹", anomaly: "AIS blackout 6h",       risk: "HIGH",   type: "Cargo",     speed: "0.0 kn", course: "N/A",  mx: 298, my: 112 },
-  { mmsi: "212987654", name: "AEGEAN STAR",   flag: "🇬🇷", anomaly: "Unusual anchorage",      risk: "MEDIUM", type: "Tanker",    speed: "0.4 kn", course: "217°", mx: 390, my: 178 },
-  { mmsi: "538001234", name: "PACIFIC WOLF",  flag: "🇲🇭", anomaly: "Speed anomaly +8 kn",    risk: "MEDIUM", type: "Bulk",      speed: "19.2 kn",course: "084°", mx: 320, my: 118 },
-  { mmsi: "636091234", name: "LIBERIA MOON",  flag: "🇱🇷", anomaly: "None",                   risk: "LOW",    type: "Container", speed: "14.1 kn", course: "262°", mx: 295, my: 200 },
-  { mmsi: "311000450", name: "ATLAS PRIME",   flag: "🇧🇸", anomaly: "Dark ship rendezvous",   risk: "HIGH",   type: "Tanker",    speed: "1.1 kn", course: "008°", mx: 168, my: 185 },
+  { mmsi: "247123456", name: "ADRIATICA SUN",  flag: "🇮🇹", anomaly: "AIS blackout 6h",           risk: "HIGH",     type: "Cargo",     speed: "0.0 kn",  course: "N/A",  mx: 298, my: 112 },
+  { mmsi: "212987654", name: "AEGEAN STAR",    flag: "🇬🇷", anomaly: "Unusual anchorage",          risk: "MEDIUM",   type: "Tanker",    speed: "0.4 kn",  course: "217°", mx: 390, my: 178 },
+  { mmsi: "538001234", name: "PACIFIC WOLF",   flag: "🇲🇭", anomaly: "Speed anomaly +8 kn",        risk: "MEDIUM",   type: "Bulk",      speed: "19.2 kn", course: "084°", mx: 320, my: 118 },
+  { mmsi: "636091234", name: "LIBERIA MOON",   flag: "🇱🇷", anomaly: "None",                       risk: "LOW",      type: "Container", speed: "14.1 kn", course: "262°", mx: 295, my: 200 },
+  { mmsi: "311000450", name: "ATLAS PRIME",    flag: "🇧🇸", anomaly: "Dark ship rendezvous",       risk: "HIGH",     type: "Tanker",    speed: "1.1 kn",  course: "008°", mx: 168, my: 185 },
+  { mmsi: "477123789", name: "ORIENT TIGER",   flag: "🇨🇳", anomaly: "Identity spoofing suspected", risk: "HIGH",    type: "Tanker",    speed: "8.2 kn",  course: "135°", mx: 435, my: 148 },
+  { mmsi: "319001234", name: "CAYMAN GHOST",   flag: "🇰🇾", anomaly: "AIS blackout 18h",           risk: "HIGH",     type: "Cargo",     speed: "0.0 kn",  course: "N/A",  mx: 200, my: 162 },
+  { mmsi: "255801234", name: "NOVA MERCATOR",  flag: "🇵🇹", anomaly: "Unusual speed reduction",    risk: "LOW",      type: "Container", speed: "9.1 kn",  course: "022°", mx: 280, my: 195 },
+  { mmsi: "229034567", name: "MARE NERO",      flag: "🇲🇹", anomaly: "Loitering near chokepoint",  risk: "MEDIUM",   type: "Tanker",    speed: "2.3 kn",  course: "180°", mx: 355, my: 148 },
+  { mmsi: "441012345", name: "SEOUL DAWN",     flag: "🇰🇷", anomaly: "None",                       risk: "LOW",      type: "Container", speed: "18.7 kn", course: "280°", mx: 462, my: 168 },
+  { mmsi: "355012345", name: "PANAMA GHOST",   flag: "🇵🇦", anomaly: "Shadow fleet suspected",     risk: "HIGH",     type: "Tanker",    speed: "11.4 kn", course: "310°", mx: 148, my: 145 },
+  { mmsi: "205012345", name: "BALTIC EAGLE",   flag: "🇧🇪", anomaly: "Possible GNSS spoofing",     risk: "MEDIUM",   type: "Bulk",      speed: "5.6 kn",  course: "045°", mx: 332, my: 100 },
 ];
 
 const rc = r => r === "HIGH" ? "#ff4d4d" : r === "MEDIUM" ? "#ffd700" : "#00ff9d";

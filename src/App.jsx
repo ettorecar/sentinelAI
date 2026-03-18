@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NAV, ENERGY_IDS } from "./constants";
-import { BADGE, GlobalStyles } from "./components/shared";
+import { BADGE, GlobalStyles, ToastProvider, validateApiKey } from "./components/shared";
 import { ApiKeyProvider, useApiKey } from "./context/ApiKeyContext";
 import SplashScreen, { useSplash } from "./components/SplashScreen";
 
@@ -91,24 +91,25 @@ function NavBtn({ n, active, onClick }) {
 
 function ApiKeyBanner() {
   const [apiKey, setApiKey] = useApiKey();
-  const [draft, setDraft] = useState("");
-  const [show, setShow] = useState(false);
+  const [draft, setDraft]   = useState("");
+  const [show, setShow]     = useState(false);
+  const [err, setErr]       = useState("");
 
-  function apply() { setApiKey(draft.trim()); setShow(false); }
-  function clear()  { setApiKey(""); setDraft(""); setShow(false); }
+  function apply() {
+    const e = validateApiKey(draft.trim());
+    if (e) { setErr(e); return; }
+    setApiKey(draft.trim()); setShow(false); setErr("");
+  }
+  function clear() { setApiKey(""); setDraft(""); setShow(false); setErr(""); }
 
   return (
     <div style={{
       background: apiKey ? "#030e07" : "#0e0800",
       borderBottom: `1px solid ${apiKey ? "#00ff9d22" : "#ff9d0022"}`,
       padding: "5px 16px",
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      flexWrap: "wrap",
-      minHeight: 34,
+      display: "flex", alignItems: "center", gap: 10,
+      flexWrap: "wrap", minHeight: 34,
     }}>
-      {/* Status indicator dot */}
       <div style={{
         width: 6, height: 6, borderRadius: "50%",
         background: apiKey ? "#00ff9d" : "#ff9d00",
@@ -120,10 +121,10 @@ function ApiKeyBanner() {
         <>
           <span style={{ color: "#00ff9d", fontSize: 11, fontWeight: 600 }}>AI ACTIVE</span>
           <span style={{ color: "#2d4a3e", fontSize: 11 }}>·</span>
-          <span style={{ color: "#4a5568", fontSize: 11 }}>All 18 modules operating with live inference</span>
-          <button
-            onClick={clear}
-            style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 10, padding: "2px 8px", cursor: "pointer", marginLeft: "auto" }}>
+          <span style={{ color: "#4a5568", fontSize: 11 }}>
+            {`sk-ant-...${apiKey.slice(-6)}`} · 18 moduli operativi
+          </span>
+          <button onClick={clear} style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 10, padding: "2px 8px", cursor: "pointer", marginLeft: "auto" }}>
             Disconnect
           </button>
         </>
@@ -131,33 +132,32 @@ function ApiKeyBanner() {
         <>
           <span style={{ color: "#ff9d00", fontSize: 11, fontWeight: 600 }}>NO API KEY</span>
           <span style={{ color: "#3a2800", fontSize: 11 }}>·</span>
-          <span style={{ color: "#4a5568", fontSize: 11 }}>Connect Anthropic key to enable AI across all tools</span>
+          <span style={{ color: "#4a5568", fontSize: 11 }}>Connetti la chiave Anthropic per abilitare l'AI</span>
           {show ? (
-            <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto" }}>
-              <input
-                type="password"
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && apply()}
-                placeholder="sk-ant-..."
-                autoFocus
-                style={{
-                  background: "#0d1626",
-                  border: "1px solid #ff9d0044",
-                  borderRadius: 4,
-                  padding: "4px 10px",
-                  color: "#e2e8f0",
-                  fontSize: 11,
-                  width: 220,
-                  outline: "none",
-                }}
-              />
-              <button onClick={apply} style={{ background: "#ff9d00", color: "#0a0f1e", border: "none", borderRadius: 4, padding: "4px 12px", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
-                Connect
-              </button>
-              <button onClick={() => setShow(false)} style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 11, padding: "4px 8px", cursor: "pointer" }}>
-                Cancel
-              </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginLeft: "auto" }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="password"
+                  value={draft}
+                  onChange={e => { setDraft(e.target.value); setErr(""); }}
+                  onKeyDown={e => e.key === "Enter" && apply()}
+                  placeholder="sk-ant-api03-..."
+                  autoFocus
+                  style={{
+                    background: "#0d1626",
+                    border: `1px solid ${err ? "#ff4d4d66" : "#ff9d0044"}`,
+                    borderRadius: 4, padding: "4px 10px",
+                    color: "#e2e8f0", fontSize: 11, width: 240, outline: "none",
+                  }}
+                />
+                <button onClick={apply} style={{ background: "#ff9d00", color: "#0a0f1e", border: "none", borderRadius: 4, padding: "4px 12px", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                  Connect
+                </button>
+                <button onClick={() => { setShow(false); setErr(""); }} style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 11, padding: "4px 8px", cursor: "pointer" }}>
+                  ✕
+                </button>
+              </div>
+              {err && <div style={{ color: "#ff4d4d", fontSize: 10, paddingLeft: 2 }}>⚠ {err}</div>}
             </div>
           ) : (
             <button onClick={() => setShow(true)} style={{ background: "none", border: "1px solid #ff9d0055", borderRadius: 4, color: "#ff9d00", fontSize: 11, padding: "3px 12px", cursor: "pointer", marginLeft: "auto", fontWeight: 600 }}>
@@ -278,7 +278,9 @@ function AppWithSplash() {
 export default function App() {
   return (
     <ApiKeyProvider>
-      <AppWithSplash />
+      <ToastProvider>
+        <AppWithSplash />
+      </ToastProvider>
     </ApiKeyProvider>
   );
 }

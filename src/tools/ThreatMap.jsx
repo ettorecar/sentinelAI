@@ -14,16 +14,31 @@ async function callClaude(apiKey, prompt) {
 }
 
 const hotspots = [
-  { id: 1,  label: "Eastern Ukraine",  type: "Kinetic",      level: "CRITICAL", x: 390, y: 118, actors: "APT-1887 + ground forces" },
-  { id: 2,  label: "South China Sea",  type: "Maritime",     level: "HIGH",     x: 620, y: 195, actors: "PLAN vessels, AIS spoofing" },
-  { id: 3,  label: "Sahel Region",     type: "Terrorism",    level: "HIGH",     x: 270, y: 230, actors: "Multiple non-state actors" },
-  { id: 4,  label: "Baltic Sea",       type: "Hybrid",       level: "HIGH",     x: 345, y: 90,  actors: "Undersea cable interference" },
-  { id: 5,  label: "Horn of Africa",   type: "Bio+Piracy",   level: "MEDIUM",   x: 380, y: 245, actors: "BT-2026-003 + maritime" },
-  { id: 6,  label: "Taiwan Strait",    type: "Cyber+Naval",  level: "CRITICAL", x: 635, y: 168, actors: "IRON CARDINAL + PLAN" },
-  { id: 7,  label: "Persian Gulf",     type: "Maritime",     level: "MEDIUM",   x: 460, y: 185, actors: "Tanker harassment ops" },
-  { id: 8,  label: "Eastern Balkans",  type: "Bio+Disinfo",  level: "HIGH",     x: 360, y: 125, actors: "BT-2026-031 + EMBER WOLF" },
-  { id: 9,  label: "Venezuela",        type: "Cyber",        level: "MEDIUM",   x: 185, y: 230, actors: "Criminal syndicate APT" },
-  { id: 10, label: "North Korea",      type: "Cyber+ICBM",   level: "CRITICAL", x: 650, y: 140, actors: "State APT cluster" },
+  { id: 1,  label: "Eastern Ukraine",     type: "Kinetic",       level: "CRITICAL", x: 390, y: 118, actors: "APT-1887 + ground forces" },
+  { id: 2,  label: "South China Sea",     type: "Maritime",      level: "HIGH",     x: 620, y: 195, actors: "PLAN vessels, AIS spoofing" },
+  { id: 3,  label: "Sahel Region",        type: "Terrorism",     level: "HIGH",     x: 270, y: 230, actors: "Multiple non-state actors" },
+  { id: 4,  label: "Baltic Sea",          type: "Hybrid",        level: "HIGH",     x: 345, y: 90,  actors: "Undersea cable interference" },
+  { id: 5,  label: "Horn of Africa",      type: "Bio+Piracy",    level: "MEDIUM",   x: 380, y: 248, actors: "BT-2026-003 + maritime" },
+  { id: 6,  label: "Taiwan Strait",       type: "Cyber+Naval",   level: "CRITICAL", x: 635, y: 168, actors: "IRON CARDINAL + PLAN" },
+  { id: 7,  label: "Persian Gulf",        type: "Maritime",      level: "MEDIUM",   x: 460, y: 185, actors: "Tanker harassment ops" },
+  { id: 8,  label: "Eastern Balkans",     type: "Bio+Disinfo",   level: "HIGH",     x: 360, y: 125, actors: "BT-2026-031 + EMBER WOLF" },
+  { id: 9,  label: "Venezuela",           type: "Cyber",         level: "MEDIUM",   x: 185, y: 230, actors: "Criminal syndicate APT" },
+  { id: 10, label: "North Korea",         type: "Cyber+ICBM",    level: "CRITICAL", x: 650, y: 140, actors: "State APT cluster" },
+  { id: 11, label: "Syria / Levant",      type: "Hybrid",        level: "HIGH",     x: 402, y: 157, actors: "Multiple armed factions, foreign forces" },
+  { id: 12, label: "Libya",               type: "Terrorism",     level: "MEDIUM",   x: 328, y: 192, actors: "Rival militias, foreign mercenaries" },
+  { id: 13, label: "Kashmir LoC",         type: "Kinetic",       level: "HIGH",     x: 524, y: 153, actors: "Pak-India border incidents, militant groups" },
+  { id: 14, label: "Myanmar",             type: "Hybrid",        level: "HIGH",     x: 590, y: 198, actors: "Military junta, resistance forces, ethnic armies" },
+  { id: 15, label: "Yemen / Aden",        type: "Maritime",      level: "CRITICAL", x: 430, y: 213, actors: "Houthi naval units, coalition forces" },
+  { id: 16, label: "DRC / Kivu",          type: "Terrorism",     level: "HIGH",     x: 362, y: 260, actors: "M23, FDLR, armed non-state actors" },
+  { id: 17, label: "Sudan",               type: "Kinetic",       level: "HIGH",     x: 388, y: 230, actors: "SAF vs RSF — active civil war" },
+  { id: 18, label: "Mozambique",          type: "Terrorism",     level: "MEDIUM",   x: 396, y: 278, actors: "ASWJ insurgency, Cabo Delgado" },
+  { id: 19, label: "Colombia",            type: "Terrorism",     level: "MEDIUM",   x: 173, y: 237, actors: "FARC dissidents, ELN remnants" },
+  { id: 20, label: "Arctic / Svalbard",   type: "Hybrid",        level: "MEDIUM",   x: 362, y: 52,  actors: "Russian Arctic brigade, military buildup" },
+  { id: 21, label: "Armenia-Azerbaijan",  type: "Kinetic",       level: "MEDIUM",   x: 432, y: 138, actors: "Post-Karabakh tensions, border disputes" },
+  { id: 22, label: "Iran Nuclear Sites",  type: "Cyber+Kinetic", level: "HIGH",     x: 450, y: 166, actors: "State actors, covert ops assessed" },
+  { id: 23, label: "Philippines / WPS",   type: "Maritime",      level: "HIGH",     x: 630, y: 200, actors: "PLA Navy, BRP Sierra Madre standoff" },
+  { id: 24, label: "Transnistria",        type: "Hybrid",        level: "MEDIUM",   x: 374, y: 112, actors: "Russian forces, Moldovan border friction" },
+  { id: 25, label: "Sinai Peninsula",     type: "Terrorism",     level: "MEDIUM",   x: 378, y: 172, actors: "IS-Sinai remnants, cross-border activity" },
 ];
 
 const typeColor = t =>
@@ -68,7 +83,7 @@ export default function ThreatMap() {
         accent="#ff4d4d"
         dataMode={apiKey ? "hybrid" : "mock"}
         classification="SECRET"
-        badges={[{ text: "10 Hotspots", color: "#ff4d4d" }, { text: "Live", color: "#00ff9d" }]}
+        badges={[{ text: "25 Hotspots", color: "#ff4d4d" }, { text: "Live", color: "#00ff9d" }]}
       />
 
       <StatBar stats={[

@@ -1,4 +1,115 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext, createContext, useRef, useCallback } from "react";
+
+// ── Toast context ──────────────────────────────────────────────────────────
+const ToastCtx = createContext(() => {});
+
+export function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+  const show = useCallback((msg, duration = 2400) => {
+    const id = Date.now() + Math.random();
+    setToasts(p => [...p, { id, msg }]);
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), duration);
+  }, []);
+  return (
+    <ToastCtx.Provider value={show}>
+      {children}
+      <div style={{ position: "fixed", bottom: 24, right: 20, zIndex: 9998, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
+        {toasts.map(t => (
+          <div key={t.id} style={{
+            background: "#0d1626", border: "1px solid #00ff9d44",
+            borderLeft: "3px solid #00ff9d",
+            borderRadius: 6, padding: "9px 16px",
+            color: "#e2e8f0", fontSize: 12, fontWeight: 600,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+            animation: "sentinelSlideIn 0.2s ease",
+            whiteSpace: "nowrap",
+          }}>
+            {t.msg}
+          </div>
+        ))}
+      </div>
+    </ToastCtx.Provider>
+  );
+}
+export const useToast = () => useContext(ToastCtx);
+
+// ── API key validation ─────────────────────────────────────────────────────
+export function validateApiKey(key) {
+  if (!key) return "Inserisci la API key Anthropic.";
+  if (!key.startsWith("sk-ant-")) return "Formato non valido — deve iniziare con sk-ant-";
+  if (key.length < 40) return "Key troppo corta — controlla di averla copiata per intero.";
+  return null; // ok
+}
+
+// ── Download JSON utility ──────────────────────────────────────────────────
+export function downloadJson(data, filename = "sentinel-export") {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `${filename}.json`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ── Last analysis hook + tag ───────────────────────────────────────────────
+export function useLastAnalysis(toolId) {
+  const KEY = `sentinel_last_${toolId}`;
+  function stamp() { localStorage.setItem(KEY, String(Date.now())); }
+  function read()  { return localStorage.getItem(KEY) ? Number(localStorage.getItem(KEY)) : null; }
+  return { stamp, read };
+}
+
+export function LastAnalysisTag({ toolId }) {
+  const KEY = `sentinel_last_${toolId}`;
+  const [label, setLabel] = useState(null);
+  useEffect(() => {
+    function update() {
+      const ts = localStorage.getItem(KEY);
+      if (!ts) { setLabel(null); return; }
+      const diff = Math.round((Date.now() - Number(ts)) / 60000);
+      setLabel(diff === 0 ? "Analisi effettuata adesso" : diff === 1 ? "Analisi 1 minuto fa" : `Analisi ${diff} minuti fa`);
+    }
+    update();
+    const t = setInterval(update, 30000);
+    return () => clearInterval(t);
+  }, [KEY]);
+  if (!label) return null;
+  return (
+    <span style={{ color: "#3a4a5c", fontSize: 10, fontStyle: "italic", letterSpacing: 0.3 }}>
+      · {label}
+    </span>
+  );
+}
+
+// ── CountUp animation ──────────────────────────────────────────────────────
+function useCountUp(target, duration = 700) {
+  const n = parseInt(target, 10) || 0;
+  const [val, setVal] = useState(0);
+  const rafRef = useRef();
+  useEffect(() => {
+    if (n === 0) return;
+    let start = null;
+    function tick(ts) {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      // ease-out: progress^0.5
+      setVal(Math.floor(Math.sqrt(progress) * n));
+      if (progress < 1) rafRef.current = requestAnimationFrame(tick);
+      else setVal(n);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [n, duration]);
+  return val;
+}
+
+function AnimatedValue({ value }) {
+  // Extract number + suffix from strings like "38", "67%", "72/100", "14 GW"
+  const match = String(value).match(/^(\d+)(.*)/);
+  const count = useCountUp(match ? parseInt(match[1], 10) : 0);
+  if (!match) return <>{value}</>;
+  return <>{count}{match[2]}</>;
+}
 
 // ── Global keyframe injector (render once in App) ─────────────────────────
 export const GlobalStyles = () => (
@@ -65,24 +176,57 @@ export const Card = ({ children, style, onClick }) => {
 };
 
 // ── Input ─────────────────────────────────────────────────────────────────
-export const Input = ({ label, value, onChange, placeholder, type = "text", rows }) => {
+export const Input = ({ label, value, onChange, placeholder, type = "text", rows, maxLength, onKeyDown, onClear, hint }) => {
   const [focused, setFocused] = useState(false);
   const baseStyle = {
     width: "100%", background: "#0d1626",
     border: `1px solid ${focused ? "#00ff9d55" : "#1f2d45"}`,
-    borderRadius: 6, padding: 10, color: "#e2e8f0", fontSize: 14,
+    borderRadius: 6, padding: rows ? "10px 10px" : "10px 36px 10px 10px",
+    color: "#e2e8f0", fontSize: 14,
     resize: "vertical", boxSizing: "border-box",
     outline: "none", transition: "border-color 0.2s",
     fontFamily: "inherit",
   };
-  const handlers = { onFocus: () => setFocused(true), onBlur: () => setFocused(false) };
+  const handlers = {
+    onFocus: () => setFocused(true),
+    onBlur:  () => setFocused(false),
+    onKeyDown,
+  };
+  const hasValue = String(value).length > 0;
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 6, letterSpacing: "0.3px" }}>{label}</div>}
-      {rows
-        ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows} style={baseStyle} {...handlers} />
-        : <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={baseStyle} {...handlers} />
-      }
+      {/* Label row */}
+      {(label || maxLength) && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          {label && <div style={{ color: "#9ca3af", fontSize: 12, letterSpacing: "0.3px" }}>{label}</div>}
+          {maxLength && (
+            <div style={{ fontSize: 10, color: value.length > maxLength * 0.85 ? "#ffd700" : "#3a4a5c", fontVariantNumeric: "tabular-nums" }}>
+              {value.length}/{maxLength}
+            </div>
+          )}
+        </div>
+      )}
+      {/* Field wrapper */}
+      <div style={{ position: "relative" }}>
+        {rows
+          ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows} maxLength={maxLength} style={{ ...baseStyle, padding: "10px 10px" }} {...handlers} />
+          : <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength} style={baseStyle} {...handlers} />
+        }
+        {/* Clear button — only on single-line inputs */}
+        {!rows && onClear && hasValue && (
+          <button onClick={onClear} tabIndex={-1} style={{
+            position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+            background: "none", border: "none", color: "#3a4a5c", cursor: "pointer",
+            fontSize: 14, lineHeight: 1, padding: 2,
+            transition: "color 0.15s",
+          }}
+          onMouseEnter={e => e.target.style.color = "#9ca3af"}
+          onMouseLeave={e => e.target.style.color = "#3a4a5c"}>
+            ✕
+          </button>
+        )}
+      </div>
+      {hint && <div style={{ color: "#4a5568", fontSize: 10, marginTop: 4 }}>{hint}</div>}
     </div>
   );
 };
@@ -227,7 +371,9 @@ export const StatBar = ({ stats }) => (
         borderTop: `2px solid ${color}`,
         borderRadius: 8, padding: "12px 14px", textAlign: "center",
       }}>
-        <div style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+        <div style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+          <AnimatedValue value={value} />
+        </div>
         {trend && (
           <div style={{
             fontSize: 9, fontWeight: 700, marginTop: 2,
@@ -277,3 +423,98 @@ export const FlickerVal = ({ children, color = "#ff4d4d" }) => (
     {children}
   </span>
 );
+
+// ── Copy to clipboard button ───────────────────────────────────────────────
+export const CopyBtn = ({ text, label = "Copia", size = "sm" }) => {
+  const showToast = useToast();
+  const [copied, setCopied] = useState(false);
+  function copy(e) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      showToast("📋 Copiato negli appunti");
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button onClick={copy} title="Copia" style={{
+      background: copied ? "#00ff9d22" : "transparent",
+      border: `1px solid ${copied ? "#00ff9d55" : "#1f2d45"}`,
+      borderRadius: 4, padding: size === "xs" ? "1px 6px" : "3px 9px",
+      color: copied ? "#00ff9d" : "#4a5568",
+      fontSize: size === "xs" ? 10 : 11, cursor: "pointer",
+      transition: "all 0.2s", whiteSpace: "nowrap", fontWeight: 600,
+    }}
+    onMouseEnter={e => { if (!copied) { e.currentTarget.style.color = "#9ca3af"; e.currentTarget.style.borderColor = "#4a5568"; }}}
+    onMouseLeave={e => { if (!copied) { e.currentTarget.style.color = "#4a5568"; e.currentTarget.style.borderColor = "#1f2d45"; }}}
+    >
+      {copied ? "✓" : "📋"}{size !== "xs" && ` ${label}`}
+    </button>
+  );
+};
+
+// ── Export JSON button ─────────────────────────────────────────────────────
+export const ExportBtn = ({ data, filename = "sentinel-export", label = "Export JSON" }) => {
+  const showToast = useToast();
+  function handle() {
+    downloadJson(data, filename);
+    showToast("⬇ Export avviato");
+  }
+  return (
+    <button onClick={handle} style={{
+      background: "transparent", border: "1px solid #1f2d45", borderRadius: 4,
+      color: "#4a5568", fontSize: 11, cursor: "pointer", padding: "3px 9px",
+      fontWeight: 600, transition: "all 0.15s",
+    }}
+    onMouseEnter={e => { e.currentTarget.style.color = "#9ca3af"; e.currentTarget.style.borderColor = "#4a5568"; }}
+    onMouseLeave={e => { e.currentTarget.style.color = "#4a5568"; e.currentTarget.style.borderColor = "#1f2d45"; }}
+    >
+      ↓ {label}
+    </button>
+  );
+};
+
+// ── Tooltip ────────────────────────────────────────────────────────────────
+export const Tooltip = ({ text, children }) => {
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState({ top: true });
+  const ref = useRef();
+  function handleEnter() {
+    if (ref.current) {
+      const r = ref.current.getBoundingClientRect();
+      setPos({ top: r.top > 60 });
+    }
+    setShow(true);
+  }
+  return (
+    <span ref={ref} style={{ position: "relative", display: "inline-block", cursor: "help" }}
+      onMouseEnter={handleEnter} onMouseLeave={() => setShow(false)}>
+      {children}
+      {show && (
+        <div style={{
+          position: "absolute",
+          [pos.top ? "bottom" : "top"]: "calc(100% + 7px)",
+          left: "50%", transform: "translateX(-50%)",
+          background: "#0d1626", border: "1px solid #1f2d45",
+          borderRadius: 5, padding: "6px 11px",
+          color: "#9ca3af", fontSize: 11, lineHeight: 1.4,
+          maxWidth: 220, textAlign: "center",
+          zIndex: 500, pointerEvents: "none",
+          boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
+          whiteSpace: "normal",
+          animation: "sentinelFadeIn 0.12s ease",
+        }}>
+          {text}
+          <div style={{
+            position: "absolute",
+            [pos.top ? "top" : "bottom"]: "100%",
+            left: "50%", transform: "translateX(-50%)",
+            width: 0, height: 0,
+            borderLeft: "5px solid transparent", borderRight: "5px solid transparent",
+            [pos.top ? "borderBottom" : "borderTop"]: "5px solid #1f2d45",
+          }} />
+        </div>
+      )}
+    </span>
+  );
+};
