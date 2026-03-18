@@ -152,7 +152,7 @@ function ApiKeyBanner() {
                     background: "#0d1626",
                     border: `1px solid ${err ? "#ff4d4d66" : "#ff9d0044"}`,
                     borderRadius: 4, padding: "4px 10px",
-                    color: "#e2e8f0", fontSize: 11, width: 240, outline: "none",
+                    color: "#e2e8f0", fontSize: 11, width: 200, maxWidth: "calc(100vw - 120px)", outline: "none",
                   }}
                 />
                 <button onClick={apply} style={{ background: "#ff9d00", color: "#0a0f1e", border: "none", borderRadius: 4, padding: "4px 12px", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
@@ -214,7 +214,7 @@ function fmtTime(d) {
   return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
 }
 
-function NotificationBell({ setPage, notifs }) {
+function NotificationBell({ setPage, notifs, narrow }) {
   const [open, setOpen] = useState(false);
   const [read, setRead] = useState(() => {
     try { return parseInt(localStorage.getItem("sentinel-notif-read") || "0", 10); } catch { return 0; }
@@ -254,7 +254,10 @@ function NotificationBell({ setPage, notifs }) {
           <div style={{
             position: "fixed", top: 46, right: 4,
             background: "#0b111e", border: "1px solid #1f2d45",
-            borderRadius: 10, width: 310, zIndex: 200,
+            borderRadius: 10,
+            width: narrow ? "calc(100vw - 8px)" : 310,
+            maxWidth: 310,
+            zIndex: 200,
             boxShadow: "0 12px 40px #000a",
           }}>
             <div style={{ padding: "10px 14px", borderBottom: "1px solid #1f2d45", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -410,6 +413,63 @@ function ShortcutHelp({ onClose }) {
   );
 }
 
+function QuickStatusPanel({ onClose, currentNav, accent, notifs }) {
+  const top3 = notifs.slice(0, 3);
+  const [utc, setUtc] = useState(() => new Date().toISOString().slice(11, 19));
+  useEffect(() => {
+    const t = setInterval(() => setUtc(new Date().toISOString().slice(11, 19)), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "#0a0f1ecc", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "50px 8px 0" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: "#0b111e", border: "1px solid #1f2d45", borderRadius: 12, width: "100%", maxWidth: 400, boxShadow: "0 20px 60px #000a" }}>
+        {/* Header */}
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #1f2d45", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ color: accent, fontWeight: 700, fontSize: 13, letterSpacing: 0.3 }}>
+            {currentNav?.icon} {currentNav?.label || "SENTINEL AI"}
+          </span>
+          <button onClick={onClose} style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 10, padding: "2px 8px", cursor: "pointer" }}>✕</button>
+        </div>
+        {/* Tool description */}
+        {currentNav && TOOL_DESC[currentNav.id] && (
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #0d1626" }}>
+            <div style={{ color: "#2d3f55", fontSize: 9, letterSpacing: 1, marginBottom: 5, textTransform: "uppercase" }}>Tool Overview</div>
+            <div style={{ color: "#9ca3af", fontSize: 12, lineHeight: 1.5 }}>{TOOL_DESC[currentNav.id]}</div>
+          </div>
+        )}
+        {/* Recent alerts */}
+        <div style={{ borderBottom: "1px solid #0d1626" }}>
+          <div style={{ padding: "8px 16px 4px", color: "#2d3f55", fontSize: 9, letterSpacing: 1, textTransform: "uppercase" }}>Recent Alerts</div>
+          {top3.map((n, i) => (
+            <div key={i} style={{ padding: "8px 16px", borderLeft: `2px solid ${NOTIF_LC[n.level] || "#4a5568"}` }}>
+              <div style={{ color: NOTIF_LC[n.level], fontSize: 9, fontWeight: 700, marginBottom: 2 }}>{n.level}</div>
+              <div style={{ color: "#c9d1da", fontSize: 11, lineHeight: 1.4 }}>{n.msg}</div>
+            </div>
+          ))}
+        </div>
+        {/* System status footer */}
+        <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#ff4d4d", boxShadow: "0 0 4px #ff4d4d" }} />
+            <span style={{ color: "#ff4d4d", fontSize: 10, fontWeight: 700 }}>3 CRITICAL</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ fontSize: 9 }}>🛢️</span>
+            <span style={{ color: "#ff9d00", fontSize: 10, fontWeight: 700 }}>ENERGY ALERT</span>
+          </div>
+          <div style={{ color: "#4a6080", fontSize: 10, fontFamily: "monospace", marginLeft: "auto" }}>
+            {utc} <span style={{ color: "#2d3f55" }}>UTC</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function useNarrow(bp = 860) {
   const [narrow, setNarrow] = useState(() => window.innerWidth < bp);
   useEffect(() => {
@@ -468,7 +528,7 @@ function HamburgerMenu({ page, navigate }) {
   );
 }
 
-function StatusWidgets({ blink, setPage, onSearchOpen, onHelpOpen, notifs }) {
+function StatusWidgets({ blink, setPage, onSearchOpen, onHelpOpen, onInfoOpen, notifs, narrow }) {
   const [utc, setUtc] = useState(() => new Date().toISOString().slice(11, 19));
   useEffect(() => {
     const t = setInterval(() => setUtc(new Date().toISOString().slice(11, 19)), 1000);
@@ -477,62 +537,71 @@ function StatusWidgets({ blink, setPage, onSearchOpen, onHelpOpen, notifs }) {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto", paddingLeft: 8, flexShrink: 0 }}>
-      {/* Search button */}
+      {/* Search button — icon-only on mobile */}
       <button onClick={onSearchOpen} style={{
         background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 5,
-        padding: "4px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-        color: "#4a5568", fontSize: 10,
+        padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+        color: "#4a5568", fontSize: narrow ? 14 : 10,
       }}>
-        🔍 <span>Search</span>
-        <kbd style={{ background: "#111827", border: "1px solid #1f2d45", borderRadius: 3, padding: "1px 4px", fontSize: 9, fontFamily: "monospace", color: "#2d3f55" }}>Ctrl+K</kbd>
+        🔍
+        {!narrow && (
+          <>
+            <span>Search</span>
+            <kbd style={{ background: "#111827", border: "1px solid #1f2d45", borderRadius: 3, padding: "1px 4px", fontSize: 9, fontFamily: "monospace", color: "#2d3f55" }}>Ctrl+K</kbd>
+          </>
+        )}
       </button>
-      {/* Help shortcut button */}
-      <button onClick={onHelpOpen} title="Keyboard shortcuts" style={{
-        background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 5,
-        padding: "4px 8px", cursor: "pointer", color: "#4a5568",
-        fontSize: 12, fontWeight: 700, fontFamily: "monospace", lineHeight: 1,
-      }}>?</button>
-      {/* H1 — Live notification bell */}
-      <NotificationBell setPage={setPage} notifs={notifs} />
-      {/* CRITICAL alert widget */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 5,
-        background: "#0f0505", borderRadius: 5, padding: "4px 9px",
-        border: "1px solid #ff4d4d33",
-      }}>
-        <div style={{
-          width: 5, height: 5, borderRadius: "50%",
-          background: blink ? "#ff4d4d" : "#1a0000",
-          transition: "background 0.3s",
-          boxShadow: blink ? "0 0 4px #ff4d4d" : "none",
-        }} />
-        <span style={{ color: "#ff4d4d", fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>3 CRITICAL</span>
-      </div>
-      {/* Energy sector widget */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 5,
-        background: "#0e0800", borderRadius: 5, padding: "4px 9px",
-        border: "1px solid #ff9d0033",
-      }}>
-        <span style={{ fontSize: 9 }}>🛢️</span>
-        <span style={{ color: "#ff9d00", fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>ENERGY</span>
-      </div>
-      {/* Live UTC Clock */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 4,
-        background: "#060d1a", borderRadius: 5, padding: "4px 9px",
-        border: "1px solid #0d1f3a",
-      }}>
-        <span style={{ color: "#2d4a6a", fontSize: 8, letterSpacing: 1 }}>UTC</span>
-        <span style={{
-          color: "#4a6080", fontSize: 10, fontFamily: "monospace",
-          letterSpacing: 1, fontVariantNumeric: "tabular-nums",
-        }}>{utc}</span>
-      </div>
-      {/* Version */}
-      <div style={{ color: "#2d3f55", fontSize: 9, fontFamily: "monospace", letterSpacing: 1, paddingLeft: 2 }}>
-        v0.8
-      </div>
+      {/* Desktop: keyboard shortcuts (?) | Mobile: quick status (ℹ) */}
+      {narrow ? (
+        <button onClick={onInfoOpen} title="Quick Status" style={{
+          background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 5,
+          padding: "4px 8px", cursor: "pointer", color: "#4a5568",
+          fontSize: 13, lineHeight: 1,
+        }}>ℹ</button>
+      ) : (
+        <button onClick={onHelpOpen} title="Keyboard shortcuts" style={{
+          background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 5,
+          padding: "4px 8px", cursor: "pointer", color: "#4a5568",
+          fontSize: 12, fontWeight: 700, fontFamily: "monospace", lineHeight: 1,
+        }}>?</button>
+      )}
+      {/* Live notification bell */}
+      <NotificationBell setPage={setPage} notifs={notifs} narrow={narrow} />
+      {/* Desktop-only widgets */}
+      {!narrow && (
+        <>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 5,
+            background: "#0f0505", borderRadius: 5, padding: "4px 9px",
+            border: "1px solid #ff4d4d33",
+          }}>
+            <div style={{
+              width: 5, height: 5, borderRadius: "50%",
+              background: blink ? "#ff4d4d" : "#1a0000",
+              transition: "background 0.3s",
+              boxShadow: blink ? "0 0 4px #ff4d4d" : "none",
+            }} />
+            <span style={{ color: "#ff4d4d", fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>3 CRITICAL</span>
+          </div>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 5,
+            background: "#0e0800", borderRadius: 5, padding: "4px 9px",
+            border: "1px solid #ff9d0033",
+          }}>
+            <span style={{ fontSize: 9 }}>🛢️</span>
+            <span style={{ color: "#ff9d00", fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>ENERGY</span>
+          </div>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 4,
+            background: "#060d1a", borderRadius: 5, padding: "4px 9px",
+            border: "1px solid #0d1f3a",
+          }}>
+            <span style={{ color: "#2d4a6a", fontSize: 8, letterSpacing: 1 }}>UTC</span>
+            <span style={{ color: "#4a6080", fontSize: 10, fontFamily: "monospace", letterSpacing: 1, fontVariantNumeric: "tabular-nums" }}>{utc}</span>
+          </div>
+          <div style={{ color: "#2d3f55", fontSize: 9, fontFamily: "monospace", letterSpacing: 1, paddingLeft: 2 }}>v0.8</div>
+        </>
+      )}
     </div>
   );
 }
@@ -546,6 +615,7 @@ function AppInner() {
   const [blink, setBlink] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const narrow = useNarrow();
 
   // H1 — live feed: start from baseline, inject random alert every ~90s
@@ -600,6 +670,7 @@ function AppInner() {
       <GlobalStyles />
       {searchOpen && <SearchModal onNavigate={navigate} onClose={() => setSearchOpen(false)} />}
       {helpOpen   && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
+      {infoOpen   && <QuickStatusPanel onClose={() => setInfoOpen(false)} currentNav={currentNav} accent={accent} notifs={liveNotifs} />}
 
       {/* G3 — responsive nav */}
       <nav style={{
@@ -619,7 +690,15 @@ function AppInner() {
             <NavBtn key={n.id} n={n} active={page === n.id} onClick={() => navigate(n.id)} />
           ))
         )}
-        <StatusWidgets blink={blink} setPage={navigate} notifs={liveNotifs} onSearchOpen={() => { setSearchOpen(true); setHelpOpen(false); }} onHelpOpen={() => { setHelpOpen(x => !x); setSearchOpen(false); }} />
+        <StatusWidgets
+          blink={blink}
+          setPage={navigate}
+          notifs={liveNotifs}
+          narrow={narrow}
+          onSearchOpen={() => { setSearchOpen(true); setHelpOpen(false); setInfoOpen(false); }}
+          onHelpOpen={() => { setHelpOpen(x => !x); setSearchOpen(false); setInfoOpen(false); }}
+          onInfoOpen={() => { setInfoOpen(x => !x); setSearchOpen(false); setHelpOpen(false); }}
+        />
       </nav>
 
       <ApiKeyBanner />
