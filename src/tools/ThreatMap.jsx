@@ -52,6 +52,24 @@ const typeColor = t =>
 const levelColor = l =>
   l === "CRITICAL" ? "#ff4d4d" : l === "HIGH" ? "#ff9d00" : l === "MEDIUM" ? "#ffd700" : "#00ff9d";
 
+const TYPE_FILTERS = [
+  { id: "ALL",       label: "All",       color: "#9ca3af" },
+  { id: "Kinetic",   label: "Kinetic",   color: "#ff4d4d" },
+  { id: "Cyber",     label: "Cyber",     color: "#4db8ff" },
+  { id: "Maritime",  label: "Maritime",  color: "#00cfff" },
+  { id: "Terrorism", label: "Terror",    color: "#ff9d00" },
+  { id: "Bio",       label: "Bio",       color: "#00ff9d" },
+  { id: "Hybrid",    label: "Hybrid",    color: "#b47fff" },
+];
+const LEVEL_FILTERS = ["ALL", "CRITICAL", "HIGH", "MEDIUM"];
+
+function matchType(type, filter) {
+  if (filter === "ALL") return true;
+  if (filter === "Cyber") return type === "Cyber" || type.startsWith("Cyber");
+  if (filter === "Bio") return type.startsWith("Bio");
+  return type === filter || type.startsWith(filter + "+");
+}
+
 export default function ThreatMap() {
   const [apiKey] = useApiKey();
   const [tick, setTick] = useState(0);
@@ -60,8 +78,20 @@ export default function ThreatMap() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [scanY, setScanY] = useState(0);
+  const [filterType, setFilterType] = useState("ALL");
+  const [filterLevel, setFilterLevel] = useState("ALL");
   useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 1500); return () => clearInterval(t); }, []);
   useEffect(() => { const t = setInterval(() => setScanY(y => (y + 6) % 384), 40); return () => clearInterval(t); }, []);
+
+  const visible = hotspots.filter(h =>
+    matchType(h.type, filterType) && (filterLevel === "ALL" || h.level === filterLevel)
+  );
+
+  function selectHotspot(h) {
+    if (!visible.find(v => v.id === h.id)) return;
+    setSel(sel?.id === h.id ? null : h);
+    setAiResult(null); setAiError("");
+  }
 
   async function analyzeHotspot(h) {
     setAiResult(null); setAiError(""); setAiLoading(true);
@@ -122,11 +152,12 @@ export default function ThreatMap() {
             const crit = h.level === "CRITICAL";
             const phase = (tick + i * 2) % 8;
             const isSel = sel?.id === h.id;
+            const isFiltered = !visible.find(v => v.id === h.id);
             return (
-              <g key={h.id} onClick={() => setSel(isSel ? null : h)} style={{ cursor: "pointer" }}>
-                {crit && <circle cx={h.x} cy={h.y} r={18 + phase * 1.5} fill="none" stroke={c} strokeWidth="0.5" opacity={Math.max(0, 0.45 - phase * 0.055)} />}
-                <circle cx={h.x} cy={h.y} r={crit ? 9 : 6} fill={c} opacity={isSel ? 1 : 0.85} />
-                <circle cx={h.x} cy={h.y} r={crit ? 14 : 10} fill="none" stroke={c} strokeWidth={isSel ? 2 : 1} opacity={isSel ? 0.8 : 0.35} />
+              <g key={h.id} onClick={() => selectHotspot(h)} style={{ cursor: isFiltered ? "default" : "pointer" }}>
+                {!isFiltered && crit && <circle cx={h.x} cy={h.y} r={18 + phase * 1.5} fill="none" stroke={c} strokeWidth="0.5" opacity={Math.max(0, 0.45 - phase * 0.055)} />}
+                <circle cx={h.x} cy={h.y} r={crit ? 9 : 6} fill={isFiltered ? "#1a2535" : c} opacity={isFiltered ? 0.3 : isSel ? 1 : 0.85} />
+                <circle cx={h.x} cy={h.y} r={crit ? 14 : 10} fill="none" stroke={isFiltered ? "#1a2535" : c} strokeWidth={isSel ? 2 : 1} opacity={isFiltered ? 0.2 : isSel ? 0.8 : 0.35} />
                 {isSel && <circle cx={h.x} cy={h.y} r={20} fill="none" stroke={c} strokeWidth="1.5" strokeDasharray="4 2" opacity="0.7" />}
                 {isSel && <text x={h.x + 14} y={h.y - 6} fill="#e2e8f0" fontSize="9" fontWeight="bold">{h.label}</text>}
               </g>
@@ -177,11 +208,56 @@ export default function ThreatMap() {
         </Card>
       )}
 
+      {/* Filters */}
+      <Card style={{ padding: "12px 14px", marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginRight: 2 }}>TYPE</span>
+            {TYPE_FILTERS.map(f => {
+              const active = filterType === f.id;
+              return (
+                <button key={f.id} onClick={() => { setFilterType(f.id); setSel(null); }} style={{
+                  background: active ? f.color : "#1f2d45",
+                  color: active ? "#0a0f1e" : "#9ca3af",
+                  border: `1px solid ${active ? f.color : "transparent"}`,
+                  borderRadius: 4, padding: "3px 9px", cursor: "pointer", fontSize: 10, fontWeight: active ? 700 : 400,
+                  transition: "all 0.15s",
+                }}>{f.label}</button>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginRight: 2 }}>LEVEL</span>
+            {LEVEL_FILTERS.map(f => {
+              const active = filterLevel === f;
+              const fc = f === "CRITICAL" ? "#ff4d4d" : f === "HIGH" ? "#ff9d00" : f === "MEDIUM" ? "#ffd700" : "#9ca3af";
+              return (
+                <button key={f} onClick={() => { setFilterLevel(f); setSel(null); }} style={{
+                  background: active ? fc : "#1f2d45",
+                  color: active ? "#0a0f1e" : "#9ca3af",
+                  border: `1px solid ${active ? fc : "transparent"}`,
+                  borderRadius: 4, padding: "3px 9px", cursor: "pointer", fontSize: 10, fontWeight: active ? 700 : 400,
+                  transition: "all 0.15s",
+                }}>{f}</button>
+              );
+            })}
+          </div>
+          <span style={{ marginLeft: "auto", color: "#4a5568", fontSize: 11 }}>
+            {visible.length} / {hotspots.length} hotspots
+          </span>
+        </div>
+      </Card>
+
       {/* Hotspot list */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-        {hotspots.map(h => (
-          <HotspotRow key={h.id} h={h} sel={sel} setSel={setSel} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gap: 6 }}>
+        {visible.map(h => (
+          <HotspotRow key={h.id} h={h} sel={sel} setSel={v => { setSel(v); setAiResult(null); setAiError(""); }} />
         ))}
+        {visible.length === 0 && (
+          <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "28px 0", color: "#4a5568" }}>
+            No hotspots match the selected filters.
+          </div>
+        )}
       </div>
     </div>
   );

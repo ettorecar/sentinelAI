@@ -185,7 +185,7 @@ export default function Maritime() {
 
         {/* Selected vessel detail panel */}
         {sel && (
-          <div style={{ margin: "0 14px 14px", background: "#0a1628", borderRadius: 8, padding: 14, borderLeft: `3px solid ${rc(sel.risk)}`, border: `1px solid ${rc(sel.risk)}33`, borderLeft: `3px solid ${rc(sel.risk)}` }}>
+          <div style={{ margin: "0 14px 14px", background: "#0a1628", borderRadius: 8, padding: 14, border: `1px solid ${rc(sel.risk)}33`, borderLeft: `3px solid ${rc(sel.risk)}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
               <div>
                 <div style={{ fontSize: 10, color: "#4a5568", letterSpacing: 2, marginBottom: 4 }}>VESSEL INTELLIGENCE</div>

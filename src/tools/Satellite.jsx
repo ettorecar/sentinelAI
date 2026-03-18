@@ -35,7 +35,6 @@ function PassRow({ p }) {
         borderRadius: 7,
         padding: "10px 14px",
         marginBottom: 6,
-        borderLeft: `3px solid ${color}`,
         border: `1px solid ${hovered ? "#2a3f5f" : "#1f2d45"}`,
         borderLeft: `3px solid ${color}`,
         display: "flex",

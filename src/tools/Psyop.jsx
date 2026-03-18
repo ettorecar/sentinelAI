@@ -26,7 +26,6 @@ function TechniqueItem({ t }) {
         borderRadius: 7,
         padding: "10px 12px",
         marginBottom: 7,
-        borderLeft: `3px solid ${color}`,
         border: `1px solid ${hovered ? "#2a3f5f" : "#1f2d45"}`,
         borderLeft: `3px solid ${color}`,
         transition: "background 0.15s, border-color 0.15s",

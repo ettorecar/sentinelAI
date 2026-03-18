@@ -87,6 +87,7 @@ export default function Osint() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selNode, setSelNode] = useState(null); // null | "center" | number (connection index)
 
   async function run() {
     if (!apiKey) { setError("Set the Anthropic API key using the banner above."); return; }
@@ -112,7 +113,7 @@ Return exactly this JSON structure:
 }
 
 Include 4-6 realistic connections and 3-4 intelligence notes. Make connections plausible for this type of entity.`;
-      setResult(await callClaude(apiKey, prompt)); stamp();
+      setResult(await callClaude(apiKey, prompt)); stamp(); setSelNode(null);
     } catch (e) { setError("Error: " + e.message); }
     setLoading(false);
   }
@@ -163,37 +164,87 @@ Include 4-6 realistic connections and 3-4 intelligence notes. Make connections p
 
             {/* Graph */}
             <Card>
-              <ST icon="📊" label="Entity Graph" color="#4db8ff" sub={`${result.connections?.length || 0} connections mapped`} />
+              <ST icon="📊" label="Entity Graph" color="#4db8ff" sub={`${result.connections?.length || 0} connections mapped · click a node for details`} />
               <svg viewBox="0 0 520 310" style={{ width: "100%", background: "#0a1628", borderRadius: 8 }}>
                 {/* Background grid */}
                 {[80,155,230].map(y => <line key={y} x1={0} y1={y} x2={520} y2={y} stroke="#0d1a2e" strokeWidth="1" />)}
                 {[130,260,390].map(x => <line key={x} x1={x} y1={0} x2={x} y2={310} stroke="#0d1a2e" strokeWidth="1" />)}
                 {/* Edges */}
-                {outerNodes.map((n, i) => (
-                  <g key={i}>
-                    <line x1={centerNode.x} y1={centerNode.y} x2={n.x} y2={n.y}
-                      stroke={riskColor(n.risk) + "44"} strokeWidth="1.5" strokeDasharray="5" />
-                  </g>
-                ))}
+                {outerNodes.map((n, i) => {
+                  const isSel = selNode === i;
+                  return (
+                    <line key={i} x1={centerNode.x} y1={centerNode.y} x2={n.x} y2={n.y}
+                      stroke={riskColor(n.risk) + (isSel ? "cc" : "44")} strokeWidth={isSel ? 2.5 : 1.5}
+                      strokeDasharray={isSel ? "0" : "5"} style={{ transition: "all 0.2s" }} />
+                  );
+                })}
                 {/* Outer nodes */}
-                {outerNodes.map((n, i) => (
-                  <g key={i}>
-                    <circle cx={n.x} cy={n.y} r={22} fill="#111827" stroke={riskColor(n.risk)} strokeWidth="1.5" />
-                    <circle cx={n.x} cy={n.y} r={4} fill={riskColor(n.risk)} />
-                    <text x={n.x} y={n.y - 29} textAnchor="middle" fill={riskColor(n.risk)} fontSize="9" fontWeight="bold">
-                      {n.label.length > 14 ? n.label.slice(0, 14) + "…" : n.label}
-                    </text>
-                    <text x={n.x} y={n.y + 4} textAnchor="middle" fill="#6b7a8d" fontSize="7">{n.type.slice(0, 10)}</text>
-                  </g>
-                ))}
+                {outerNodes.map((n, i) => {
+                  const isSel = selNode === i;
+                  const nc = riskColor(n.risk);
+                  return (
+                    <g key={i} onClick={() => setSelNode(selNode === i ? null : i)} style={{ cursor: "pointer" }}>
+                      {isSel && <circle cx={n.x} cy={n.y} r={32} fill="none" stroke={nc} strokeWidth="1" strokeDasharray="4 2" opacity="0.6" />}
+                      <circle cx={n.x} cy={n.y} r={isSel ? 24 : 22} fill={isSel ? nc + "22" : "#111827"} stroke={nc} strokeWidth={isSel ? 2.5 : 1.5} style={{ transition: "all 0.2s" }} />
+                      <circle cx={n.x} cy={n.y} r={isSel ? 6 : 4} fill={nc} />
+                      <text x={n.x} y={n.y - 30} textAnchor="middle" fill={isSel ? nc : nc + "cc"} fontSize={isSel ? 10 : 9} fontWeight="bold">
+                        {n.label.length > 14 ? n.label.slice(0, 14) + "…" : n.label}
+                      </text>
+                      <text x={n.x} y={n.y + (isSel ? 5 : 4)} textAnchor="middle" fill={isSel ? "#9ca3af" : "#6b7a8d"} fontSize="7">{n.type.slice(0, 10)}</text>
+                    </g>
+                  );
+                })}
                 {/* Center node */}
-                <circle cx={centerNode.x} cy={centerNode.y} r={32} fill="#111827" stroke={riskColor(centerNode.risk)} strokeWidth="2.5" />
-                <circle cx={centerNode.x} cy={centerNode.y} r={38} fill="none" stroke={riskColor(centerNode.risk)} strokeWidth="0.8" opacity="0.3" />
-                <text x={centerNode.x} y={centerNode.y - 5} textAnchor="middle" fill={riskColor(centerNode.risk)} fontSize="9" fontWeight="bold">
-                  {centerNode.label.length > 14 ? centerNode.label.slice(0, 14) + "…" : centerNode.label}
-                </text>
-                <text x={centerNode.x} y={centerNode.y + 8} textAnchor="middle" fill="#6b7a8d" fontSize="8">{centerNode.type}</text>
+                {(() => {
+                  const isSel = selNode === "center";
+                  const cc = riskColor(centerNode.risk);
+                  return (
+                    <g onClick={() => setSelNode(selNode === "center" ? null : "center")} style={{ cursor: "pointer" }}>
+                      {isSel && <circle cx={centerNode.x} cy={centerNode.y} r={46} fill="none" stroke={cc} strokeWidth="1" strokeDasharray="4 2" opacity="0.5" />}
+                      <circle cx={centerNode.x} cy={centerNode.y} r={32} fill={isSel ? cc + "22" : "#111827"} stroke={cc} strokeWidth={isSel ? 3 : 2.5} style={{ transition: "all 0.2s" }} />
+                      <circle cx={centerNode.x} cy={centerNode.y} r={38} fill="none" stroke={cc} strokeWidth="0.8" opacity="0.3" />
+                      <text x={centerNode.x} y={centerNode.y - 5} textAnchor="middle" fill={cc} fontSize="9" fontWeight="bold">
+                        {centerNode.label.length > 14 ? centerNode.label.slice(0, 14) + "…" : centerNode.label}
+                      </text>
+                      <text x={centerNode.x} y={centerNode.y + 8} textAnchor="middle" fill="#6b7a8d" fontSize="8">{centerNode.type}</text>
+                    </g>
+                  );
+                })()}
               </svg>
+
+              {/* Node detail panel */}
+              {selNode === "center" && (
+                <div style={{ marginTop: 10, background: "#0d1626", borderRadius: 8, padding: 14, borderLeft: `3px solid ${riskColor(result.risk_level)}` }}>
+                  <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 2, marginBottom: 5 }}>PIVOT ENTITY</div>
+                  <div style={{ fontWeight: 800, color: "#e2e8f0", fontSize: 14, marginBottom: 4 }}>{result.entity}</div>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                    <BADGE text={result.entity_type} color="blue" />
+                    <BADGE text={result.risk_level} color={riskBadge(result.risk_level)} />
+                    <span style={{ color: "#ffd700", fontSize: 11 }}>Conf: {result.confidence}%</span>
+                  </div>
+                  <div style={{ color: "#c9d1da", fontSize: 12, lineHeight: 1.6 }}>{result.summary}</div>
+                </div>
+              )}
+              {selNode !== null && selNode !== "center" && (() => {
+                const conn = result.connections?.[selNode];
+                if (!conn) return null;
+                const nc = riskColor(conn.risk);
+                return (
+                  <div style={{ marginTop: 10, background: "#0d1626", borderRadius: 8, padding: 14, borderLeft: `3px solid ${nc}` }}>
+                    <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 2, marginBottom: 5 }}>CONNECTED ENTITY</div>
+                    <div style={{ fontWeight: 800, color: "#e2e8f0", fontSize: 14, marginBottom: 6 }}>{conn.entity}</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+                      <BADGE text={`Relation: ${conn.relation}`} color="blue" />
+                      <BADGE text={conn.risk} color={riskBadge(conn.risk)} />
+                    </div>
+                    <div style={{ color: "#9ca3af", fontSize: 12 }}>
+                      Source: <span style={{ color: "#ffd700" }}>{conn.source}</span>
+                      <span style={{ margin: "0 8px" }}>·</span>
+                      Pivot: <span style={{ color: "#4db8ff" }}>{result.entity}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </Card>
 
             {/* Connections */}
