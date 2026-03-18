@@ -36,9 +36,9 @@ Il valore differenziale rispetto ai competitor è l'**integrazione nativa di AI 
 
 ---
 
-## 3. Stato attuale — v0.7 (Marzo 2026)
+## 3. Stato attuale — v0.8 (Marzo 2026)
 
-La piattaforma è una **React SPA modulare** con **17 tool** implementati.
+La piattaforma è una **React SPA modulare** con **19 tool** implementati (+ Workspace).
 Frontend-only (no backend). API key Claude inserita dall'utente tramite banner globale (in-memory, non persistita).
 
 ### Tool implementati
@@ -46,48 +46,62 @@ Frontend-only (no backend). API key Claude inserita dall'utente tramite banner g
 | # | Tool | Stato | AI | Modulo |
 |---|---|---|---|---|
 | 1 | 🌍 **Threat Map** | Mock + AI on-demand | ✅ AI click su hotspot | Core |
-| 2 | 🤖 **Red Team Scenario Generator** | ✅ AI live | ✅ Generazione scenario | Core |
+| 2 | 🤖 **Red Team Scenario Generator** | ✅ AI live | ✅ MITRE heatmap + kill chain animata | Core |
 | 3 | 🔍 **OSINT Correlator** | ✅ AI live | ✅ Entity correlation | Core |
-| 4 | 📰 **Disinformation Detector** | ✅ AI live | ✅ Classificazione tecniche | Core |
-| 5 | 🌊 **Maritime Anomaly Tracker** | Mock + AI on-demand | ✅ AI analisi vessel | Core |
-| 6 | 🛰️ **Satellite Pass Planner** | Mock + AI on-demand | ✅ AI intel brief | Core |
+| 4 | 📰 **Disinformation Detector** | ✅ AI live | ✅ Barchart 7gg + sparkline velocità | Core |
+| 5 | 🌊 **Maritime Anomaly Tracker** | Mock + AI on-demand | ✅ AI analisi vessel + prefill export | Core |
+| 6 | 🛰️ **Satellite Pass Planner** | Mock + AI on-demand | ✅ Ground track SVG + countdown | Core |
 | 7 | 📍 **Pattern-of-Life Analyzer** | ✅ AI live | ✅ Ricostruzione spazio-temporale | Core |
-| 8 | 🧠 **PSYOP Content Analyzer** | ✅ AI live | ✅ Identificazione tecniche | Core |
-| 9 | 🦠 **Bio-Threat Early Warning** | Mock + AI on-demand | ✅ AI risk assessment | Core |
-| 10 | 🔐 **Cyber Threat Intelligence** | Mock + AI on-demand | ✅ AI actor profile | Core |
+| 8 | 🧠 **PSYOP Content Analyzer** | ✅ AI live | ✅ Radar chart 6 assi + barre demografiche | Core |
+| 9 | 🦠 **Bio-Threat Early Warning** | Mock + AI on-demand | ✅ Mappa SVG + gauge R₀ + timeline | Core |
+| 10 | 🔐 **Cyber Threat Intelligence** | Mock + AI on-demand | ✅ Donut IOC + threat bar + prefill export | Core |
 | 11 | 🌐 **Multilingual Battlefield Translator** | Mock + AI on-demand | ✅ AI translation+analysis | Core |
 | 12 | 🛢️ **Oil Infrastructure Monitor** | Mock + AI on-demand | ✅ AI threat assessment | Energy |
 | 13 | 🚢 **Strategic Chokepoint Monitor** | Mock + AI on-demand | ✅ AI geopolitical analysis | Energy |
-| 14 | 📊 **Energy Supply Chain Risk** | ✅ AI live | ✅ AI disruption assessment | Energy |
+| 14 | 📊 **Energy Supply Chain Risk** | ✅ AI live | ✅ Radial network + grouped bar + compare | Energy |
 | 15 | ⚡ **Energy Grid Resilience Simulator** | Mock + AI on-demand | ✅ AI cascade analysis | Energy |
-| 16 | 📋 **Intelligence Report Generator** | ✅ AI live | ✅ Multi-domain brief + export | Report |
-| 17 | 🏠 **Home Dashboard** | Live feed cliccabile | — | — |
+| 16 | 📋 **Intelligence Report Generator** | ✅ AI live | ✅ Tabbed output + 3 KPI + import prefill | Report |
+| 17 | 🎯 **Scenario Builder** | ✅ AI live | ✅ Wizard 3-step, cascade/escalation | Report |
+| 18 | 🗂️ **Workspace** | Session locale | — Session log + export JSON | Session |
+| 19 | 🏠 **Home Dashboard** | Live feed cliccabile | — | — |
 
 ### Architettura AI attuale
 - **Global API Key:** React Context (in-memory, no localStorage). Banner fisso in alto con campo password. Tutti i tool leggono la chiave dal context via `useApiKey()`.
-- **Layer 2 tools** (usano input utente): RedTeam, OSINT, Disinfo, PatLife, PSYOP, EnergyRisk, IntelReport — generazione AI completa
+- **Layer 2 tools** (usano input utente): RedTeam, OSINT, Disinfo, PatLife, PSYOP, EnergyRisk, IntelReport, ScenarioBuilder — generazione AI completa
 - **Layer 1 tools** (dati mock + AI on-demand): ThreatMap, Maritime, Satellite, BioThreat, CTI, OilInfra, Chokepoint, EnergyGrid — pulsante "🤖 AI Analysis" sul dettaglio selezionato
+
+### Aggiunte UX v0.8 (Blocchi E/F/G/H)
+- **Blocco G:** URL hash routing (`#threatmap` etc), tasto `?` shortcut help, nav hamburger <860px, breadcrumb con `← Home`
+- **Blocco E:** Visualizzazioni SVG avanzate in Disinfo, PSYOP, BioThreat, EnergyRisk (barchart, radar, mappa mondo, radial network)
+- **Blocco F:** MITRE ATT&CK heatmap + kill chain (RedTeam), ground track + countdown (Satellite), IOC donut (CTI), report tabbed + KPI (IntelReport)
+- **Blocco H:** Live alert feed 17 voci ogni ~90s (bell), Workspace page con session log, IntelReport "Import from →" prefill, Export Session JSON
 
 ---
 
 ## 4. Roadmap aggiornata
 
-### ✅ Fase 1 — Completamento mock e polish visivo (COMPLETATA)
+### ✅ Fase 1 — Completamento mock e polish visivo (COMPLETATA v0.7)
 - [x] Tool: Energy Grid Resilience Simulator
 - [x] Tool: Multilingual Battlefield Comms Translator
-- [x] Tool: Intelligence Report Generator (nuovo — da doc fase 6)
+- [x] Tool: Intelligence Report Generator
 - [x] Export Report via window.print()
 - [x] Global API key (in-memory context)
 - [x] AI su tutti i Layer 1 tool (click on-demand)
 - [x] Feed Home cliccabile con navigazione ai tool
-- [x] Badge versione aggiornato v0.7
+
+### ✅ Fase 1b — UX & Visualizzazioni avanzate (COMPLETATA v0.8)
+- [x] **Blocco G** — URL hash routing, shortcut help `?`, nav hamburger <860px, breadcrumb
+- [x] **Blocco E** — SVG avanzati: barchart Disinfo, radar PSYOP, mappa BioThreat, radial EnergyRisk
+- [x] **Blocco F** — MITRE heatmap + kill chain (RedTeam), ground track SVG (Satellite), IOC donut (CTI), tabbed report + KPI (IntelReport)
+- [x] **Blocco H** — Live alert feed ~90s, Workspace session log, IntelReport prefill import, Export Session JSON
+- [x] Tool: Scenario Builder (wizard 3-step, cascade/escalation)
+- [x] SplashScreen con input API key
+- [x] 19 tool totali (18 intel + Workspace)
 
 ### ⏳ Da fare prima del backend (frontend-only)
 - [ ] **AI Copilot** — chat globale trasversale a tutti i tool (stand-by, bassa priorità)
-- [ ] **Scenario Builder** — tool nuovo per analisi multi-dominio di scenari geopolitici
-- [ ] Schermata splash/login per aspetto prodotto finito
-- [ ] Responsive mobile
-- [ ] EnergyRisk: aggiungere messaggio "Set API key per abilitare AI" quando chiave assente
+- [ ] Responsive mobile completo
+- [ ] Export PDF reale (Puppeteer o react-pdf)
 
 ### 🔜 Fase 2 — Backend Node.js + Vercel Functions
 - Serverless functions per Layer 1 (dati aggiornati AI ogni 30min, cachati)
@@ -144,7 +158,9 @@ sentinel/
 │       ├── Chokepoint.jsx
 │       ├── EnergyRisk.jsx
 │       ├── EnergyGrid.jsx
-│       └── IntelReport.jsx
+│       ├── IntelReport.jsx
+│       ├── ScenarioBuilder.jsx
+│       └── Workspace.jsx
 └── package.json
 ```
 
@@ -179,4 +195,4 @@ Fornire in apertura:
 
 ---
 
-*Ultimo aggiornamento: Marzo 2026 — v0.7 — 17 tool (Core + Energy + Report)*
+*Ultimo aggiornamento: Marzo 2026 — v0.8 — 19 tool (Core + Energy + Report + Session)*

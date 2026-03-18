@@ -54,8 +54,12 @@ export function downloadJson(data, filename = "sentinel-export") {
 // ── Last analysis hook + tag ───────────────────────────────────────────────
 export function useLastAnalysis(toolId) {
   const KEY = `sentinel_last_${toolId}`;
-  function stamp() { localStorage.setItem(KEY, String(Date.now())); }
-  function read()  { return localStorage.getItem(KEY) ? Number(localStorage.getItem(KEY)) : null; }
+  const EXCERPT_KEY = `sentinel_excerpt_${toolId}`;
+  function stamp(excerpt) {
+    localStorage.setItem(KEY, String(Date.now()));
+    if (excerpt) try { localStorage.setItem(EXCERPT_KEY, String(excerpt).slice(0, 300)); } catch {}
+  }
+  function read() { return localStorage.getItem(KEY) ? Number(localStorage.getItem(KEY)) : null; }
   return { stamp, read };
 }
 

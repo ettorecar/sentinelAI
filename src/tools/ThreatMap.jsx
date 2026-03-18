@@ -140,6 +140,7 @@ export default function ThreatMap() {
         `You are a senior intelligence analyst. Provide a concise threat assessment for: ${h.label} (Type: ${h.type}, Level: ${h.level}, Actors: ${h.actors}). Return plain text — 3-4 sentences covering: current situation, key actors, immediate risks, and recommended posture.`
       );
       setAiResult(text);
+      try { localStorage.setItem("sentinel_prefill_threatmap", text.slice(0, 300)); } catch {}
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }

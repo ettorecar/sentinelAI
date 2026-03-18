@@ -118,9 +118,33 @@ export default function IntelReport() {
   const { stamp } = useLastAnalysis("intelreport");
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("summary");
+  const [importOpen, setImportOpen] = useState(false);
 
   function toggleDomain(id) {
     setSelectedDomains(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
+  }
+
+  // H3 — import prefill from a prior tool analysis
+  const IMPORT_SOURCES = [
+    { id: "threatmap", label: "Threat Map",    domains: ["kinetic", "cyber"] },
+    { id: "cti",       label: "Cyber Intel",   domains: ["cyber"] },
+    { id: "maritime",  label: "Maritime",      domains: ["maritime"] },
+    { id: "biothreat", label: "Bio-Threat",    domains: ["bio"] },
+    { id: "disinfo",   label: "Disinformation", domains: ["disinfo"] },
+  ];
+
+  function importFrom(src) {
+    setImportOpen(false);
+    // add relevant domains
+    setSelectedDomains(prev => {
+      const next = [...new Set([...prev, ...src.domains])];
+      return next;
+    });
+    // read prefill text, fall back to tool description
+    let text = "";
+    try { text = localStorage.getItem(`sentinel_prefill_${src.id}`) || ""; } catch {}
+    if (!text) text = `Context from recent ${src.label} analysis`;
+    setFocus(text.slice(0, 400));
   }
 
   async function generate() {
@@ -211,10 +235,63 @@ Return ONLY a JSON object (no markdown, no backticks):
             ⚠ Set your Anthropic API key in the banner at the top to generate reports.
           </div>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <Btn onClick={generate} disabled={loading || !apiKey} color="#b47fff">
             {loading ? "⏳ Generating Report..." : "📋 Generate Intelligence Report"}
           </Btn>
+          {/* H3 — Import from prior tool analysis */}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setImportOpen(x => !x)}
+              style={{
+                background: importOpen ? "#b47fff22" : "#1f2d45",
+                border: `1px solid ${importOpen ? "#b47fff55" : "transparent"}`,
+                borderRadius: 6, padding: "6px 12px", cursor: "pointer",
+                color: importOpen ? "#b47fff" : "#9ca3af", fontSize: 12,
+                transition: "all 0.15s",
+              }}
+            >
+              ↗ Import from →
+            </button>
+            {importOpen && (
+              <>
+                <div style={{ position: "fixed", inset: 0, zIndex: 49 }} onClick={() => setImportOpen(false)} />
+                <div style={{
+                  position: "absolute", top: "calc(100% + 5px)", left: 0,
+                  background: "#0b111e", border: "1px solid #1f2d45",
+                  borderRadius: 8, zIndex: 50, minWidth: 180,
+                  boxShadow: "0 8px 32px #000a", overflow: "hidden",
+                }}>
+                  <div style={{ padding: "7px 12px", borderBottom: "1px solid #1f2d45", color: "#4a5568", fontSize: 10, letterSpacing: 1 }}>
+                    IMPORT FROM TOOL
+                  </div>
+                  {IMPORT_SOURCES.map(src => {
+                    const hasData = (() => { try { return !!localStorage.getItem(`sentinel_last_${src.id}`); } catch { return false; } })();
+                    return (
+                      <button key={src.id}
+                        onClick={() => importFrom(src)}
+                        disabled={!hasData}
+                        style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          width: "100%", textAlign: "left", background: "transparent",
+                          border: "none", padding: "9px 12px", cursor: hasData ? "pointer" : "not-allowed",
+                          color: hasData ? "#e2e8f0" : "#2d3f55", fontSize: 12,
+                          borderBottom: "1px solid #0d1626",
+                        }}
+                        onMouseEnter={e => { if (hasData) e.currentTarget.style.background = "#0d1626"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                      >
+                        <span>{src.label}</span>
+                        {hasData
+                          ? <span style={{ color: "#00ff9d", fontSize: 9, fontWeight: 700 }}>✓ disponibile</span>
+                          : <span style={{ color: "#2d3f55", fontSize: 9 }}>no analisi</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
           <LastAnalysisTag toolId="intelreport" />
         </div>
       </Card>

@@ -25,6 +25,7 @@ export const NAV = [
   { id: "energygrid",  label: "Energy Grid Simulator",    icon: "⚡" },
   { id: "intelreport",    label: "Intel Report",       icon: "📋" },
   { id: "scenariobuilder", label: "Scenario Builder",  icon: "🎯" },
+  { id: "workspace",       label: "Workspace",          icon: "🗂️" },
 ];
 
 export const ENERGY_IDS = ["oilinfra", "chokepoint", "energyrisk", "energygrid"];
@@ -47,4 +48,5 @@ export const TOOL_DESC = {
   energygrid:  "Simulate cascading failures and resilience of national energy grid infrastructure.",
   intelreport:    "Generate a structured multi-domain intelligence brief with executive summary and recommendations.",
   scenariobuilder: "Build multi-domain crisis scenarios, define actors and events across domains, and analyze cascade effects and escalation paths.",
+  workspace: "Session log of all intelligence analyses — browse history, view excerpts, and export session data as JSON.",
 };

@@ -22,6 +22,7 @@ import EnergyRisk      from "./tools/EnergyRisk";
 import EnergyGrid      from "./tools/EnergyGrid";
 import IntelReport     from "./tools/IntelReport";
 import ScenarioBuilder from "./tools/ScenarioBuilder";
+import Workspace       from "./tools/Workspace";
 
 const PAGES = {
   home:           Home,
@@ -42,6 +43,7 @@ const PAGES = {
   energygrid:     EnergyGrid,
   intelreport:    IntelReport,
   scenariobuilder: ScenarioBuilder,
+  workspace:      Workspace,
 };
 
 function navAccent(id) {
@@ -170,27 +172,53 @@ function ApiKeyBanner() {
   );
 }
 
-const NOTIFS = [
-  { time: "14:32", msg: "New IOC cluster linked to EMBER WOLF",               level: "CRITICAL", page: "cti"        },
-  { time: "14:18", msg: "Drone threat detected — Abqaiq perimeter",            level: "CRITICAL", page: "oilinfra"   },
-  { time: "13:55", msg: "Hormuz: new mine-laying report, strait traffic -18%", level: "CRITICAL", page: "chokepoint" },
-  { time: "13:41", msg: "Coordinated narrative surge — Telegram",              level: "HIGH",     page: "psyop"      },
-  { time: "12:59", msg: "ADRIATICA SUN AIS blackout extended >8h",             level: "HIGH",     page: "maritime"   },
+// H1 — baseline notifications
+const NOTIFS_BASE = [
+  { msg: "New IOC cluster linked to EMBER WOLF",               level: "CRITICAL", page: "cti"        },
+  { msg: "Drone threat detected — Abqaiq perimeter",           level: "CRITICAL", page: "oilinfra"   },
+  { msg: "Hormuz: new mine-laying report, strait traffic -18%", level: "CRITICAL", page: "chokepoint" },
+  { msg: "Coordinated narrative surge — Telegram",             level: "HIGH",     page: "psyop"      },
+  { msg: "ADRIATICA SUN AIS blackout extended >8h",            level: "HIGH",     page: "maritime"   },
 ];
+
+// H1 — live feed pool (15+ entries rotated every ~90s)
+const FEED_POOL = [
+  { msg: "APT-8834 PHANTOM CRANE: new C2 infrastructure detected", level: "CRITICAL", page: "cti"      },
+  { msg: "GNSS jamming event — Baltic Sea corridor, 3h duration",   level: "HIGH",     page: "satellite" },
+  { msg: "R₀ spike detected: West Africa cluster now at 2.8",       level: "CRITICAL", page: "biothreat" },
+  { msg: "AIS manipulation: 4 vessels spoofed near Bab-el-Mandeb",  level: "HIGH",     page: "maritime"  },
+  { msg: "Energy grid anomaly: Poland-Germany interconnector -40%",  level: "HIGH",     page: "energygrid"},
+  { msg: "Narrative injection: coordinated hashtag campaign detected",level: "MEDIUM",   page: "disinfo"   },
+  { msg: "New zero-day: VPN appliance RCE, 3 CRITICAL actors active",level: "CRITICAL", page: "cti"      },
+  { msg: "Suez Canal: vessel convoy gap detected — 2h window",       level: "MEDIUM",   page: "chokepoint"},
+  { msg: "Oil pipeline pressure drop: Libya export terminal",         level: "HIGH",     page: "oilinfra"  },
+  { msg: "PSYOP signal: fear narrative surge — 3 platforms +180%",   level: "HIGH",     page: "psyop"     },
+  { msg: "SIGINT: encrypted burst traffic spike — Eastern Med",       level: "MEDIUM",   page: "redteam"   },
+  { msg: "Satellite recon window: PLEIADES-1A priority tasking",      level: "MEDIUM",   page: "satellite" },
+  { msg: "JADE SERPENT new TTP: supply chain injection confirmed",    level: "CRITICAL", page: "cti"      },
+  { msg: "Energy storage anomaly: 3 EU grid nodes below threshold",   level: "HIGH",     page: "energyrisk"},
+  { msg: "Bio-signal: unexplained pneumonia cluster — Central Asia",  level: "HIGH",     page: "biothreat" },
+  { msg: "Maritime: submarine cable repair vessel off Morocco coast", level: "MEDIUM",   page: "maritime"  },
+  { msg: "Pattern of life break: HVT subject absent 72h",            level: "HIGH",     page: "patlife"   },
+];
+
 const NOTIF_LC = { CRITICAL: "#ff4d4d", HIGH: "#ff9d00", MEDIUM: "#ffd700" };
 
-function NotificationBell({ setPage }) {
+function fmtTime(d) {
+  return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+
+function NotificationBell({ setPage, notifs }) {
   const [open, setOpen] = useState(false);
   const [read, setRead] = useState(() => {
     try { return parseInt(localStorage.getItem("sentinel-notif-read") || "0", 10); } catch { return 0; }
   });
-  const unread = Math.max(0, NOTIFS.length - read);
+  const unread = Math.max(0, notifs.length - read);
 
   function toggle() {
     if (!open) {
-      const n = NOTIFS.length;
-      setRead(n);
-      try { localStorage.setItem("sentinel-notif-read", String(n)); } catch {}
+      setRead(notifs.length);
+      try { localStorage.setItem("sentinel-notif-read", String(notifs.length)); } catch {}
     }
     setOpen(x => !x);
   }
@@ -211,7 +239,7 @@ function NotificationBell({ setPage }) {
             background: "#ff4d4d", color: "#fff", fontSize: 8, fontWeight: 700,
             borderRadius: "50%", width: 14, height: 14,
             display: "flex", alignItems: "center", justifyContent: "center",
-          }}>{unread}</span>
+          }}>{Math.min(unread, 99)}</span>
         )}
       </button>
       {open && (
@@ -220,20 +248,24 @@ function NotificationBell({ setPage }) {
           <div style={{
             position: "absolute", top: "calc(100% + 6px)", right: 0,
             background: "#0b111e", border: "1px solid #1f2d45",
-            borderRadius: 10, width: 300, zIndex: 100,
+            borderRadius: 10, width: 310, zIndex: 100,
             boxShadow: "0 12px 40px #000a",
           }}>
             <div style={{ padding: "10px 14px", borderBottom: "1px solid #1f2d45", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "#6b7a8d", fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>NOTIFICATIONS</span>
-              <span style={{ color: "#2d3f55", fontSize: 10 }}>{NOTIFS.length} alerts</span>
+              <span style={{ color: "#6b7a8d", fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>LIVE ALERTS</span>
+              <span style={{ color: "#2d3f55", fontSize: 10 }}>{notifs.length} total</span>
             </div>
-            <div style={{ maxHeight: 280, overflowY: "auto" }}>
-              {NOTIFS.map((n, i) => (
+            <div style={{ maxHeight: 320, overflowY: "auto" }}>
+              {notifs.map((n, i) => (
                 <div key={i}
                   onClick={() => { setOpen(false); setPage(n.page); }}
-                  style={{ padding: "9px 14px", borderBottom: "1px solid #0d1626", cursor: "pointer", borderLeft: `2px solid ${NOTIF_LC[n.level] || "#4a5568"}` }}
+                  style={{
+                    padding: "9px 14px", borderBottom: "1px solid #0d1626",
+                    cursor: "pointer", borderLeft: `2px solid ${NOTIF_LC[n.level] || "#4a5568"}`,
+                    background: i === 0 && notifs.length > NOTIFS_BASE.length ? "#0a1220" : "transparent",
+                  }}
                   onMouseEnter={e => e.currentTarget.style.background = "#0f1a2e"}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  onMouseLeave={e => e.currentTarget.style.background = i === 0 && notifs.length > NOTIFS_BASE.length ? "#0a1220" : "transparent"}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                     <span style={{ color: NOTIF_LC[n.level], fontSize: 9, fontWeight: 700 }}>{n.level}</span>
@@ -430,7 +462,7 @@ function HamburgerMenu({ page, navigate }) {
   );
 }
 
-function StatusWidgets({ blink, setPage, onSearchOpen, onHelpOpen }) {
+function StatusWidgets({ blink, setPage, onSearchOpen, onHelpOpen, notifs }) {
   const [utc, setUtc] = useState(() => new Date().toISOString().slice(11, 19));
   useEffect(() => {
     const t = setInterval(() => setUtc(new Date().toISOString().slice(11, 19)), 1000);
@@ -454,8 +486,8 @@ function StatusWidgets({ blink, setPage, onSearchOpen, onHelpOpen }) {
         padding: "4px 8px", cursor: "pointer", color: "#4a5568",
         fontSize: 12, fontWeight: 700, fontFamily: "monospace", lineHeight: 1,
       }}>?</button>
-      {/* Notification bell */}
-      <NotificationBell setPage={setPage} />
+      {/* H1 — Live notification bell */}
+      <NotificationBell setPage={setPage} notifs={notifs} />
       {/* CRITICAL alert widget */}
       <div style={{
         display: "flex", alignItems: "center", gap: 5,
@@ -509,6 +541,18 @@ function AppInner() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const narrow = useNarrow();
+
+  // H1 — live feed: start from baseline, inject random alert every ~90s
+  const [liveNotifs, setLiveNotifs] = useState(() =>
+    NOTIFS_BASE.map(n => ({ ...n, time: fmtTime(new Date()) }))
+  );
+  useEffect(() => {
+    const t = setInterval(() => {
+      const pick = FEED_POOL[Math.floor(Math.random() * FEED_POOL.length)];
+      setLiveNotifs(prev => [{ ...pick, time: fmtTime(new Date()) }, ...prev].slice(0, 30));
+    }, 90000);
+    return () => clearInterval(t);
+  }, []);
 
   // G1 — sync hash → page on browser back/forward
   useEffect(() => {
@@ -569,7 +613,7 @@ function AppInner() {
             <NavBtn key={n.id} n={n} active={page === n.id} onClick={() => navigate(n.id)} />
           ))
         )}
-        <StatusWidgets blink={blink} setPage={navigate} onSearchOpen={() => { setSearchOpen(true); setHelpOpen(false); }} onHelpOpen={() => { setHelpOpen(x => !x); setSearchOpen(false); }} />
+        <StatusWidgets blink={blink} setPage={navigate} notifs={liveNotifs} onSearchOpen={() => { setSearchOpen(true); setHelpOpen(false); }} onHelpOpen={() => { setHelpOpen(x => !x); setSearchOpen(false); }} />
       </nav>
 
       <ApiKeyBanner />
