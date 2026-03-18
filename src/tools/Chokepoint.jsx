@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { MapContainer, TileLayer, CircleMarker, useMapEvents } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -14,26 +16,29 @@ async function callClaude(apiKey, prompt) {
 }
 
 const chokepoints = [
-  { id: "CP-01", name: "Strait of Hormuz",    location: "Persian Gulf",          mx: 455, my: 188, risk: "CRITICAL", flow: "21Mb/d", pct: "21%", tension: "Extreme",  threats: ["Iranian naval exercises", "Mine laying reports", "Drone harassment of tankers"],        altRoute: "None — no viable alternative",                        history: [18, 19, 20, 21, 20, 19, 21] },
-  { id: "CP-02", name: "Strait of Malacca",   location: "SE Asia",               mx: 590, my: 215, risk: "HIGH",     flow: "16Mb/d", pct: "16%", tension: "Elevated", threats: ["Piracy incidents up 40%", "Territorial disputes", "Cyber attacks on port systems"],    altRoute: "Lombok Strait (+4 days transit)",                      history: [14, 15, 15, 16, 16, 15, 16] },
-  { id: "CP-03", name: "Bab-el-Mandeb",       location: "Red Sea / Yemen",       mx: 405, my: 218, risk: "CRITICAL", flow: "8.8Mb/d",pct: "9%",  tension: "Extreme",  threats: ["Houthi missile attacks", "Drone boats", "Coalition naval response"],                  altRoute: "Cape of Good Hope (+15 days, +$1.2M/voyage)",          history: [9, 8, 7, 6, 5, 4, 4] },
-  { id: "CP-04", name: "Suez Canal",          location: "Egypt",                 mx: 375, my: 178, risk: "MEDIUM",   flow: "5.5Mb/d", pct: "5%",  tension: "Moderate", threats: ["Diversion due to Houthi threat", "Congestion incidents"],                            altRoute: "Cape of Good Hope or SUMED pipeline",                  history: [7, 7, 6, 6, 5, 5, 6] },
-  { id: "CP-05", name: "Turkish Straits",     location: "Bosphorus/Dardanelles", mx: 365, my: 138, risk: "MEDIUM",   flow: "2.4Mb/d", pct: "2%",  tension: "Moderate", threats: ["Russian Black Sea fleet movements", "Sanctions complications"],                      altRoute: "Trans-Anatolian Pipeline (TANAP)",                     history: [3, 3, 2, 2, 2, 2, 2] },
-  { id: "CP-06", name: "Danish Straits",      location: "North Sea",             mx: 322, my: 88,  risk: "LOW",      flow: "1.5Mb/d", pct: "1%",  tension: "Low",      threats: ["Occasional Russian submarine activity"],                                              altRoute: "Pipeline alternatives available",                      history: [1, 1, 2, 1, 1, 2, 1] },
-  { id: "CP-07", name: "Strait of Gibraltar", location: "Atlantic / Med",        mx: 298, my: 153, risk: "LOW",      flow: "1.8Mb/d", pct: "2%",  tension: "Low",      threats: ["Occasional migrant crisis spillover", "Russian sub activity"],                            altRoute: "North Africa overland pipelines",                      history: [2, 2, 1, 2, 2, 1, 2] },
-  { id: "CP-08", name: "Cape of Good Hope",   location: "South Africa",          mx: 325, my: 285, risk: "LOW",      flow: "3.2Mb/d", pct: "3%",  tension: "Low",      threats: ["Weather-driven routing disruptions", "Piracy uptick near Cape"],                         altRoute: "Suez Canal (normal route)",                            history: [2, 3, 3, 4, 4, 5, 6] },
-  { id: "CP-09", name: "Panama Canal",        location: "Central America",       mx: 168, my: 200, risk: "MEDIUM",   flow: "1.0Mb/d", pct: "1%",  tension: "Moderate", threats: ["Water shortage reducing daily transits", "US-China geopolitical pressure", "Cartel activity near locks"], altRoute: "Suez Canal or US land bridge",              history: [1, 1, 1, 1, 1, 1, 1] },
-  { id: "CP-10", name: "Luzon Strait",        location: "Philippines / Taiwan",  mx: 638, my: 180, risk: "HIGH",     flow: "2.0Mb/d", pct: "2%",  tension: "Elevated", threats: ["PLA Navy exercises", "Taiwan Strait tensions spillover", "Submarine cable vulnerability"], altRoute: "Lombok Strait (+2 days transit)",               history: [1, 2, 2, 3, 3, 4, 5] },
+  { id: "CP-01", name: "Strait of Hormuz",    location: "Persian Gulf",          lat:  26.5, lon:  56.5, risk: "CRITICAL", flow: "21Mb/d",  pct: "21%", tension: "Extreme",  threats: ["Iranian naval exercises", "Mine laying reports", "Drone harassment of tankers"],        altRoute: "None — no viable alternative",                        history: [18, 19, 20, 21, 20, 19, 21] },
+  { id: "CP-02", name: "Strait of Malacca",   location: "SE Asia",               lat:   2.0, lon: 101.5, risk: "HIGH",     flow: "16Mb/d",  pct: "16%", tension: "Elevated", threats: ["Piracy incidents up 40%", "Territorial disputes", "Cyber attacks on port systems"],    altRoute: "Lombok Strait (+4 days transit)",                      history: [14, 15, 15, 16, 16, 15, 16] },
+  { id: "CP-03", name: "Bab-el-Mandeb",       location: "Red Sea / Yemen",       lat:  12.5, lon:  43.5, risk: "CRITICAL", flow: "8.8Mb/d", pct: "9%",  tension: "Extreme",  threats: ["Houthi missile attacks", "Drone boats", "Coalition naval response"],                  altRoute: "Cape of Good Hope (+15 days, +$1.2M/voyage)",          history: [9, 8, 7, 6, 5, 4, 4] },
+  { id: "CP-04", name: "Suez Canal",          location: "Egypt",                 lat:  30.5, lon:  32.5, risk: "MEDIUM",   flow: "5.5Mb/d", pct: "5%",  tension: "Moderate", threats: ["Diversion due to Houthi threat", "Congestion incidents"],                            altRoute: "Cape of Good Hope or SUMED pipeline",                  history: [7, 7, 6, 6, 5, 5, 6] },
+  { id: "CP-05", name: "Turkish Straits",     location: "Bosphorus/Dardanelles", lat:  41.0, lon:  29.0, risk: "MEDIUM",   flow: "2.4Mb/d", pct: "2%",  tension: "Moderate", threats: ["Russian Black Sea fleet movements", "Sanctions complications"],                      altRoute: "Trans-Anatolian Pipeline (TANAP)",                     history: [3, 3, 2, 2, 2, 2, 2] },
+  { id: "CP-06", name: "Danish Straits",      location: "North Sea",             lat:  56.0, lon:  10.5, risk: "LOW",      flow: "1.5Mb/d", pct: "1%",  tension: "Low",      threats: ["Occasional Russian submarine activity"],                                              altRoute: "Pipeline alternatives available",                      history: [1, 1, 2, 1, 1, 2, 1] },
+  { id: "CP-07", name: "Strait of Gibraltar", location: "Atlantic / Med",        lat:  35.9, lon:  -5.5, risk: "LOW",      flow: "1.8Mb/d", pct: "2%",  tension: "Low",      threats: ["Occasional migrant crisis spillover", "Russian sub activity"],                       altRoute: "North Africa overland pipelines",                      history: [2, 2, 1, 2, 2, 1, 2] },
+  { id: "CP-08", name: "Cape of Good Hope",   location: "South Africa",          lat: -34.4, lon:  18.5, risk: "LOW",      flow: "3.2Mb/d", pct: "3%",  tension: "Low",      threats: ["Weather-driven routing disruptions", "Piracy uptick near Cape"],                     altRoute: "Suez Canal (normal route)",                            history: [2, 3, 3, 4, 4, 5, 6] },
+  { id: "CP-09", name: "Panama Canal",        location: "Central America",       lat:   9.0, lon: -79.5, risk: "MEDIUM",   flow: "1.0Mb/d", pct: "1%",  tension: "Moderate", threats: ["Water shortage reducing daily transits", "US-China geopolitical pressure", "Cartel activity near locks"], altRoute: "Suez Canal or US land bridge", history: [1, 1, 1, 1, 1, 1, 1] },
+  { id: "CP-10", name: "Luzon Strait",        location: "Philippines / Taiwan",  lat:  20.0, lon: 121.0, risk: "HIGH",     flow: "2.0Mb/d", pct: "2%",  tension: "Elevated", threats: ["PLA Navy exercises", "Taiwan Strait tensions spillover", "Submarine cable vulnerability"], altRoute: "Lombok Strait (+2 days transit)", history: [1, 2, 2, 3, 3, 4, 5] },
 ];
+
+function MapClickHandler({ onDeselect }) {
+  useMapEvents({ click: onDeselect });
+  return null;
+}
 
 export default function Chokepoint() {
   const [apiKey] = useApiKey();
   const [sel, setSel] = useState(null);
-  const [tick, setTick] = useState(0);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
-  useEffect(() => { const t = setInterval(() => setTick(x => x + 1), 1800); return () => clearInterval(t); }, []);
 
   async function analyzeChokepoint(cp) {
     setAiResult(null); setAiError(""); setAiLoading(true);
@@ -57,64 +62,38 @@ export default function Chokepoint() {
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "12px 16px 0", fontWeight: 700, color: "#4db8ff" }}>🗺️ Global Chokepoint Map — Click for detail</div>
-        <svg viewBox="0 0 700 310" style={{ width: "100%", background: "#050d1a", display: "block" }}>
-          {[65, 125, 195, 265].map(y => <line key={y} x1={0} y1={y} x2={700} y2={y} stroke="#0d2040" strokeWidth="1" />)}
-          {[0, 140, 280, 420, 560, 700].map(x => <line key={x} x1={x} y1={0} x2={x} y2={310} stroke="#0d2040" strokeWidth="1" />)}
-          <path d="M 60 78 Q 80 60 120 64 Q 150 59 175 79 Q 185 99 180 129 Q 170 158 155 178 Q 140 198 120 208 Q 100 193 85 173 Q 65 148 55 119 Q 48 93 60 78Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 145 218 Q 165 213 180 228 Q 190 248 185 278 Q 178 308 165 316 Q 150 318 138 306 Q 125 288 125 258 Q 125 236 145 218Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 293 68 Q 330 58 365 68 Q 385 78 390 98 Q 385 113 365 116 Q 340 120 315 113 Q 293 103 288 88 Q 286 76 293 68Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 293 128 Q 330 123 360 133 Q 375 153 372 183 Q 368 218 355 246 Q 338 266 318 263 Q 298 258 288 236 Q 278 208 280 178 Q 282 150 293 128Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 398 63 Q 468 53 538 63 Q 598 68 648 83 Q 683 98 693 123 Q 688 148 663 158 Q 628 166 588 160 Q 543 153 498 146 Q 453 138 418 126 Q 393 113 388 93 Q 388 76 398 63Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          <path d="M 598 253 Q 638 248 668 261 Q 683 278 676 298 Q 663 313 638 313 Q 613 310 603 293 Q 594 275 598 253Z" fill="#0d2040" stroke="#1a3a6a" strokeWidth="1" />
-          {/* ── Global shipping lane network ── */}
-          {/* Main E-W artery: Panama → Gibraltar → Suez → Bab → Hormuz → Malacca → Luzon */}
-          <path d="M 168 200 Q 230 178 298 153 Q 338 162 375 178 Q 390 200 405 218 Q 432 202 455 188 Q 525 208 590 215 Q 616 198 638 180"
-            fill="none" stroke="#4db8ff" strokeWidth="2" strokeDasharray="8 4" opacity="0.5"
-            style={{ animation: "sentinelDash 5s linear infinite" }} />
-          {/* North Atlantic: Gibraltar → Europe */}
-          <path d="M 298 153 Q 265 140 225 128 Q 185 118 148 118 Q 110 122 80 135 Q 55 148 40 158"
-            fill="none" stroke="#00cfff" strokeWidth="1.2" strokeDasharray="6 5" opacity="0.35"
-            style={{ animation: "sentinelDash 6s linear infinite" }} />
-          {/* Trans-Pacific approach to Panama */}
-          <path d="M 0 185 Q 55 185 100 185 Q 135 190 168 200"
-            fill="none" stroke="#4db8ff" strokeWidth="1" strokeDasharray="5 5" opacity="0.25" />
-          {/* Far East outbound */}
-          <path d="M 638 180 Q 660 172 690 162"
-            fill="none" stroke="#4db8ff" strokeWidth="1" strokeDasharray="5 5" opacity="0.22" />
-          {/* Sub-Africa bypass via Cape of Good Hope */}
-          <path d="M 298 153 Q 300 198 314 242 Q 325 285 368 288 Q 415 278 452 252 Q 480 232 505 224 Q 548 218 590 215"
-            fill="none" stroke="#6070a8" strokeWidth="1.2" strokeDasharray="5 6" opacity="0.3" />
-          {/* Indian Ocean cross-route */}
-          <path d="M 455 188 Q 460 210 462 230 Q 465 248 476 258 Q 510 268 548 260 Q 572 250 590 235 Q 592 225 590 215"
-            fill="none" stroke="#3a6080" strokeWidth="1" strokeDasharray="4 6" opacity="0.25" />
-          {/* Baltic / Nordic route → Danish Straits → North Sea */}
-          <path d="M 322 88 Q 310 105 302 122 Q 300 138 298 153"
-            fill="none" stroke="#3a6a80" strokeWidth="1" strokeDasharray="4 5" opacity="0.28" />
-          {/* Black Sea route → Turkish Straits */}
-          <path d="M 365 138 Q 382 128 400 118 Q 415 112 430 108"
-            fill="none" stroke="#3a6a80" strokeWidth="1" strokeDasharray="4 5" opacity="0.25" />
-          {/* Lane traffic labels */}
-          <text x={295} y={175} fill="#2a4060" fontSize="7" textAnchor="middle">MED ROUTE</text>
-          <text x={500} y={202} fill="#2a4060" fontSize="7" textAnchor="middle">INDIAN OCEAN</text>
-          <text x={200} y={145} fill="#2a4060" fontSize="7" textAnchor="middle">N.ATLANTIC</text>
-          {chokepoints.map((cp, i) => {
-            const c = riskColor(cp.risk);
-            const pulse = (tick + i * 3) % 10;
-            const crit = cp.risk === "CRITICAL";
+        <MapContainer
+          center={[20, 15]}
+          zoom={2}
+          minZoom={1}
+          maxZoom={8}
+          style={{ height: 380, background: "#050d1a" }}
+          attributionControl={false}
+        >
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            subdomains="abcd"
+            maxZoom={8}
+          />
+          <MapClickHandler onDeselect={() => setSel(null)} />
+          {chokepoints.map(cp => {
+            const color = riskColor(cp.risk);
+            const isSel = sel?.id === cp.id;
             return (
-              <g key={cp.id} onClick={() => setSel(sel?.id === cp.id ? null : cp)} style={{ cursor: "pointer" }}>
-                {crit && <circle cx={cp.mx} cy={cp.my} r={14 + pulse * 1.2} fill="none" stroke={c} strokeWidth="0.8" opacity={Math.max(0, 0.5 - pulse * 0.05)} />}
-                <circle cx={cp.mx} cy={cp.my} r={crit ? 10 : 7} fill={c} opacity={0.85} />
-                <circle cx={cp.mx} cy={cp.my} r={crit ? 15 : 11} fill="none" stroke={c} strokeWidth="1.5" opacity="0.3" />
-                <text x={cp.mx} y={cp.my - 16} textAnchor="middle" fill="#e2e8f0" fontSize="8" fontWeight="bold">{cp.name.split(" ").slice(-1)[0]}</text>
-                <text x={cp.mx} y={cp.my + 4} textAnchor="middle" fill="#fff" fontSize="7" fontWeight="bold">{cp.flow}</text>
-              </g>
+              <CircleMarker
+                key={cp.id}
+                center={[cp.lat, cp.lon]}
+                radius={isSel ? 12 : cp.risk === "CRITICAL" ? 10 : cp.risk === "HIGH" ? 8 : 6}
+                pathOptions={{
+                  color, fillColor: color,
+                  fillOpacity: isSel ? 0.9 : 0.8,
+                  weight: isSel ? 2 : 1,
+                }}
+                eventHandlers={{ click: (e) => { e.originalEvent.stopPropagation(); setSel(sel?.id === cp.id ? null : cp); } }}
+              />
             );
           })}
-          {[["CRITICAL", "#ff0000", 10], ["HIGH", "#ff4d4d", 72], ["MEDIUM", "#ffd700", 128], ["LOW", "#00ff9d", 186]].map(([l, c, x]) => (
-            <g key={l}><circle cx={x + 7} cy={298} r={5} fill={c} /><text x={x + 15} y={302} fill="#9ca3af" fontSize="8">{l}</text></g>
-          ))}
-        </svg>
+        </MapContainer>
       </Card>
 
       {sel && (
