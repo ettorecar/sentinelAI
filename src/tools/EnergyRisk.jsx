@@ -42,6 +42,107 @@ function ScenarioRow({ s }) {
   );
 }
 
+// E4 — Supply chain dependency network SVG
+function SupplyNetworkSVG({ country, suppliers }) {
+  const cx = 130, cy = 110, R = 80;
+  const n = suppliers.length;
+  const RISK_COLOR = { CRITICAL: "#ff0000", HIGH: "#ff4d4d", MEDIUM: "#ffd700", LOW: "#00ff9d" };
+
+  return (
+    <svg viewBox="0 0 260 220" style={{ width: "100%", height: "auto" }}>
+      {/* Connection lines — thickness = share % */}
+      {suppliers.map((s, i) => {
+        const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+        const sx = cx + R * Math.cos(angle), sy = cy + R * Math.sin(angle);
+        const color = RISK_COLOR[s.risk] || "#4db8ff";
+        return (
+          <line key={i} x1={cx} y1={cy} x2={sx} y2={sy}
+            stroke={color} strokeWidth={Math.max(1, (s.pct / 100) * 7)} opacity="0.35" />
+        );
+      })}
+      {/* Supplier nodes */}
+      {suppliers.map((s, i) => {
+        const angle = (i / n) * 2 * Math.PI - Math.PI / 2;
+        const sx = cx + R * Math.cos(angle), sy = cy + R * Math.sin(angle);
+        const color = RISK_COLOR[s.risk] || "#4db8ff";
+        const nr = Math.max(7, (s.pct / 100) * 22);
+        const lx = cx + (R + nr + 16) * Math.cos(angle);
+        const ly = cy + (R + nr + 16) * Math.sin(angle);
+        return (
+          <g key={i}>
+            <circle cx={sx} cy={sy} r={nr} fill={color} opacity="0.15" stroke={color} strokeWidth="1.5" />
+            <text x={sx} y={sy} textAnchor="middle" dominantBaseline="middle" fill={color} fontSize="8" fontWeight="700">{s.pct}%</text>
+            <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fill="#9ca3af" fontSize="7">{s.name}</text>
+          </g>
+        );
+      })}
+      {/* Central country node */}
+      <circle cx={cx} cy={cy} r="24" fill="#ff9d0015" stroke="#ff9d00" strokeWidth="2" />
+      <text x={cx} y={cy - 5} textAnchor="middle" fill="#ff9d00" fontSize="9" fontWeight="700">{country}</text>
+      <text x={cx} y={cy + 7} textAnchor="middle" fill="#9ca3af" fontSize="6.5">import hub</text>
+    </svg>
+  );
+}
+
+// E4 — Country comparison grouped bar chart (max 3 countries)
+const COMPARE_METRICS = [
+  { key: "import_dep",       label: "Import Dep %", max: 100 },
+  { key: "resilience_score", label: "Resilience",   max: 100 },
+  { key: "storage_days",     label: "Storage Days", max: 100 },
+  { key: "alt_score",        label: "Alt Supply",   max: 100 },
+];
+const COMPARE_COLORS = ["#4db8ff", "#00ff9d", "#ff9d00"];
+
+function ComparisonChart({ compareList }) {
+  if (compareList.length < 2) return null;
+  const BH = 11, BGAP = 3, GPAD = 18, LW = 80, BW = 160, RW = 36;
+  const gH = compareList.length * (BH + BGAP) + GPAD;
+  const SVG_H = COMPARE_METRICS.length * gH + 4;
+  const SVG_W = LW + BW + RW;
+
+  return (
+    <div>
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap" }}>
+        {compareList.map((name, i) => (
+          <div key={name} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: COMPARE_COLORS[i] }} />
+            <span style={{ color: "#e2e8f0", fontSize: 11 }}>{name}</span>
+          </div>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: "100%", height: SVG_H }}>
+        {COMPARE_METRICS.map((m, mi) => {
+          const groupY = mi * gH + 2;
+          return (
+            <g key={m.key}>
+              <text x={0} y={groupY + (BH + BGAP) * compareList.length / 2} fill="#4a5568"
+                fontSize="8.5" dominantBaseline="middle">{m.label}</text>
+              {compareList.map((name, ci) => {
+                const prof = profiles[name];
+                if (!prof) return null;
+                const raw = prof[m.key] ?? 0;
+                const val = Math.min(m.max, raw);
+                const bw = (val / m.max) * BW;
+                const by = groupY + ci * (BH + BGAP);
+                const color = COMPARE_COLORS[ci];
+                return (
+                  <g key={name}>
+                    <rect x={LW} y={by} width={BW} height={BH} fill="#111827" rx="2" />
+                    <rect x={LW} y={by} width={bw} height={BH} fill={color} opacity="0.85" rx="2" />
+                    <text x={LW + BW + 4} y={by + BH / 2} fill={color} fontSize="8" dominantBaseline="middle"
+                      fontWeight="600">{raw}</text>
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 function CountryBtn({ label, active, onClick }) {
   const [hovered, setHovered] = useState(false);
   return (
@@ -118,6 +219,18 @@ export default function EnergyRisk() {
   const [aiAssessment, setAiAssessment] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // E4 — comparison mode state (max 3 countries)
+  const [compareSet, setCompareSet] = useState(new Set());
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  function toggleCompare(name) {
+    setCompareSet(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) { next.delete(name); }
+      else if (next.size < 3) { next.add(name); }
+      return next;
+    });
+  }
   const p = profiles[country];
 
   async function analyze() {
@@ -150,12 +263,57 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
           ))}
         </div>
         {error && <div style={{ color: "#ff4d4d", marginTop: 10, fontSize: 13 }}>{error}</div>}
-        <div style={{ marginTop: 14 }}>
+        <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <Btn onClick={analyze} disabled={loading} color="#ff9d00">
             {loading ? "⏳ Analyzing..." : "⚡ Analyze Risk Profile"}
           </Btn>
+          {/* E4 — compare toggle */}
+          <button onClick={() => setCompareOpen(x => !x)} style={{
+            background: compareOpen ? "#ff9d0022" : "transparent",
+            border: `1px solid ${compareOpen ? "#ff9d00" : "#1f2d45"}`,
+            borderRadius: 6, padding: "7px 14px", cursor: "pointer",
+            color: compareOpen ? "#ff9d00" : "#9ca3af", fontSize: 12,
+            transition: "all 0.15s",
+          }}>
+            📊 Compare ({compareSet.size}/3)
+          </button>
         </div>
       </Card>
+
+      {/* E4 — compare country picker + chart */}
+      {compareOpen && (
+        <Card>
+          <ST icon="📊" label="Country Risk Comparison" color="#ff9d00"
+            sub="Select up to 3 countries to compare side by side" style={{ marginBottom: 10 }} />
+          <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+            {countries.map(c => {
+              const inSet = compareSet.has(c);
+              const disabled = !inSet && compareSet.size >= 3;
+              return (
+                <button key={c} onClick={() => !disabled && toggleCompare(c)} style={{
+                  background: inSet ? `${COMPARE_COLORS[Array.from(compareSet).indexOf(c)]}22` : "transparent",
+                  border: `1px solid ${inSet ? COMPARE_COLORS[Array.from(compareSet).indexOf(c)] : "#1f2d45"}`,
+                  borderRadius: 6, padding: "5px 12px", cursor: disabled ? "not-allowed" : "pointer",
+                  color: inSet ? COMPARE_COLORS[Array.from(compareSet).indexOf(c)] : disabled ? "#2d3f55" : "#9ca3af",
+                  fontSize: 12, opacity: disabled ? 0.4 : 1, transition: "all 0.15s",
+                }}>
+                  {inSet ? "✓ " : ""}{c}
+                </button>
+              );
+            })}
+            {compareSet.size > 0 && (
+              <button onClick={() => setCompareSet(new Set())} style={{
+                background: "transparent", border: "1px solid #1f2d45", borderRadius: 6,
+                padding: "5px 10px", cursor: "pointer", color: "#4a5568", fontSize: 11,
+              }}>Clear</button>
+            )}
+          </div>
+          {compareSet.size >= 2
+            ? <ComparisonChart compareList={Array.from(compareSet)} />
+            : <div style={{ color: "#2d3f55", fontSize: 12, textAlign: "center", padding: "16px 0" }}>Select at least 2 countries to see comparison</div>
+          }
+        </Card>
+      )}
 
       {ran && p && (
         <>
@@ -187,6 +345,11 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
                     </div>
                   ))}
                 </div>
+              </div>
+              {/* E4 — supply chain network SVG */}
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #1f2d45" }}>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>SUPPLY CHAIN DEPENDENCY NETWORK</div>
+                <SupplyNetworkSVG country={country} suppliers={p.top_suppliers} />
               </div>
             </Card>
 

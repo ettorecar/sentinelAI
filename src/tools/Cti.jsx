@@ -46,6 +46,64 @@ const iocs = [
 
 const FILTERS = ["ALL", "CRITICAL", "HIGH", "MEDIUM"];
 
+// F3 — IOC type colors for donut
+const IOC_TYPE_COLORS = { IP: "#4db8ff", Domain: "#ffd700", Hash: "#ff9d00", URL: "#b47fff", Email: "#00ff9d" };
+
+// F3 — IOC breakdown donut chart
+function IocDonut({ iocList }) {
+  const counts = {};
+  iocList.forEach(ioc => { counts[ioc.type] = (counts[ioc.type] || 0) + 1; });
+  const total = iocList.length;
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+  const R = 42, r = 27, cx = 55, cy = 55;
+  let cumAngle = -Math.PI / 2;
+  const segments = entries.map(([type, count]) => {
+    const fraction = count / total;
+    const angle = fraction * 2 * Math.PI;
+    const startAngle = cumAngle;
+    cumAngle += angle;
+    const GAP = 0.04;
+    const sa = startAngle + GAP, ea = cumAngle - GAP;
+    const x1 = cx + R * Math.cos(sa), y1 = cy + R * Math.sin(sa);
+    const x2 = cx + R * Math.cos(ea), y2 = cy + R * Math.sin(ea);
+    const xi1 = cx + r * Math.cos(sa), yi1 = cy + r * Math.sin(sa);
+    const xi2 = cx + r * Math.cos(ea), yi2 = cy + r * Math.sin(ea);
+    const largeArc = angle > Math.PI ? 1 : 0;
+    const path = `M ${x1} ${y1} A ${R} ${R} 0 ${largeArc} 1 ${x2} ${y2} L ${xi2} ${yi2} A ${r} ${r} 0 ${largeArc} 0 ${xi1} ${yi1} Z`;
+    return { type, count, path };
+  });
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+      <svg viewBox="0 0 110 110" style={{ width: 110, height: 110, flexShrink: 0 }}>
+        {segments.map(({ type, path }) => (
+          <path key={type} d={path} fill={IOC_TYPE_COLORS[type] || "#555"} opacity="0.9" />
+        ))}
+        <circle cx={cx} cy={cy} r={r - 1} fill="#0a1220" />
+        <text x={cx} y={cy - 4} textAnchor="middle" fill="#e2e8f0" fontSize="15" fontWeight="900">{total}</text>
+        <text x={cx} y={cy + 8} textAnchor="middle" fill="#4a5568" fontSize="6" letterSpacing="1">IOCs</text>
+      </svg>
+      <div style={{ flex: 1, minWidth: 140 }}>
+        {entries.map(([type, count]) => (
+          <div key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: IOC_TYPE_COLORS[type] || "#555" }} />
+              <span style={{ color: "#9ca3af", fontSize: 11 }}>{type}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 56, background: "#1f2d45", borderRadius: 2, height: 4 }}>
+                <div style={{ width: `${(count / total) * 100}%`, background: IOC_TYPE_COLORS[type] || "#555", height: 4, borderRadius: 2 }} />
+              </div>
+              <span style={{ color: IOC_TYPE_COLORS[type] || "#555", fontSize: 11, fontWeight: 700, minWidth: 14, textAlign: "right" }}>{count}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MiniBar({ data, color }) {
   const max = Math.max(...data);
   return (
@@ -238,6 +296,12 @@ export default function Cti() {
         />
       )}
 
+      {/* F3 — IOC breakdown donut */}
+      <Card>
+        <ST icon="🍩" label="IOC Type Breakdown" color="#ff9d00" sub="Distribution by indicator category" style={{ marginBottom: 14 }} />
+        <IocDonut iocList={iocs} />
+      </Card>
+
       <Card>
         <ST icon="🔎" label="IOC Feed" color="#ff9d00" sub="Indicators of Compromise — last 72h" />
         <div style={{ overflowX: "auto" }}>
@@ -317,6 +381,15 @@ function ActorRow({ a, selActor, onSelect }) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, marginLeft: 12 }}>
           <BADGE text={a.threat} color={threatColor} />
+          {/* F3 — threat-level mini-bar */}
+          <div style={{ width: 60 }}>
+            <div style={{ background: "#1f2d45", borderRadius: 2, height: 3 }}>
+              <div style={{
+                width: `${a.threat === "CRITICAL" ? 100 : a.threat === "HIGH" ? 75 : a.threat === "MEDIUM" ? 50 : 25}%`,
+                background: threatColor, height: 3, borderRadius: 2, transition: "width 0.3s",
+              }} />
+            </div>
+          </div>
           <div>
             <div style={{ color: "#3a4a5c", fontSize: 9, textAlign: "right", marginBottom: 2, letterSpacing: 1 }}>7d activity</div>
             <MiniBar data={a.activity} color={c} />

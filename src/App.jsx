@@ -325,7 +325,112 @@ function SearchModal({ onNavigate, onClose }) {
   );
 }
 
-function StatusWidgets({ blink, setPage, onSearchOpen }) {
+const SHORTCUTS = [
+  { key: "Ctrl+K",     desc: "Open global search" },
+  { key: "?",          desc: "Show keyboard shortcuts" },
+  { key: "Esc",        desc: "Close any modal / overlay" },
+  { key: "↑ / ↓",      desc: "Navigate search results" },
+  { key: "↵",          desc: "Open selected search result" },
+  { key: "Ctrl+Enter", desc: "Run analysis — Translator, ScenarioBuilder" },
+  { key: "Scroll",     desc: "Zoom in/out — Threat Map" },
+  { key: "Drag",       desc: "Pan — Threat Map" },
+  { key: "+ / −",      desc: "Zoom buttons — Threat Map" },
+  { key: "RST",        desc: "Reset zoom & pan — Threat Map" },
+];
+
+function ShortcutHelp({ onClose }) {
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "#0a0f1ecc", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{ background: "#0b111e", border: "1px solid #1f2d45", borderRadius: 12, width: "100%", maxWidth: 460, boxShadow: "0 20px 60px #000a" }}>
+        <div style={{ padding: "14px 18px", borderBottom: "1px solid #1f2d45", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 14, letterSpacing: 0.3 }}>⌨️ Keyboard Shortcuts</span>
+          <button onClick={onClose} style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 10, padding: "2px 8px", cursor: "pointer" }}>ESC</button>
+        </div>
+        <div style={{ padding: "8px 0" }}>
+          {SHORTCUTS.map((s, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 18px" }}>
+              <div style={{ minWidth: 120, display: "flex", gap: 3, flexWrap: "wrap" }}>
+                {s.key.split("+").map((k, j) => (
+                  <span key={j} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    {j > 0 && <span style={{ color: "#2d3f55", fontSize: 9 }}>+</span>}
+                    <kbd style={{ background: "#111827", border: "1px solid #1f2d45", borderRadius: 4, padding: "2px 7px", fontSize: 10, fontFamily: "monospace", color: "#9ca3af" }}>{k.trim()}</kbd>
+                  </span>
+                ))}
+              </div>
+              <span style={{ color: "#6b7a8d", fontSize: 12 }}>{s.desc}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: "9px 18px", borderTop: "1px solid #1f2d45", color: "#2d3f55", fontSize: 10, textAlign: "center" }}>
+          Press <kbd style={{ background: "#111827", border: "1px solid #1f2d45", borderRadius: 3, padding: "1px 5px", fontSize: 9, fontFamily: "monospace" }}>?</kbd> anywhere to toggle
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useNarrow(bp = 860) {
+  const [narrow, setNarrow] = useState(() => window.innerWidth < bp);
+  useEffect(() => {
+    const fn = () => setNarrow(window.innerWidth < bp);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, [bp]);
+  return narrow;
+}
+
+function HamburgerMenu({ page, navigate }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "relative", flexShrink: 0 }}>
+      <button onClick={() => setOpen(x => !x)} style={{
+        background: open ? "#0f1a2e" : "transparent",
+        border: `1px solid ${open ? "#1f2d45" : "transparent"}`,
+        borderRadius: 5, padding: "7px 12px", cursor: "pointer",
+        color: "#9ca3af", fontSize: 16, lineHeight: 1,
+      }}>☰</button>
+      {open && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 98 }} onClick={() => setOpen(false)} />
+          <div style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0,
+            background: "#0b111e", border: "1px solid #1f2d45", borderRadius: 10,
+            zIndex: 99, minWidth: 210, maxHeight: "80vh", overflowY: "auto",
+            boxShadow: "0 8px 32px #000c",
+          }}>
+            {NAV.map(n => {
+              const accent = navAccent(n.id);
+              const active = page === n.id;
+              return (
+                <button key={n.id}
+                  onClick={() => { navigate(n.id); setOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 9,
+                    width: "100%", textAlign: "left",
+                    background: active ? `${accent}12` : "transparent",
+                    border: "none", borderLeft: `2px solid ${active ? accent : "transparent"}`,
+                    color: active ? accent : "#9ca3af",
+                    padding: "10px 14px", cursor: "pointer", fontSize: 12,
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#0d1626"; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? `${accent}12` : "transparent"; }}
+                >
+                  <span style={{ fontSize: 14, flexShrink: 0 }}>{n.icon}</span>
+                  <span>{n.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function StatusWidgets({ blink, setPage, onSearchOpen, onHelpOpen }) {
   const [utc, setUtc] = useState(() => new Date().toISOString().slice(11, 19));
   useEffect(() => {
     const t = setInterval(() => setUtc(new Date().toISOString().slice(11, 19)), 1000);
@@ -333,7 +438,7 @@ function StatusWidgets({ blink, setPage, onSearchOpen }) {
   }, []);
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto", paddingLeft: 12, flexShrink: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto", paddingLeft: 8, flexShrink: 0 }}>
       {/* Search button */}
       <button onClick={onSearchOpen} style={{
         background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 5,
@@ -343,6 +448,12 @@ function StatusWidgets({ blink, setPage, onSearchOpen }) {
         🔍 <span>Search</span>
         <kbd style={{ background: "#111827", border: "1px solid #1f2d45", borderRadius: 3, padding: "1px 4px", fontSize: 9, fontFamily: "monospace", color: "#2d3f55" }}>Ctrl+K</kbd>
       </button>
+      {/* Help shortcut button */}
+      <button onClick={onHelpOpen} title="Keyboard shortcuts" style={{
+        background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 5,
+        padding: "4px 8px", cursor: "pointer", color: "#4a5568",
+        fontSize: 12, fontWeight: 700, fontFamily: "monospace", lineHeight: 1,
+      }}>?</button>
       {/* Notification bell */}
       <NotificationBell setPage={setPage} />
       {/* CRITICAL alert widget */}
@@ -389,45 +500,98 @@ function StatusWidgets({ blink, setPage, onSearchOpen }) {
 }
 
 function AppInner() {
-  const [page, setPage] = useState("home");
+  // G1 — initialise from URL hash
+  const [page, setPage] = useState(() => {
+    const h = window.location.hash.slice(1);
+    return PAGES[h] ? h : "home";
+  });
   const [blink, setBlink] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const narrow = useNarrow();
+
+  // G1 — sync hash → page on browser back/forward
+  useEffect(() => {
+    function onHash() {
+      const h = window.location.hash.slice(1);
+      setPage(PAGES[h] ? h : "home");
+    }
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
   useEffect(() => { const t = setInterval(() => setBlink(x => !x), 800); return () => clearInterval(t); }, []);
+
+  // G1+G2 — keyboard shortcuts
   useEffect(() => {
     function onKey(e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setSearchOpen(x => !x); }
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setSearchOpen(x => !x); setHelpOpen(false); return; }
+      if (e.key === "?" && !["INPUT", "TEXTAREA"].includes(e.target.tagName)) { setHelpOpen(x => !x); setSearchOpen(false); return; }
+      if (e.key === "Escape") { setSearchOpen(false); setHelpOpen(false); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const Page = PAGES[page] || Home;
+  const currentNav = NAV.find(n => n.id === page);
+  const accent = navAccent(page);
 
-  function navigate(id) { setPage(id); setSearchOpen(false); }
+  // G1 — navigate updates hash + page
+  function navigate(id) {
+    window.location.hash = id === "home" ? "" : id;
+    setPage(id);
+    setSearchOpen(false);
+    setHelpOpen(false);
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0f1e", color: "#e2e8f0", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
       <GlobalStyles />
       {searchOpen && <SearchModal onNavigate={navigate} onClose={() => setSearchOpen(false)} />}
+      {helpOpen   && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
+
+      {/* G3 — responsive nav */}
       <nav style={{
-        background: "#0b111e",
-        borderBottom: "1px solid #131f33",
-        padding: "0 4px",
-        display: "flex",
-        alignItems: "stretch",
-        overflowX: "auto",
-        scrollbarWidth: "none",
+        background: "#0b111e", borderBottom: "1px solid #131f33",
+        padding: "0 4px", display: "flex", alignItems: "stretch",
+        overflowX: narrow ? "visible" : "auto", scrollbarWidth: "none",
       }}>
-        {NAV.map(n => (
-          <NavBtn key={n.id} n={n} active={page === n.id} onClick={() => setPage(n.id)} />
-        ))}
-        <StatusWidgets blink={blink} setPage={navigate} onSearchOpen={() => setSearchOpen(true)} />
+        {narrow ? (
+          <>
+            <HamburgerMenu page={page} navigate={navigate} />
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, color: accent, fontWeight: 700 }}>
+              {currentNav?.icon} {currentNav?.label || "SENTINEL"}
+            </div>
+          </>
+        ) : (
+          NAV.map(n => (
+            <NavBtn key={n.id} n={n} active={page === n.id} onClick={() => navigate(n.id)} />
+          ))
+        )}
+        <StatusWidgets blink={blink} setPage={navigate} onSearchOpen={() => { setSearchOpen(true); setHelpOpen(false); }} onHelpOpen={() => { setHelpOpen(x => !x); setSearchOpen(false); }} />
       </nav>
 
       <ApiKeyBanner />
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 16px" }}>
-        <Page setPage={setPage} />
+      {/* G4 — breadcrumb */}
+      {page !== "home" && (
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "8px 16px 0", display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            onClick={() => navigate("home")}
+            style={{ background: "none", border: "none", color: "#3a4a5c", cursor: "pointer", fontSize: 11, padding: "2px 0", display: "flex", alignItems: "center", gap: 4 }}
+            onMouseEnter={e => e.currentTarget.style.color = "#9ca3af"}
+            onMouseLeave={e => e.currentTarget.style.color = "#3a4a5c"}
+          >← Home</button>
+          <span style={{ color: "#1f2d45", fontSize: 11 }}>/</span>
+          <span style={{ color: accent, fontSize: 11, fontWeight: 600 }}>
+            {currentNav?.icon} {currentNav?.label}
+          </span>
+        </div>
+      )}
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "16px 16px 20px" }}>
+        <Page setPage={navigate} />
       </div>
     </div>
   );

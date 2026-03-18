@@ -71,6 +71,41 @@ function SmallToggle({ active, onClick, color = "#b47fff", children }) {
 const severityColor = s => s === "CRITICAL" ? "#ff0000" : s === "HIGH" ? "#ff4d4d" : s === "MEDIUM" ? "#ffd700" : "#00ff9d";
 const priorityColor = p => p === "IMMEDIATE" ? "#ff4d4d" : p === "SHORT_TERM" ? "#ffd700" : "#4db8ff";
 
+// F4 — Tab button
+function TabBtn({ active, onClick, children }) {
+  const [hovered, setHovered] = useState(false);
+  const color = "#b47fff";
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: active ? `${color}22` : hovered ? "#141e30" : "transparent",
+        color: active ? color : hovered ? "#9ca3af" : "#4a5568",
+        border: "none",
+        borderBottom: `2px solid ${active ? color : "transparent"}`,
+        padding: "8px 14px", cursor: "pointer", fontSize: 12,
+        fontWeight: active ? 700 : 400, letterSpacing: 0.4,
+        transition: "all 0.15s", whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+// F4 — KPI card
+function KpiCard({ label, value, color, sub }) {
+  return (
+    <div style={{ background: "#0d1626", borderRadius: 8, padding: "14px 16px", borderLeft: `3px solid ${color}`, flex: 1, minWidth: 120 }}>
+      <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 2, marginBottom: 4 }}>{label}</div>
+      <div style={{ color, fontWeight: 900, fontSize: 20, lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ color: "#4a5568", fontSize: 10, marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+}
+
 export default function IntelReport() {
   const [apiKey] = useApiKey();
   const [selectedDomains, setSelectedDomains] = useState(["cyber", "maritime"]);
@@ -82,6 +117,7 @@ export default function IntelReport() {
   const [loading, setLoading] = useState(false);
   const { stamp } = useLastAnalysis("intelreport");
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("summary");
 
   function toggleDomain(id) {
     setSelectedDomains(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
@@ -185,7 +221,7 @@ Return ONLY a JSON object (no markdown, no backticks):
 
       {result && (
         <>
-          {/* Report header */}
+          {/* F4 — Report header */}
           <Card style={{ borderColor: "#b47fff55", borderLeft: "3px solid #b47fff" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
               <div>
@@ -201,80 +237,128 @@ Return ONLY a JSON object (no markdown, no backticks):
                 <ExportBtn data={result} filename={`sentinel-intelreport-${result.date?.replace(/\s/g,"-") || "report"}`} />
               </div>
             </div>
-            <div style={{ background: "#0d1626", borderRadius: 8, padding: 14, borderLeft: "3px solid #b47fff" }}>
-              <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>EXECUTIVE SUMMARY</div>
-              <div style={{ color: "#e2e8f0", fontSize: 14, lineHeight: 1.75 }}>{result.executive_summary}</div>
+
+            {/* F4 — 3 KPI cards */}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+              <KpiCard
+                label="PEAK SEVERITY"
+                value={result.key_findings?.reduce((max, f) => {
+                  const order = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+                  return (order[f.severity] || 0) > (order[max] || 0) ? f.severity : max;
+                }, "LOW")}
+                color={severityColor(result.key_findings?.reduce((max, f) => {
+                  const order = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+                  return (order[f.severity] || 0) > (order[max] || 0) ? f.severity : max;
+                }, "LOW"))}
+                sub="highest finding"
+              />
+              <KpiCard
+                label="CONFIDENCE"
+                value={result.confidence_level}
+                color={result.confidence_level === "HIGH" ? "#00ff9d" : result.confidence_level === "MEDIUM" ? "#ffd700" : "#ff4d4d"}
+                sub="analyst assessment"
+              />
+              <KpiCard
+                label="TOTAL FINDINGS"
+                value={String(result.key_findings?.length ?? 0)}
+                color="#b47fff"
+                sub={`${selectedDomains.length} domain${selectedDomains.length !== 1 ? "s" : ""}`}
+              />
             </div>
           </Card>
 
-          {/* Key findings */}
-          <Card>
-            <ST icon="🔍" label="Key Findings" color="#b47fff" sub={`${result.key_findings?.length} findings across ${selectedDomains.length} domains`} />
-            {result.key_findings?.map((f, i) => (
-              <div key={i} style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px", marginBottom: 8, borderLeft: `3px solid ${severityColor(f.severity)}` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>{f.domain}</span>
-                    <div style={{ color: "#e2e8f0", fontSize: 13, marginTop: 3, lineHeight: 1.55 }}>{f.finding}</div>
+          {/* F4 — Tabbed output */}
+          <Card style={{ paddingTop: 0 }}>
+            {/* Tab bar */}
+            <div style={{ display: "flex", borderBottom: "1px solid #1f2d45", marginBottom: 16, overflowX: "auto" }}>
+              <TabBtn active={activeTab === "summary"}  onClick={() => setActiveTab("summary")}>📋 Executive Summary</TabBtn>
+              <TabBtn active={activeTab === "actors"}   onClick={() => setActiveTab("actors")}>👤 Threat Actors</TabBtn>
+              <TabBtn active={activeTab === "iocs"}     onClick={() => setActiveTab("iocs")}>🔍 Key Findings</TabBtn>
+              <TabBtn active={activeTab === "actions"}  onClick={() => setActiveTab("actions")}>✅ Recommended Actions</TabBtn>
+            </div>
+
+            {/* Tab: Executive Summary */}
+            {activeTab === "summary" && (
+              <div>
+                <div style={{ background: "#0d1626", borderRadius: 8, padding: 14, borderLeft: "3px solid #b47fff", marginBottom: 14 }}>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>EXECUTIVE SUMMARY</div>
+                  <div style={{ color: "#e2e8f0", fontSize: 14, lineHeight: 1.75 }}>{result.executive_summary}</div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12 }}>
+                  <div>
+                    <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>EMERGING RISKS</div>
+                    {result.emerging_risks?.map((r, i) => (
+                      <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 7 }}>
+                        <span style={{ color: "#ffd700", fontSize: 12, marginTop: 1 }}>▸</span>
+                        <span style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{r}</span>
+                      </div>
+                    ))}
                   </div>
-                  <BADGE text={f.severity} color={f.severity === "CRITICAL" || f.severity === "HIGH" ? "red" : f.severity === "MEDIUM" ? "yellow" : "green"} />
+                  <div>
+                    <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>ANALYST NOTE</div>
+                    <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.75, fontStyle: "italic" }}>{result.analyst_note}</div>
+                  </div>
                 </div>
               </div>
-            ))}
-          </Card>
+            )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 }}>
-            <Card style={{ marginBottom: 0 }}>
-              <ST icon="👤" label="Threat Actors" color="#ff4d4d" />
-              {result.threat_actors?.map((a, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 7 }}>
-                  <span style={{ color: "#ff4d4d", fontSize: 12, marginTop: 1 }}>▸</span>
-                  <span style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{a}</span>
+            {/* Tab: Threat Actors */}
+            {activeTab === "actors" && (
+              <div>
+                {result.threat_actors?.map((a, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "#0d1626", borderRadius: 6, padding: "10px 12px", marginBottom: 8, borderLeft: "3px solid #ff4d4d" }}>
+                    <span style={{ color: "#ff4d4d", fontSize: 14, marginTop: 1, flexShrink: 0 }}>▸</span>
+                    <span style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.55 }}>{a}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>INTELLIGENCE GAPS</div>
+                  {result.intelligence_gaps?.map((g, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8, marginBottom: 7 }}>
+                      <span style={{ color: "#4db8ff" }}>•</span>
+                      <span style={{ color: "#9ca3af", fontSize: 12, lineHeight: 1.5 }}>{g}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </Card>
-            <Card style={{ marginBottom: 0 }}>
-              <ST icon="⚠️" label="Emerging Risks" color="#ffd700" />
-              {result.emerging_risks?.map((r, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 7 }}>
-                  <span style={{ color: "#ffd700", fontSize: 12, marginTop: 1 }}>▸</span>
-                  <span style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{r}</span>
-                </div>
-              ))}
-            </Card>
-          </div>
-
-          {/* Recommended actions */}
-          <Card style={{ marginTop: 14 }}>
-            <ST icon="✅" label="Recommended Actions" color="#00ff9d" />
-            {result.recommended_actions?.map((a, i) => (
-              <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "#0d1626", borderRadius: 6, padding: "9px 12px", marginBottom: 7, borderLeft: `2px solid ${priorityColor(a.priority)}` }}>
-                <span style={{ color: priorityColor(a.priority), fontSize: 10, fontWeight: 700, minWidth: 88, marginTop: 2, letterSpacing: 0.5 }}>{a.priority}</span>
-                <span style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{a.action}</span>
               </div>
-            ))}
+            )}
+
+            {/* Tab: Key Findings */}
+            {activeTab === "iocs" && (
+              <div>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 10 }}>
+                  {result.key_findings?.length} FINDINGS ACROSS {selectedDomains.length} DOMAIN{selectedDomains.length !== 1 ? "S" : ""}
+                </div>
+                {result.key_findings?.map((f, i) => (
+                  <div key={i} style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px", marginBottom: 8, borderLeft: `3px solid ${severityColor(f.severity)}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>{f.domain}</span>
+                        <div style={{ color: "#e2e8f0", fontSize: 13, marginTop: 3, lineHeight: 1.55 }}>{f.finding}</div>
+                      </div>
+                      <BADGE text={f.severity} color={f.severity === "CRITICAL" || f.severity === "HIGH" ? "red" : f.severity === "MEDIUM" ? "yellow" : "green"} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tab: Recommended Actions */}
+            {activeTab === "actions" && (
+              <div>
+                {result.recommended_actions?.map((a, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", background: "#0d1626", borderRadius: 6, padding: "9px 12px", marginBottom: 7, borderLeft: `2px solid ${priorityColor(a.priority)}` }}>
+                    <span style={{ color: priorityColor(a.priority), fontSize: 10, fontWeight: 700, minWidth: 88, marginTop: 2, letterSpacing: 0.5 }}>{a.priority}</span>
+                    <span style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{a.action}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
-          {/* Gaps + analyst note */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 }}>
-            <Card style={{ marginBottom: 0 }}>
-              <ST icon="❓" label="Intelligence Gaps" color="#4db8ff" />
-              {result.intelligence_gaps?.map((g, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, marginBottom: 7 }}>
-                  <span style={{ color: "#4db8ff" }}>•</span>
-                  <span style={{ color: "#9ca3af", fontSize: 12, lineHeight: 1.5 }}>{g}</span>
-                </div>
-              ))}
-            </Card>
-            <Card style={{ marginBottom: 0 }}>
-              <ST icon="🧠" label="Analyst Note" color="#b47fff" />
-              <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.75, fontStyle: "italic" }}>{result.analyst_note}</div>
-            </Card>
-          </div>
-
-          <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10 }}>
             <Btn onClick={() => window.print()} color="#4db8ff" size="sm">🖨 Export / Print</Btn>
-            <Btn onClick={() => setResult(null)} color="#4a5568" size="sm">🔄 New Report</Btn>
+            <Btn onClick={() => { setResult(null); setActiveTab("summary"); }} color="#4a5568" size="sm">🔄 New Report</Btn>
           </div>
         </>
       )}
