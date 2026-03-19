@@ -4,6 +4,8 @@ import "leaflet/dist/leaflet.css";
 import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
+const BE_URL = import.meta.env.VITE_API_URL || "";
+
 async function callClaude(apiKey, prompt, maxTokens = 900) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -225,6 +227,36 @@ function VesselCard({ v, selected, onClick }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
+// ── Data source badge ─────────────────────────────────────────────────────────
+const DS_CFG = {
+  live:         { bg: "#020e06", border: "#00ff9d33", dot: "#00ff9d", pulse: "sentinelPulse 2s ease-in-out infinite",   icon: "🛰️",  label: "LIVE FEED",   text: "AIS vessel data from backend service" },
+  checking:     { bg: "#05080f", border: "#38bdf833", dot: "#38bdf8", pulse: "sentinelPulse 0.7s ease-in-out infinite", icon: "⏳",  label: "CONNECTING",  text: "Reaching backend AIS service…" },
+  mock:         { bg: "#0e0800", border: "#ff9d0033", dot: "#ff9d00", pulse: "none",                                    icon: "⚠️",  label: "MOCK DATA",   text: "Backend not reachable — showing static dataset" },
+  unconfigured: { bg: "#06060e", border: "#2d3f5533", dot: "#3a4a5c", pulse: "none",                                    icon: "📦",  label: "LOCAL DATA",  text: "No backend configured — using built-in dataset" },
+};
+
+function DataSourceBadge({ source }) {
+  const c = DS_CFG[source] ?? DS_CFG.unconfigured;
+  return (
+    <div style={{
+      background: c.bg, border: `1px solid ${c.border}`, borderRadius: 6,
+      padding: "6px 14px", marginBottom: 10,
+      display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+    }}>
+      <span style={{ fontSize: 12 }}>{c.icon}</span>
+      <span style={{ width: 5, height: 5, borderRadius: "50%", background: c.dot, display: "inline-block", animation: c.pulse }} />
+      <span style={{ color: c.dot, fontSize: 10, fontWeight: 700, fontFamily: "monospace", letterSpacing: 1 }}>{c.label}</span>
+      <span style={{ color: "#2d3f55", fontSize: 10 }}>—</span>
+      <span style={{ color: "#6b7a8d", fontSize: 10 }}>{c.text}</span>
+      {source === "live" && (
+        <span style={{ marginLeft: "auto", color: "#3a4a5c", fontSize: 9, fontFamily: "monospace" }}>
+          BACKEND ACTIVE · {BE_URL.replace(/https?:\/\//, "")}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function Maritime() {
   const [apiKey]  = useApiKey();
   const [sel, setSel]           = useState(null);
@@ -242,6 +274,30 @@ export default function Maritime() {
   const [briefError, setBriefError]     = useState("");
   const [progress, setProgress] = useState(() => VESSELS.map((_, i) => i / VESSELS.length));
 
+  // ── Data source state ──────────────────────────────────────────────────────
+  const [vessels, setVessels]       = useState(VESSELS);
+  const [sigintFeed, setSigintFeed] = useState(SIGINT_FEED);
+  const [dataSource, setDataSource] = useState(BE_URL ? "checking" : "unconfigured");
+  const vesselsRef = useRef(VESSELS);
+
+  useEffect(() => {
+    if (!BE_URL) return;
+    const ctrl = new AbortController();
+    fetch(`${BE_URL}/api/maritime/vessels`, { signal: ctrl.signal })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        if (data.vessels?.length) {
+          setVessels(data.vessels);
+          vesselsRef.current = data.vessels;
+          setProgress(data.vessels.map((_, i) => i / data.vessels.length));
+        }
+        if (data.sigint?.length) setSigintFeed(data.sigint);
+        setDataSource("live");
+      })
+      .catch(() => setDataSource("mock"));
+    return () => ctrl.abort();
+  }, []);
+
   useEffect(() => {
     const SPEED = 0.000045;
     let last = Date.now();
@@ -250,7 +306,7 @@ export default function Maritime() {
       const dt = now - last;
       last = now;
       setProgress(prev => prev.map((p, i) => {
-        const v = VESSELS[i];
+        const v = vesselsRef.current[i];
         if (v.status === "ANCHORED" || v.track.length < 2) return p;
         if (v.status === "DRIFTING") return (p + SPEED * dt * 0.25) % 1;
         return (p + SPEED * dt * (0.55 + i * 0.03)) % 1;
@@ -282,9 +338,9 @@ export default function Maritime() {
   async function generateFleetBrief() {
     setBriefResult(null); setBriefError(""); setBriefLoading(true);
     try {
-      const highRisk   = VESSELS.filter(v => v.risk === "HIGH").map(v => `${v.name}: ${v.anomaly}`).join("; ");
-      const darkFleet  = VESSELS.filter(v => v.darkFleet).map(v => v.name).join(", ");
-      const critSigint = SIGINT_FEED.filter(s => s.sev === "CRITICAL").map(s => s.msg).join("; ");
+      const highRisk   = vessels.filter(v => v.risk === "HIGH").map(v => `${v.name}: ${v.anomaly}`).join("; ");
+      const darkFleet  = vessels.filter(v => v.darkFleet).map(v => v.name).join(", ");
+      const critSigint = sigintFeed.filter(s => s.sev === "CRITICAL").map(s => s.msg).join("; ");
       const badPorts   = PORTS.filter(p => p.status === "DANGER" || p.status === "CLOSED").map(p => `${p.name} (${p.status})`).join(", ");
       const text = await callClaude(apiKey,
         `You are a maritime intelligence chief briefing a naval operations center. Write a 6-8 sentence classified assessment covering: (1) dominant threat vectors across Red Sea, Hormuz, Black Sea, Mediterranean; (2) dark fleet / sanctions evasion activity; (3) SIGINT/ELINT picture; (4) port and chokepoint disruption impact; (5) priority targets and recommended force posture next 48 hours.\n\nHIGH-RISK VESSELS: ${highRisk}\nDARK FLEET: ${darkFleet}\nCRITICAL SIGINT: ${critSigint}\nPORT CLOSURES/DANGER: ${badPorts}\nThreat zones active: ${THREAT_ZONES.filter(z => z.level === "CRITICAL").map(z => z.name).join(", ")}\nTotal AIS anomalies: ${VESSELS.filter(v => v.anomaly !== "None detected").length}/${VESSELS.length} vessels\n\nWrite in classified intelligence style — precise, actionable.`,
@@ -295,15 +351,15 @@ export default function Maritime() {
     setBriefLoading(false);
   }
 
-  const filteredVessels = VESSELS.filter(v =>
+  const filteredVessels = vessels.filter(v =>
     (filterRisk === "ALL"   || v.risk === filterRisk) &&
     (filterType === "ALL"   || v.type === filterType) &&
     (filterFleet === "ALL"  || (filterFleet === "DARK" ? v.darkFleet : !v.darkFleet))
   );
 
-  const highRiskCount  = VESSELS.filter(v => v.risk === "HIGH").length;
-  const darkFleetCount = VESSELS.filter(v => v.darkFleet).length;
-  const anomalyCount   = VESSELS.filter(v => v.anomaly !== "None detected").length;
+  const highRiskCount  = vessels.filter(v => v.risk === "HIGH").length;
+  const darkFleetCount = vessels.filter(v => v.darkFleet).length;
+  const anomalyCount   = vessels.filter(v => v.anomaly !== "None detected").length;
 
   return (
     <div>
@@ -316,13 +372,15 @@ export default function Maritime() {
         classification="SECRET"
       />
 
+      <DataSourceBadge source={dataSource} />
+
       <StatBar stats={[
-        { label: "Vessels Tracked", value: String(VESSELS.length),       color: "#38bdf8" },
+        { label: "Vessels Tracked", value: String(vessels.length),       color: "#38bdf8" },
         { label: "High Risk",       value: String(highRiskCount),        color: "#ff4d4d" },
         { label: "Anomalies",       value: String(anomalyCount),         color: "#ff9d00" },
         { label: "Dark Fleet",      value: String(darkFleetCount),       color: "#ff4d4d" },
         { label: "Threat Zones",    value: String(THREAT_ZONES.length),  color: "#ffd700" },
-        { label: "SIGINT Events",   value: String(SIGINT_FEED.length),   color: "#b47fff" },
+        { label: "SIGINT Events",   value: String(sigintFeed.length),   color: "#b47fff" },
       ]} />
 
       {/* AI Fleet Brief */}
@@ -396,7 +454,7 @@ export default function Maritime() {
           ))}
 
           {/* Track trails — shown when vessel selected */}
-          {VESSELS.map(v => {
+          {vessels.map(v => {
             if (sel?.mmsi !== v.mmsi || v.track.length < 2) return null;
             return (
               <Polyline key={`track-${v.mmsi}`} positions={v.track}
@@ -406,7 +464,7 @@ export default function Maritime() {
           })}
 
           {/* Animated vessels */}
-          {VESSELS.map((v, i) => {
+          {vessels.map((v, i) => {
             const pos = v.status === "ANCHORED" || v.track.length < 2
               ? v.track[0]
               : interpolatePolyline(v.track, progress[i]);
@@ -547,8 +605,8 @@ export default function Maritime() {
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, marginBottom: 10, borderBottom: "1px solid #1f2d45" }}>
         {[
-          ["vessels", "Vessels",            VESSELS.length],
-          ["sigint",  "SIGINT Feed",        SIGINT_FEED.length],
+          ["vessels", "Vessels",            vessels.length],
+          ["sigint",  "SIGINT Feed",        sigintFeed.length],
           ["ports",   "Port & Chokepoint Status", PORTS.length],
         ].map(([key, label, count]) => (
           <button key={key} onClick={() => setTab(key)} style={{
@@ -595,7 +653,7 @@ export default function Maritime() {
                 borderRadius: 4, padding: "4px 9px", fontSize: 10, cursor: "pointer", fontWeight: filterFleet === f ? 700 : 400,
               }}>{label}</button>
             ))}
-            <span style={{ color: "#4a5568", fontSize: 10, marginLeft: "auto" }}>{filteredVessels.length}/{VESSELS.length}</span>
+            <span style={{ color: "#4a5568", fontSize: 10, marginLeft: "auto" }}>{filteredVessels.length}/{vessels.length}</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 8 }}>
             {filteredVessels.map(v => (
@@ -611,9 +669,9 @@ export default function Maritime() {
       {/* SIGINT tab */}
       {tab === "sigint" && (
         <>
-          <ST icon="📡" label="SIGINT / ELINT / HUMINT Intercept Feed" color="#b47fff" sub={`${SIGINT_FEED.length} active intercepts — combined intelligence sources`} />
+          <ST icon="📡" label="SIGINT / ELINT / HUMINT Intercept Feed" color="#b47fff" sub={`${sigintFeed.length} active intercepts — combined intelligence sources`} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-            {SIGINT_FEED.map((s, i) => (
+            {sigintFeed.map((s, i) => (
               <div key={i} style={{
                 background: "#0d1626", borderRadius: 8, padding: "12px 16px",
                 border: "1px solid #1f2d45", borderLeft: `3px solid ${sevColor(s.sev)}`,
@@ -632,7 +690,7 @@ export default function Maritime() {
                 </div>
                 <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{s.msg}</div>
                 {s.mmsi && (() => {
-                  const v = VESSELS.find(x => x.mmsi === s.mmsi);
+                  const v = vessels.find(x => x.mmsi === s.mmsi);
                   return v ? (
                     <div style={{ marginTop: 6, fontSize: 10, color: "#4a5568", fontFamily: "monospace" }}>
                       MMSI: {s.mmsi} · {v.type} · {v.flag} · Last port: {v.lastPort}

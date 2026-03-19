@@ -1,6 +1,5 @@
 import time
 import os
-from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,26 +14,23 @@ app.add_middleware(
 )
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
-# Configurable TTL via env var, default 15 minutes.
 CACHE_TTL = int(os.getenv("CACHE_TTL_MINUTES", "15")) * 60
 
-_cache: dict[str, dict] = {}  # { key: {"data": Any, "ts": float} }
+_cache: dict = {}
 
 
-def cache_get(key: str) -> Any | None:
-    """Return cached value if fresher than CACHE_TTL, else None."""
+def cache_get(key: str):
     entry = _cache.get(key)
     if entry and (time.time() - entry["ts"]) < CACHE_TTL:
         return entry["data"]
     return None
 
 
-def cache_set(key: str, data: Any) -> None:
+def cache_set(key: str, data) -> None:
     _cache[key] = {"data": data, "ts": time.time()}
 
 
-def cache_age(key: str) -> int | None:
-    """Return age in seconds of a cache entry, or None if missing/expired."""
+def cache_age(key: str):
     entry = _cache.get(key)
     if entry and (time.time() - entry["ts"]) < CACHE_TTL:
         return round(time.time() - entry["ts"])
@@ -48,10 +44,6 @@ _START = time.time()
 # ── Routes ───────────────────────────────────────────────────────────────────
 @app.get("/status")
 def status():
-    """
-    Lightweight health-check — used by frontend to verify BE is reachable.
-    Returns uptime, cache TTL config, and count of live cache entries.
-    """
     live_entries = sum(
         1 for v in _cache.values()
         if (time.time() - v["ts"]) < CACHE_TTL
@@ -66,29 +58,158 @@ def status():
         },
         "services": {
             "api": "online",
+            "maritime": "online",
         },
     }
 
 
-# ── Example cached AI endpoint (template for future tools) ───────────────────
-#
-# from anthropic import Anthropic
-# client = Anthropic()  # reads ANTHROPIC_API_KEY from env automatically
-#
-# @app.post("/api/threatmap/brief")
-# async def threatmap_brief(payload: dict):
-#     key = f"threatmap_brief_{payload.get('region', 'global')}"
-#     cached = cache_get(key)
-#     if cached:
-#         return {**cached, "cache_hit": True, "cache_age_seconds": cache_age(key)}
-#
-#     # Cache miss → call Claude
-#     msg = client.messages.create(
-#         model="claude-opus-4-6",
-#         max_tokens=1200,
-#         system="You are a senior intelligence analyst...",
-#         messages=[{"role": "user", "content": payload.get("prompt", "")}],
-#     )
-#     result = {"brief": msg.content[0].text}
-#     cache_set(key, result)
-#     return {**result, "cache_hit": False}
+# ── Maritime ──────────────────────────────────────────────────────────────────
+# Currently returns curated mock AIS data.
+# Replace vessel positions / sigint entries with a real AIS provider feed
+# (e.g. MarineTraffic API, VT Explorer, exactEarth) when available.
+
+_VESSELS = [
+    {
+        "mmsi": "247123456", "name": "ADRIATICA SUN", "flag": "🇮🇹", "type": "Cargo", "darkFleet": False,
+        "anomaly": "AIS blackout 8h — resumed near Libyan coastal waters", "risk": "HIGH",
+        "speed": "0.0 kn", "course": "N/A", "draft": "7.2m", "dwt": "18,400t",
+        "lastPort": "Benghazi (LY)", "nextPort": "Unknown",
+        "status": "ANCHORED", "zone": "LY-MC",
+        "track": [[40.5, 18.5], [40.5, 18.5]],
+        "sigint": "VHF intercept — Arabic comms, non-standard call signs, Libyan militia freq",
+    },
+    {
+        "mmsi": "212987654", "name": "AEGEAN STAR", "flag": "🇬🇷", "type": "Tanker", "darkFleet": False,
+        "anomaly": "Unusual anchorage — Peloponnese coast, no cargo declared", "risk": "MEDIUM",
+        "speed": "0.4 kn", "course": "217°", "draft": "11.1m", "dwt": "74,200t",
+        "lastPort": "Piraeus (GR)", "nextPort": "Alexandria (EG)",
+        "status": "DRIFTING", "zone": None,
+        "track": [[37.5, 23.5], [37.3, 23.8], [37.1, 24.2], [36.9, 24.7]],
+        "sigint": None,
+    },
+    {
+        "mmsi": "538001234", "name": "PACIFIC WOLF", "flag": "🇲🇭", "type": "Bulk", "darkFleet": True,
+        "anomaly": "Speed anomaly +8 kn — exceeds class limit, AIS gaps noted", "risk": "MEDIUM",
+        "speed": "19.2 kn", "course": "084°", "draft": "9.8m", "dwt": "52,000t",
+        "lastPort": "Novorossiysk (RU)", "nextPort": "Port Said (EG)",
+        "status": "UNDERWAY", "zone": None,
+        "track": [[39.0, 20.0], [38.8, 22.0], [38.5, 24.5], [38.2, 27.0], [37.8, 29.5]],
+        "sigint": "Encrypted satcomm burst — unusual frequency pattern, IRGC profile",
+    },
+    {
+        "mmsi": "636091234", "name": "LIBERIA MOON", "flag": "🇱🇷", "type": "Container", "darkFleet": False,
+        "anomaly": "None detected", "risk": "LOW",
+        "speed": "14.1 kn", "course": "262°", "draft": "12.5m", "dwt": "42,000t",
+        "lastPort": "Port Said (EG)", "nextPort": "Rotterdam (NL)",
+        "status": "UNDERWAY", "zone": None,
+        "track": [[37.0, 12.0], [37.5, 9.0], [38.0, 5.0], [38.5, 1.0], [39.0, -3.0]],
+        "sigint": None,
+    },
+    {
+        "mmsi": "308765432", "name": "SAMOS PIONEER", "flag": "🇵🇦", "type": "Tanker", "darkFleet": True,
+        "anomaly": "AIS spoofing — GPS position inconsistent with satellite imagery", "risk": "HIGH",
+        "speed": "8.3 kn", "course": "155°", "draft": "14.2m", "dwt": "105,000t",
+        "lastPort": "Bandar Abbas (IR)", "nextPort": "Undeclared",
+        "status": "UNDERWAY", "zone": "IR-HZ",
+        "track": [[26.8, 56.2], [26.5, 56.8], [26.2, 57.5], [25.8, 58.2]],
+        "sigint": "OFAC SDN match — operator Bandar Kish Shipping LLC, Iranian crude network",
+    },
+    {
+        "mmsi": "341876543", "name": "BOREALIS SKY", "flag": "🇵🇦", "type": "Cargo", "darkFleet": True,
+        "anomaly": "Dark fleet — 14d AIS blackout, reappeared Red Sea sector", "risk": "HIGH",
+        "speed": "11.6 kn", "course": "335°", "draft": "8.4m", "dwt": "26,700t",
+        "lastPort": "Unknown (last: Jeddah)", "nextPort": "Unknown",
+        "status": "UNDERWAY", "zone": "YE-RS",
+        "track": [[12.5, 43.8], [13.1, 43.5], [13.8, 43.1], [14.5, 42.8]],
+        "sigint": "Vessel linked to IRGC-Q logistics network — OFAC watch list priority",
+    },
+    {
+        "mmsi": "249112233", "name": "KAVKAZ", "flag": "🇷🇺", "type": "Tanker", "darkFleet": True,
+        "anomaly": "Shadow fleet — STS transfer Black Sea, sanctions evasion suspected", "risk": "HIGH",
+        "speed": "6.1 kn", "course": "012°", "draft": "13.8m", "dwt": "92,000t",
+        "lastPort": "Novorossiysk (RU)", "nextPort": "Unknown",
+        "status": "UNDERWAY", "zone": "UA-BS",
+        "track": [[44.8, 33.0], [45.2, 32.8], [45.6, 32.5], [46.0, 32.2]],
+        "sigint": "STS operation detected — radar contact 43.9°N 33.7°E, unknown tanker",
+    },
+    {
+        "mmsi": "518000987", "name": "SOUTHERN CROSS", "flag": "🇸🇬", "type": "Container", "darkFleet": False,
+        "anomaly": "Red Sea avoidance — Cape of Good Hope diversion, +11 days transit", "risk": "MEDIUM",
+        "speed": "17.4 kn", "course": "290°", "draft": "11.9m", "dwt": "67,000t",
+        "lastPort": "Singapore (SG)", "nextPort": "Cape Town (ZA) — DIVERTED",
+        "status": "UNDERWAY", "zone": None,
+        "track": [[1.3, 104.0], [5.0, 98.0], [8.0, 88.0], [11.0, 75.0], [14.0, 62.0]],
+        "sigint": None,
+    },
+    {
+        "mmsi": "636098765", "name": "MARITIME JUSTICE", "flag": "🇱🇷", "type": "Bulk", "darkFleet": False,
+        "anomaly": "Loitering — 36h outside Hormuz, no declared destination", "risk": "MEDIUM",
+        "speed": "1.2 kn", "course": "Variable", "draft": "10.3m", "dwt": "58,000t",
+        "lastPort": "Dubai (AE)", "nextPort": "None declared",
+        "status": "DRIFTING", "zone": "IR-HZ",
+        "track": [[25.5, 57.0], [25.6, 57.2], [25.5, 57.4], [25.4, 57.2]],
+        "sigint": None,
+    },
+    {
+        "mmsi": "212345678", "name": "HERMES", "flag": "🇬🇷", "type": "Tanker", "darkFleet": False,
+        "anomaly": "None — convoy escort active (NATO Op. ASPIDES)", "risk": "LOW",
+        "speed": "13.8 kn", "course": "096°", "draft": "12.0m", "dwt": "80,000t",
+        "lastPort": "Rota (ES)", "nextPort": "Alexandria (EG)",
+        "status": "UNDERWAY", "zone": None,
+        "track": [[35.9, -5.6], [35.8, -1.0], [35.6, 4.0], [35.4, 9.0], [35.2, 14.0]],
+        "sigint": None,
+    },
+    {
+        "mmsi": "477123789", "name": "ORIENT FORTUNE", "flag": "🇭🇰", "type": "Container", "darkFleet": False,
+        "anomaly": "Cape of Good Hope diversion — Red Sea avoidance, +11 days", "risk": "MEDIUM",
+        "speed": "15.2 kn", "course": "245°", "draft": "13.1m", "dwt": "89,000t",
+        "lastPort": "Shanghai (CN)", "nextPort": "Cape Town (ZA) — DIVERTED",
+        "status": "UNDERWAY", "zone": None,
+        "track": [[22.0, 115.0], [18.0, 111.0], [12.0, 105.0], [5.0, 101.0], [0.0, 102.0]],
+        "sigint": None,
+    },
+    {
+        "mmsi": "538012345", "name": "DARK PHANTOM", "flag": "🇲🇭", "type": "Tanker", "darkFleet": True,
+        "anomaly": "No AIS since Jan 2026 — VLCC reacquired by SAR satellite, Bab el-Mandeb", "risk": "HIGH",
+        "speed": "9.0 kn", "course": "190°", "draft": "16.0m", "dwt": "280,000t",
+        "lastPort": "Unknown (last known: Kharg Island, IR)", "nextPort": "Unknown",
+        "status": "UNDERWAY", "zone": "YE-RS",
+        "track": [[14.0, 44.5], [13.5, 44.2], [12.8, 43.9], [12.0, 43.5]],
+        "sigint": "VLCC — linked to Iranian crude exports via Kish Maritime LLC (OFAC designated)",
+    },
+]
+
+_SIGINT = [
+    {"ts": "14:47", "mmsi": "538001234", "vessel": "PACIFIC WOLF",  "type": "ELINT",  "msg": "Encrypted burst comms — 400MHz range, IRGC pattern match", "sev": "HIGH"},
+    {"ts": "14:31", "mmsi": "341876543", "vessel": "BOREALIS SKY",  "type": "HUMINT", "msg": "Agent report: vessel loading at undisclosed Yemen anchorage, arms cargo suspected", "sev": "CRITICAL"},
+    {"ts": "14:12", "mmsi": "247123456", "vessel": "ADRIATICA SUN", "type": "SIGINT", "msg": "Arabic VHF — non-IMO call sign, Libyan militia frequency confirmed", "sev": "HIGH"},
+    {"ts": "13:58", "mmsi": "249112233", "vessel": "KAVKAZ",        "type": "IMINT",  "msg": "Satellite imagery confirms STS transfer with unknown tanker — 45.2°N 32.8°E", "sev": "HIGH"},
+    {"ts": "13:44", "mmsi": "308765432", "vessel": "SAMOS PIONEER", "type": "OSINT",  "msg": "OFAC SDN match confirmed — operator Bandar Kish Shipping LLC, Tehran nexus", "sev": "CRITICAL"},
+    {"ts": "13:22", "mmsi": "538012345", "vessel": "DARK PHANTOM",  "type": "ELINT",  "msg": "VLCC reacquired via SAR satellite — 13.8°N 44.4°E, no AIS broadcast", "sev": "CRITICAL"},
+    {"ts": "12:55", "mmsi": None,        "vessel": "UNKNOWN",        "type": "ACINT",  "msg": "Underwater acoustic contact — Hormuz narrows, submarine probable, Type 209 profile", "sev": "HIGH"},
+    {"ts": "12:30", "mmsi": None,        "vessel": "YE-RS zone",     "type": "RADINT", "msg": "Houthi C2 radar emission — 14.2°N 43.1°E, Silkworm/YJ-12 variant lock-on sequence", "sev": "CRITICAL"},
+]
+
+
+@app.get("/api/maritime/vessels")
+def maritime_vessels():
+    """
+    Returns vessel tracking data and SIGINT feed.
+    Currently serves curated mock AIS data — replace _VESSELS / _SIGINT with
+    a real AIS provider integration when available.
+    Cache TTL controlled by CACHE_TTL_MINUTES env var (default 15 min).
+    """
+    key = "maritime_vessels"
+    cached = cache_get(key)
+    if cached:
+        return {**cached, "cache_hit": True, "cache_age_seconds": cache_age(key)}
+
+    data = {
+        "vessels": _VESSELS,
+        "sigint": _SIGINT,
+        "source": "mock",         # change to "live" when real AIS feed is connected
+        "fetched_at": time.time(),
+        "cache_hit": False,
+    }
+    cache_set(key, data)
+    return data
