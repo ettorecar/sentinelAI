@@ -1,6 +1,6 @@
 import time
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Sentinel AI Backend", version="0.1.0")
@@ -12,6 +12,20 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+# Set API_SECRET in Railway env vars.  Same value goes in VITE_API_SECRET on Vercel.
+# If API_SECRET is empty the server runs open (useful for local dev without a key).
+API_SECRET = os.getenv("API_SECRET", "")
+
+
+def require_auth(x_sentinel_key: str = Header(default="")):
+    """FastAPI dependency — validates X-Sentinel-Key on all /api/* routes."""
+    if not API_SECRET:
+        return  # no secret configured → open (local dev mode)
+    if x_sentinel_key != API_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid or missing X-Sentinel-Key")
+
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
 CACHE_TTL = int(os.getenv("CACHE_TTL_MINUTES", "15")) * 60
@@ -41,9 +55,10 @@ def cache_age(key: str):
 _START = time.time()
 
 
-# ── Routes ───────────────────────────────────────────────────────────────────
+# ── Public routes ─────────────────────────────────────────────────────────────
 @app.get("/status")
 def status():
+    """Public health-check — no auth required (minimal info, no Claude calls)."""
     live_entries = sum(
         1 for v in _cache.values()
         if (time.time() - v["ts"]) < CACHE_TTL
@@ -52,6 +67,7 @@ def status():
         "status": "online",
         "version": "0.1.0",
         "uptime_seconds": round(time.time() - _START),
+        "auth": "enabled" if API_SECRET else "disabled",
         "cache": {
             "ttl_minutes": CACHE_TTL // 60,
             "live_entries": live_entries,
@@ -63,10 +79,8 @@ def status():
     }
 
 
-# ── Maritime ──────────────────────────────────────────────────────────────────
-# Currently returns curated mock AIS data.
-# Replace vessel positions / sigint entries with a real AIS provider feed
-# (e.g. MarineTraffic API, VT Explorer, exactEarth) when available.
+# ── Protected routes (/api/*) ─────────────────────────────────────────────────
+# All routes below require a valid X-Sentinel-Key header.
 
 _VESSELS = [
     {
@@ -192,22 +206,15 @@ _SIGINT = [
 
 
 @app.get("/api/maritime/vessels")
-def maritime_vessels():
-    """
-    Returns vessel tracking data and SIGINT feed.
-    Currently serves curated mock AIS data — replace _VESSELS / _SIGINT with
-    a real AIS provider integration when available.
-    Cache TTL controlled by CACHE_TTL_MINUTES env var (default 15 min).
-    """
+def maritime_vessels(_: None = Depends(require_auth)):
     key = "maritime_vessels"
     cached = cache_get(key)
     if cached:
         return {**cached, "cache_hit": True, "cache_age_seconds": cache_age(key)}
-
     data = {
         "vessels": _VESSELS,
         "sigint": _SIGINT,
-        "source": "mock",         # change to "live" when real AIS feed is connected
+        "source": "mock",
         "fetched_at": time.time(),
         "cache_hit": False,
     }

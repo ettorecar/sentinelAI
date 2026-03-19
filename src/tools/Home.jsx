@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { BADGE, Card, Btn, ST, Pulse, Divider } from "../components/shared";
 import { NAV, TOOL_DESC, ENERGY_IDS } from "../constants";
 import { useApiKey } from "../context/ApiKeyContext";
+import { BE_URL, beFetch } from "../utils/beClient";
 
 // ── Data mode per tool ────────────────────────────────────────────────────────
 const TOOL_DATA_MODE = {
@@ -74,14 +75,13 @@ const LEVEL_COLOR = { CRITICAL:"#ff4d4d", HIGH:"#ff9d00", MEDIUM:"#ffd700", LOW:
 const TYPE_COLOR  = { "Oil Infra":"#ff9d00", Chokepoint:"#ff9d00", Energy:"#ff9d00", CTI:"#38bdf8", Maritime:"#22d3ee", Airspace:"#38bdf8" };
 
 // ── Backend status hook (async, non-blocking) ─────────────────────────────────
-const BE_URL = import.meta.env.VITE_API_URL || "";
-
 function useBeStatus() {
   const [state, setState] = useState(BE_URL ? "checking" : "unconfigured");
   useEffect(() => {
     if (!BE_URL) return;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 4000);
+    // /status is public — no auth header needed
     fetch(`${BE_URL}/status`, { signal: ctrl.signal })
       .then(r => r.ok ? setState("online") : setState("offline"))
       .catch(() => setState("offline"))

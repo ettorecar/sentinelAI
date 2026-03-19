@@ -3,8 +3,7 @@ import { MapContainer, TileLayer, CircleMarker, Polyline, Circle, Tooltip, useMa
 import "leaflet/dist/leaflet.css";
 import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
-
-const BE_URL = import.meta.env.VITE_API_URL || "";
+import { BE_URL, beFetch } from "../utils/beClient";
 
 async function callClaude(apiKey, prompt, maxTokens = 900) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -283,7 +282,7 @@ export default function Maritime() {
   useEffect(() => {
     if (!BE_URL) return;
     const ctrl = new AbortController();
-    fetch(`${BE_URL}/api/maritime/vessels`, { signal: ctrl.signal })
+    beFetch("/api/maritime/vessels", { signal: ctrl.signal })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(data => {
         if (data.vessels?.length) {
