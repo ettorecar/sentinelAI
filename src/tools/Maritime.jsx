@@ -230,6 +230,7 @@ function VesselCard({ v, selected, onClick }) {
 const DS_CFG = {
   live:         { bg: "#020e06", border: "#00ff9d33", dot: "#00ff9d", pulse: "sentinelPulse 2s ease-in-out infinite",   icon: "🛰️",  label: "LIVE FEED",   text: "AIS vessel data from backend service" },
   checking:     { bg: "#05080f", border: "#38bdf833", dot: "#38bdf8", pulse: "sentinelPulse 0.7s ease-in-out infinite", icon: "⏳",  label: "CONNECTING",  text: "Reaching backend AIS service…" },
+  demo:         { bg: "#06060e", border: "#a78bfa33", dot: "#a78bfa", pulse: "none",                                    icon: "🗄️",  label: "DEMO DATA",   text: "Backend connected — serving demo dataset" },
   mock:         { bg: "#0e0800", border: "#ff9d0033", dot: "#ff9d00", pulse: "none",                                    icon: "⚠️",  label: "MOCK DATA",   text: "Backend not reachable — showing static dataset" },
   unconfigured: { bg: "#06060e", border: "#2d3f5533", dot: "#3a4a5c", pulse: "none",                                    icon: "📦",  label: "LOCAL DATA",  text: "No backend configured — using built-in dataset" },
 };
@@ -291,7 +292,7 @@ export default function Maritime() {
           setProgress(data.vessels.map((_, i) => i / data.vessels.length));
         }
         if (data.sigint?.length) setSigintFeed(data.sigint);
-        setDataSource(data.source === "live" ? "live" : "mock");
+        setDataSource(data.source === "live" ? "live" : "demo");
       })
       .catch(() => setDataSource("mock"));
     return () => ctrl.abort();
