@@ -73,6 +73,24 @@ const FEED_POOL = [
 const LEVEL_COLOR = { CRITICAL:"#ff4d4d", HIGH:"#ff9d00", MEDIUM:"#ffd700", LOW:"#00ff9d" };
 const TYPE_COLOR  = { "Oil Infra":"#ff9d00", Chokepoint:"#ff9d00", Energy:"#ff9d00", CTI:"#38bdf8", Maritime:"#22d3ee", Airspace:"#38bdf8" };
 
+// ── Backend status hook (async, non-blocking) ─────────────────────────────────
+const BE_URL = import.meta.env.VITE_API_URL || "";
+
+function useBeStatus() {
+  const [state, setState] = useState(BE_URL ? "checking" : "unconfigured");
+  useEffect(() => {
+    if (!BE_URL) return;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    fetch(`${BE_URL}/status`, { signal: ctrl.signal })
+      .then(r => r.ok ? setState("online") : setState("offline"))
+      .catch(() => setState("offline"))
+      .finally(() => clearTimeout(timer));
+    return () => { clearTimeout(timer); ctrl.abort(); };
+  }, []);
+  return state;
+}
+
 // ── Favorites hook ────────────────────────────────────────────────────────────
 function useFavorites() {
   const [favs, setFavs] = useState(() => {
@@ -191,6 +209,7 @@ function ToolCard({ t, accent, setPage, isFav, onToggleFav }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Home({ setPage }) {
   const [apiKey] = useApiKey();
+  const beStatus = useBeStatus();
   const [utc, setUtc]       = useState("");
   const [dateStr, setDateStr] = useState("");
   const [favs, toggleFav]   = useFavorites();
@@ -345,6 +364,18 @@ export default function Home({ setPage }) {
                 </div>
               </div>
             ))}
+            {/* Backend services row — async, never blocks render */}
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
+              <span style={{ color:"#4a5568", fontSize:10 }}>Backend Svc.</span>
+              <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                {{
+                  online:        <><span style={{ width:4, height:4, borderRadius:"50%", background:"#00ff9d", display:"inline-block", animation:"sentinelPulse 2s ease-in-out infinite" }} /><span style={{ color:"#00ff9d", fontSize:10, fontWeight:700, fontFamily:"monospace" }}>ONLINE</span></>,
+                  offline:       <><span style={{ width:4, height:4, borderRadius:"50%", background:"#ff4d4d", display:"inline-block" }} /><span style={{ color:"#ff4d4d", fontSize:10, fontWeight:700, fontFamily:"monospace" }}>OFFLINE</span></>,
+                  checking:      <><span style={{ width:4, height:4, borderRadius:"50%", background:"#ffd700", display:"inline-block", animation:"sentinelPulse 0.8s ease-in-out infinite" }} /><span style={{ color:"#ffd700", fontSize:10, fontWeight:700, fontFamily:"monospace" }}>PING…</span></>,
+                  unconfigured:  <><span style={{ width:4, height:4, borderRadius:"50%", background:"#3a4a5c", display:"inline-block" }} /><span style={{ color:"#3a4a5c", fontSize:10, fontWeight:700, fontFamily:"monospace" }}>—</span></>,
+                }[beStatus]}
+              </div>
+            </div>
             <div style={{ borderTop:"1px solid #1f2d45", marginTop:8, paddingTop:8 }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
                 <span style={{ color:"#4a5568", fontSize:9, fontFamily:"monospace" }}>UTC</span>
