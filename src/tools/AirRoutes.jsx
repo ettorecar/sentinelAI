@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, CircleMarker, Polyline, Circle, Tooltip, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt, maxTokens = 900) {
@@ -274,6 +274,7 @@ function RouteCard({ r, selected, onClick }) {
 export default function AirRoutes() {
   const [apiKey] = useApiKey();
   const [sel, setSel]           = useState(null);
+  const { stamp } = useLastAnalysis("airroutes");
   const [selZone, setSelZone]   = useState(null);
   const [tab, setTab]           = useState("routes");
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -325,6 +326,7 @@ export default function AirRoutes() {
         `You are a senior aviation intelligence analyst (IATA/ICAO level) specializing in conflict-zone airspace management. Provide a concise 4-5 sentence intelligence assessment covering: (1) root cause and current threat environment, (2) operational impact on airline operations and air traffic management, (3) estimated economic cost — note that we calculate ~$${cost ? (cost.total/1000).toFixed(0) + 'k' : 'N/A'} per flight in extra fuel+time costs, (4) 30-day outlook and recommended pilot/dispatch precautions.\n\nRoute: ${r.callsign} (${r.airline})\nFrom: ${r.from}  To: ${r.to}\nStatus: ${r.status}\nReason: ${r.reason}\nExtra time: ${r.addedTime} | Extra fuel: ${r.addedFuel} | Daily frequency: ${r.dailyFreq} flights/day\nActive global disruptions: Ukraine FIR, Yemen FIR, Sudan FIR, Syria, Red Sea corridor, partial Iraq/Iran restrictions.`
       );
       setAiResult(text);
+      stamp();
       try { localStorage.setItem("sentinel_prefill_airroutes", text.slice(0, 300)); } catch {}
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
@@ -615,12 +617,14 @@ export default function AirRoutes() {
                 {aiLoading ? "Analyzing..." : "AI Route Assessment"}
               </Btn>
             )}
+            <LastAnalysisTag toolId="airroutes" />
             {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
             {aiResult && (
               <div style={{ background: "#051220", border: "1px solid #38bdf833", borderLeft: "3px solid #38bdf8", borderRadius: 6, padding: 12, marginTop: 10 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
                   <LiveBadge />
                   <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI AIRSPACE ASSESSMENT · {sel.callsign}</span>
+                  <ExportBtn data={{ assessment: aiResult, route: sel?.callsign }} filename="sentinel-airroutes" />
                 </div>
                 <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.7 }}>{aiResult}</div>
               </div>

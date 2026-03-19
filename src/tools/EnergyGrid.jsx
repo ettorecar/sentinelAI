@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BADGE, Card, Btn, ST, PageHeader, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, Btn, ST, PageHeader, LiveBadge, riskColor, riskBadgeColor, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 function ScenarioCard({ s, active, onClick, children }) {
@@ -248,6 +248,7 @@ const GRID_DATA = {
 
 export default function EnergyGrid() {
   const [apiKey] = useApiKey();
+  const { stamp } = useLastAnalysis("energygrid");
   const [country, setCountry] = useState(() => {
     try { return localStorage.getItem("sentinel-energygrid-country") || "Germany"; } catch { return "Germany"; }
   });
@@ -287,6 +288,7 @@ Return exactly:
 Include 3-4 affected sectors, 3-4 recovery phases in order, and 3-4 resilience recommendations.`
       );
       setAiResult(result); setGridTab("analysis");
+      stamp();
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }
@@ -513,6 +515,7 @@ Include 3-4 affected sectors, 3-4 recovery phases in order, and 3-4 resilience r
                           <Btn onClick={() => analyzeCascade(simScenario)} disabled={aiLoading} color="#ff9d00" size="sm">
                             {aiLoading ? "⏳ Analyzing cascade..." : "🤖 AI Cascade Analysis"}
                           </Btn>
+                          <LastAnalysisTag toolId="energygrid" />
                           {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
                         </div>
                       )}
@@ -529,6 +532,7 @@ Include 3-4 affected sectors, 3-4 recovery phases in order, and 3-4 resilience r
                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
                   <LiveBadge />
                   <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI CASCADE ANALYSIS · {country}</span>
+                  <ExportBtn data={aiResult} filename="sentinel-energygrid" />
                 </div>
                 <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7, marginBottom: 14 }}>{aiResult.cascade_analysis}</div>
                 <EconomicImpactChart impact={aiResult.economic_impact} />

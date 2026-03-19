@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, CircleMarker, Polyline, Circle, Tooltip, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt, maxTokens = 900) {
@@ -228,6 +228,7 @@ function VesselCard({ v, selected, onClick }) {
 export default function Maritime() {
   const [apiKey]  = useApiKey();
   const [sel, setSel]           = useState(null);
+  const { stamp } = useLastAnalysis("maritime");
   const [selZone, setSelZone]   = useState(null);
   const [tab, setTab]           = useState("vessels");
   const [filterRisk, setFilterRisk]   = useState("ALL");
@@ -272,6 +273,7 @@ export default function Maritime() {
         `You are a senior maritime intelligence analyst (combined ONI/GCHQ/Europol maritime unit). Provide a 4-5 sentence intelligence assessment covering: (1) threat characterization — criminal, state-sponsored, sanctions evasion, or piracy; (2) operational pattern and likely intent; (3) connection to regional threat actors; (4) recommended interdiction/monitoring response.\n\nVessel: ${v.name} (MMSI: ${v.mmsi}) | Flag: ${v.flag} | Type: ${v.type} | DWT: ${v.dwt}\nAnomaly: ${v.anomaly}\nStatus: ${v.status} | Speed: ${v.speed} | Course: ${v.course}\nLast port: ${v.lastPort} | Declared destination: ${v.nextPort}\nRisk: ${v.risk}${v.darkFleet ? " | DARK FLEET: YES" : ""}${v.sigint ? `\nSIGINT: ${v.sigint}` : ""}${zone ? `\nZone: ${zone.name} — ${zone.threat}` : ""}`
       );
       setAiResult(text);
+      stamp();
       try { localStorage.setItem("sentinel_prefill_maritime", text.slice(0, 300)); } catch {}
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
@@ -526,12 +528,14 @@ export default function Maritime() {
                 {aiLoading ? "Analyzing..." : "AI Vessel Assessment"}
               </Btn>
             )}
+            <LastAnalysisTag toolId="maritime" />
             {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
             {aiResult && (
               <div style={{ background: "#051220", border: "1px solid #38bdf833", borderLeft: "3px solid #38bdf8", borderRadius: 6, padding: 12, marginTop: 10 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
                   <LiveBadge />
                   <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI MARITIME ASSESSMENT · {sel.name}</span>
+                  <ExportBtn data={{ assessment: aiResult, vessel: sel?.name }} filename="sentinel-maritime" />
                 </div>
                 <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.7 }}>{aiResult}</div>
               </div>

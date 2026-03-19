@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaudeText(apiKey, prompt, maxTokens = 700) {
@@ -366,6 +366,7 @@ export default function BioThreat() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [tab, setTab] = useState("map");
+  const { stamp } = useLastAnalysis("biothreat");
 
   function selectAlert(a) {
     if (!a) { setSel(null); return; }
@@ -388,6 +389,7 @@ Return exactly:
 Include 3-4 risk_factors and 3-4 countermeasures.`
       );
       setAiResult(result); setTab("assessment");
+      stamp();
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }
@@ -449,6 +451,7 @@ Include 3-4 risk_factors and 3-4 countermeasures.`
               <Btn onClick={() => analyzeAlert(sel)} disabled={aiLoading} color="#00ff9d" size="sm">
                 {aiLoading ? "⏳ Analyzing..." : "🤖 AI Structured Assessment"}
               </Btn>
+              <LastAnalysisTag toolId="biothreat" />
             </div>
           )}
           {!sel && (
@@ -473,6 +476,7 @@ Include 3-4 risk_factors and 3-4 countermeasures.`
               <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>
                 AI BIOSURVEILLANCE ASSESSMENT · {sel?.id}
               </span>
+              <ExportBtn data={aiResult} filename="sentinel-biothreat" />
             </div>
             <div style={{ color: "#4a5568", fontSize: 11, marginBottom: 10 }}>
               {sel?.region} — {sel?.signal}

@@ -23,6 +23,7 @@ import EnergyGrid      from "./tools/EnergyGrid";
 import IntelReport     from "./tools/IntelReport";
 import AirRoutes       from "./tools/AirRoutes";
 import ScenarioBuilder from "./tools/ScenarioBuilder";
+import SentinelChat    from "./tools/SentinelChat";
 import Workspace       from "./tools/Workspace";
 
 const PAGES = {
@@ -45,6 +46,7 @@ const PAGES = {
   airroutes:      AirRoutes,
   intelreport:    IntelReport,
   scenariobuilder: ScenarioBuilder,
+  sentinelchat:   SentinelChat,
   workspace:      Workspace,
 };
 
@@ -127,7 +129,7 @@ function ApiKeyBanner() {
           <span style={{ color: "#00ff9d", fontSize: 11, fontWeight: 600 }}>AI ACTIVE</span>
           <span style={{ color: "#2d4a3e", fontSize: 11 }}>·</span>
           <span style={{ color: "#4a5568", fontSize: 11 }}>
-            {`sk-ant-...${apiKey.slice(-6)}`} · 19 moduli operativi
+            {`sk-ant-...${apiKey.slice(-6)}`} · 20 moduli operativi
           </span>
           <button onClick={clear} style={{ background: "none", border: "1px solid #1f2d45", borderRadius: 4, color: "#6b7a8d", fontSize: 10, padding: "2px 8px", cursor: "pointer", marginLeft: "auto" }}>
             Disconnect
