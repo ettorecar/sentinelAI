@@ -340,7 +340,7 @@ export default function Home({ setPage }) {
               <BADGE text="AI Powered" color="blue" />
               <BADGE text="OSINT" color="blue" />
               <BADGE text="Energy Module" color="orange" />
-              <BADGE text="v0.8" color="gray" />
+              <BADGE text="v0.8.1" color="gray" />
             </div>
           </div>
 
