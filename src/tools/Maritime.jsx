@@ -291,7 +291,7 @@ export default function Maritime() {
           setProgress(data.vessels.map((_, i) => i / data.vessels.length));
         }
         if (data.sigint?.length) setSigintFeed(data.sigint);
-        setDataSource("live");
+        setDataSource(data.source === "live" ? "live" : "mock");
       })
       .catch(() => setDataSource("mock"));
     return () => ctrl.abort();
