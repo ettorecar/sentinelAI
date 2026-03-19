@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge, riskColor, riskBadgeColor, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -110,6 +110,7 @@ function ChokepointAssessment({ result, cp }) {
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
           <LiveBadge />
           <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI CHOKEPOINT ANALYSIS · {cp?.id}</span>
+          <ExportBtn data={result} filename="sentinel-chokepoint" />
         </div>
         <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7, marginBottom: 14 }}>{result.geopolitical_situation}</div>
 
@@ -176,6 +177,7 @@ function ChokepointAssessment({ result, cp }) {
 export default function Chokepoint() {
   const [apiKey] = useApiKey();
   const [sel, setSel] = useState(null);
+  const { stamp } = useLastAnalysis("chokepoint");
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
@@ -197,6 +199,7 @@ Return exactly:
 Include 2-3 threat_actors and 3-4 recommendations.`
       );
       setAiResult(result); setTab("analysis");
+      stamp();
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }
@@ -299,6 +302,7 @@ Include 2-3 threat_actors and 3-4 recommendations.`
                   {aiLoading ? "⏳ Analyzing..." : "🤖 AI Geopolitical Analysis"}
                 </Btn>
               )}
+              <LastAnalysisTag toolId="chokepoint" />
               {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
             </Card>
           )}

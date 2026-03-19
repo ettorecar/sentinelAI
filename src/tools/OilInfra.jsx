@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt) {
@@ -167,6 +167,7 @@ function AssessmentPanel({ result, assetId }) {
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
           <LiveBadge />
           <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI THREAT ASSESSMENT · {assetId}</span>
+          <ExportBtn data={result} filename="sentinel-oilinfra" />
         </div>
         <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7, marginBottom: 12 }}>{result.assessment}</div>
         {result.supply_impact && (
@@ -294,6 +295,7 @@ function IncidentRow({ a, onClick, selected }) {
 export default function OilInfra() {
   const [apiKey] = useApiKey();
   const [sel, setSel] = useState(null);
+  const { stamp } = useLastAnalysis("oilinfra");
   const [filter, setFilter] = useState("ALL");
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -315,6 +317,7 @@ Return exactly:
 Include 2-3 attack_vectors and 3-4 recommendations.`
       );
       setAiResult(result); setTab("assessment");
+      stamp();
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }
@@ -414,6 +417,7 @@ Include 2-3 attack_vectors and 3-4 recommendations.`
                   {aiLoading ? "⏳ Analyzing..." : "🤖 AI Threat Assessment"}
                 </Btn>
               )}
+              <LastAnalysisTag toolId="oilinfra" />
               {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
             </div>
           )}

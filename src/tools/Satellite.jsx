@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BADGE, Card, Input, Btn, ST, PageHeader, StatBar, LiveBadge } from "../components/shared";
+import { BADGE, Card, Input, Btn, ST, PageHeader, StatBar, LiveBadge, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { RC } from "../constants";
 import { useApiKey } from "../context/ApiKeyContext";
 
@@ -302,6 +302,7 @@ export default function Satellite() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [tab, setTab] = useState("track");
+  const { stamp } = useLastAnalysis("satellite");
 
   useEffect(() => {
     if (!ran) return;
@@ -323,8 +324,8 @@ Return ONLY JSON (no markdown):
   "key_features": ["feature1", "feature2", "feature3", "feature4", "feature5"]
 }`
       );
-      setAiResult(result);
-      setTab("brief");
+      setAiResult(result); setTab("brief");
+      stamp();
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }
@@ -370,6 +371,7 @@ Return ONLY JSON (no markdown):
                 {aiLoading ? "⏳ Analyzing..." : "🛰️ AI Brief"}
               </button>
             )}
+            <LastAnalysisTag toolId="satellite" />
           </div>
 
           {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginBottom: 8 }}>{aiError}</div>}
@@ -492,6 +494,7 @@ Return ONLY JSON (no markdown):
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                 <LiveBadge />
                 <ST icon="🤖" label="AI Satellite Intelligence Brief" color="#4db8ff" />
+                <ExportBtn data={aiResult} filename="sentinel-satellite" />
               </div>
               <AiBriefPanel result={aiResult} zone={zone} />
             </Card>

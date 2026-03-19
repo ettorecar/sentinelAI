@@ -26,6 +26,7 @@ export const NAV = [
   { id: "airroutes",  label: "Airspace Monitor",         icon: "✈️" },
   { id: "intelreport",    label: "Intel Report",       icon: "📋" },
   { id: "scenariobuilder", label: "Scenario Builder",  icon: "🎯" },
+  { id: "sentinelchat",    label: "AI Assistant",        icon: "💬" },
   { id: "workspace",       label: "Workspace",          icon: "🗂️" },
 ];
 
@@ -50,5 +51,6 @@ export const TOOL_DESC = {
   airroutes:   "Monitor conflict-zone airspace closures, NOTAMs, and rerouted air corridors worldwide.",
   intelreport:    "Generate a structured multi-domain intelligence brief with executive summary and recommendations.",
   scenariobuilder: "Build multi-domain crisis scenarios, define actors and events across domains, and analyze cascade effects and escalation paths.",
+  sentinelchat: "Conversational AI intelligence analyst — ask about threats, actors, scenarios, and collection priorities.",
   workspace: "Session log of all intelligence analyses — browse history, view excerpts, and export session data as JSON.",
 };

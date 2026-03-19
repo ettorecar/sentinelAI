@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BADGE, Card, ST, Btn, Input, PageHeader, riskColor, riskBadgeColor } from "../components/shared";
+import { BADGE, Card, ST, Btn, Input, PageHeader, riskColor, riskBadgeColor, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 const countries = ["Germany", "Italy", "France", "Poland", "Japan", "South Korea", "India", "Turkey"];
@@ -295,6 +295,7 @@ async function callClaude(apiKey, prompt) {
 
 export default function EnergyRisk() {
   const [apiKey] = useApiKey();
+  const { stamp } = useLastAnalysis("energyrisk");
   const [country, setCountry] = useState("Germany");
   const [ran, setRan] = useState(false);
   const [riskTab, setRiskTab] = useState("profile");
@@ -328,6 +329,7 @@ export default function EnergyRisk() {
 Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
       const assessment = await callClaude(apiKey, prompt);
       setAiAssessment(assessment); setRiskTab("assessment");
+      stamp();
     } catch (e) { setError("AI assessment error: " + e.message); }
     setLoading(false);
   }
@@ -350,6 +352,7 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
           <Btn onClick={() => { analyze(); }} disabled={loading} color="#ff9d00">
             {loading ? "⏳ Analyzing..." : "⚡ Analyze Risk Profile"}
           </Btn>
+          <LastAnalysisTag toolId="energyrisk" />
           <button onClick={() => { setCompareOpen(x => !x); if (!compareOpen && ran) setRiskTab("compare"); }} style={{
             background: compareOpen ? "#ff9d0022" : "transparent",
             border: `1px solid ${compareOpen ? "#ff9d00" : "#1f2d45"}`,
@@ -537,6 +540,7 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
                 <Card style={{ borderColor: "#ff9d00" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <ST icon="🤖" label="AI Intelligence Assessment" color="#ff9d00" />
+                    <ExportBtn data={aiAssessment} filename="sentinel-energyrisk" />
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ color: "#9ca3af", fontSize: 11 }}>TREND</span>
                       <BADGE text={aiAssessment.trend} color={aiAssessment.trend === "IMPROVING" ? "green" : aiAssessment.trend === "DETERIORATING" ? "red" : "yellow"} />

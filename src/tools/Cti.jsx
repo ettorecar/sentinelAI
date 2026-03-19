@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, riskColor, CopyBtn } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, riskColor, CopyBtn, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
 async function callClaude(apiKey, prompt, maxTokens = 900) {
@@ -442,6 +442,7 @@ function CampaignCard({ camp, onActorSelect }) {
 export default function Cti() {
   const [apiKey] = useApiKey();
   const [tab, setTab] = useState("actors");
+  const { stamp } = useLastAnalysis("cti");
   const [filter, setFilter] = useState("ALL");
   const [selActor, setSelActor] = useState(null);
   const [iocSearch, setIocSearch] = useState("");
@@ -491,6 +492,7 @@ export default function Cti() {
         1400
       );
       setBriefResult(text);
+      stamp();
     } catch (e) { setBriefError("Error: " + e.message); }
     setBriefLoading(false);
   }
@@ -535,6 +537,7 @@ export default function Cti() {
             <Btn onClick={generateBrief} disabled={briefLoading} color="#4db8ff">
               {briefLoading ? "⏳ Generating..." : "🧠 Global Brief"}
             </Btn>
+            <LastAnalysisTag toolId="cti" />
           </div>
         )}
       </div>
@@ -545,6 +548,7 @@ export default function Cti() {
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
             <LiveBadge />
             <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI GLOBAL CTI BRIEF · TS/SCI</span>
+            <ExportBtn data={{ brief: briefResult }} filename="sentinel-cti-brief" />
           </div>
           {briefError && <div style={{ color: "#ff4d4d", fontSize: 12 }}>{briefError}</div>}
           {briefResult && <div style={{ color: "#c9d1da", fontSize: 13, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>{briefResult}</div>}

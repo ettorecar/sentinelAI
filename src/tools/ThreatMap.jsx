@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { MapContainer, TileLayer, CircleMarker, Circle, Polyline, Tooltip, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, Pulse } from "../components/shared";
+import { BADGE, Card, ST, PageHeader, StatBar, Btn, LiveBadge, Pulse, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
 
-async function callClaude(apiKey, prompt, maxTokens = 900) {
+async function callClaude(apiKey, prompt, maxTokens = 1200) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
@@ -12,7 +12,8 @@ async function callClaude(apiKey, prompt, maxTokens = 900) {
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  return data.content.map(b => b.text || "").join("");
+  const text = data.content.map(b => b.text || "").join("");
+  return JSON.parse(text.replace(/```json|```/g, "").trim());
 }
 
 // ── Hotspot dataset ───────────────────────────────────────────────────────────
@@ -155,6 +156,131 @@ function HotspotRow({ h, sel, onSelect }) {
   );
 }
 
+const tabStyle = (active, color = "#ff4d4d") => ({
+  padding: "7px 16px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 400,
+  background: active ? color + "22" : "transparent",
+  color: active ? color : "#4a5568",
+  border: `1px solid ${active ? color + "44" : "transparent"}`,
+  transition: "all 0.15s",
+});
+
+function AiHotspotPanel({ result, hotspot }) {
+  const { assessment, key_vectors, intelligence_gaps, collection_priorities, outlook_30d } = result;
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ background:"#051220", border:"1px solid #4db8ff33", borderLeft:"3px solid #4db8ff", borderRadius:6, padding:14, marginBottom:10 }}>
+        <div style={{ color:"#4a5568", fontSize:10, letterSpacing:2, marginBottom:6 }}>AI THREAT ASSESSMENT · {hotspot.label.toUpperCase()}</div>
+        <div style={{ color:"#e2e8f0", fontSize:12, lineHeight:1.75 }}>{assessment}</div>
+      </div>
+      {key_vectors?.length > 0 && (
+        <div style={{ marginBottom:10 }}>
+          <div style={{ color:"#4a5568", fontSize:10, letterSpacing:2, marginBottom:6 }}>KEY THREAT VECTORS</div>
+          {key_vectors.map((v, i) => {
+            const pc = v.probability === "HIGH" ? "#ff4d4d" : v.probability === "MEDIUM" ? "#ffd700" : "#00ff9d";
+            return (
+              <div key={i} style={{ background:"#0a1830", border:`1px solid ${pc}22`, borderLeft:`3px solid ${pc}`, borderRadius:6, padding:"7px 12px", marginBottom:5 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3 }}>
+                  <span style={{ color:"#e2e8f0", fontSize:11, fontWeight:600 }}>{v.vector}</span>
+                  <span style={{ color:pc, fontSize:10, fontWeight:700 }}>{v.probability}</span>
+                </div>
+                <div style={{ color:"#9ca3af", fontSize:11 }}>{v.description}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom: outlook_30d ? 8 : 0 }}>
+        {intelligence_gaps?.length > 0 && (
+          <div style={{ background:"#0a1830", borderRadius:6, padding:"8px 10px" }}>
+            <div style={{ color:"#4a5568", fontSize:9, letterSpacing:1, marginBottom:5 }}>INTELLIGENCE GAPS</div>
+            {intelligence_gaps.map((g, i) => <div key={i} style={{ color:"#9ca3af", fontSize:10, marginBottom:3 }}>• {g}</div>)}
+          </div>
+        )}
+        {collection_priorities?.length > 0 && (
+          <div style={{ background:"#0a1830", borderRadius:6, padding:"8px 10px" }}>
+            <div style={{ color:"#4a5568", fontSize:9, letterSpacing:1, marginBottom:5 }}>COLLECTION PRIORITIES</div>
+            {collection_priorities.map((p, i) => <div key={i} style={{ color:"#4db8ff", fontSize:10, marginBottom:3 }}>→ {p}</div>)}
+          </div>
+        )}
+      </div>
+      {outlook_30d && (
+        <div style={{ background:"#0a1830", borderRadius:6, padding:"8px 12px" }}>
+          <div style={{ color:"#4a5568", fontSize:9, letterSpacing:1, marginBottom:4 }}>30-DAY OUTLOOK</div>
+          <div style={{ color:"#e2e8f0", fontSize:11, lineHeight:1.5 }}>{outlook_30d}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GlobalBriefPanel({ result }) {
+  const { summary, critical_clusters, domain_priorities, trigger_events, outlook_30d, outlook_90d } = result;
+  const domainColor = d => d === "Cyber" ? "#4db8ff" : d === "Maritime" ? "#00cfff" : d === "Kinetic" ? "#ff4d4d" : "#b47fff";
+  return (
+    <div>
+      <div style={{ background:"#051220", border:"1px solid #ff4d4d33", borderLeft:"3px solid #ff4d4d", borderRadius:6, padding:14, marginBottom:12 }}>
+        <div style={{ color:"#4a5568", fontSize:10, letterSpacing:2, marginBottom:6 }}>GLOBAL THREAT LANDSCAPE · NSC LEVEL · {new Date().toISOString().slice(0,10)}</div>
+        <div style={{ color:"#e2e8f0", fontSize:12, lineHeight:1.75 }}>{summary}</div>
+      </div>
+      {critical_clusters?.length > 0 && (
+        <div style={{ marginBottom:12 }}>
+          <div style={{ color:"#4a5568", fontSize:10, letterSpacing:2, marginBottom:8 }}>CRITICAL THREAT CLUSTERS</div>
+          {critical_clusters.map((c, i) => (
+            <div key={i} style={{ background:"#0a1830", border:"1px solid #ff4d4d22", borderLeft:"3px solid #ff4d4d", borderRadius:6, padding:"8px 12px", marginBottom:6 }}>
+              <div style={{ color:"#e2e8f0", fontSize:12, fontWeight:700, marginBottom:4 }}>{c.name}</div>
+              <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:5 }}>
+                {c.hotspots?.map((h, j) => (
+                  <span key={j} style={{ background:"#141e30", borderRadius:3, padding:"2px 7px", color:"#9ca3af", fontSize:10 }}>{h}</span>
+                ))}
+              </div>
+              <div style={{ color:"#4a5568", fontSize:11 }}>{c.nexus}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {domain_priorities?.length > 0 && (
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%,180px),1fr))", gap:8, marginBottom:12 }}>
+          {domain_priorities.map((d, i) => {
+            const col = domainColor(d.domain);
+            const tlc = d.threat_level === "CRITICAL" || d.threat_level === "HIGH" ? "#ff4d4d" : d.threat_level === "MEDIUM" ? "#ffd700" : "#00ff9d";
+            return (
+              <div key={i} style={{ background:"#0a1830", border:`1px solid ${col}22`, borderTop:`2px solid ${col}`, borderRadius:6, padding:"10px 12px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
+                  <span style={{ color:col, fontSize:11, fontWeight:700 }}>{d.domain}</span>
+                  <span style={{ color:tlc, fontSize:9, fontWeight:700 }}>{d.threat_level}</span>
+                </div>
+                <div style={{ color:"#9ca3af", fontSize:10, lineHeight:1.5 }}>{d.assessment}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {trigger_events?.length > 0 && (
+        <div style={{ background:"#0a1830", borderRadius:6, padding:"8px 12px", marginBottom:12 }}>
+          <div style={{ color:"#4a5568", fontSize:9, letterSpacing:1, marginBottom:6 }}>TRIGGER EVENTS TO MONITOR</div>
+          {trigger_events.map((e, i) => (
+            <div key={i} style={{ color:"#ff9d00", fontSize:11, padding:"3px 0", borderBottom:"1px solid #1f2d4518" }}>⚡ {e}</div>
+          ))}
+        </div>
+      )}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+        {outlook_30d && (
+          <div style={{ background:"#0a1830", borderRadius:6, padding:"8px 12px" }}>
+            <div style={{ color:"#4a5568", fontSize:9, letterSpacing:1, marginBottom:4 }}>30-DAY OUTLOOK</div>
+            <div style={{ color:"#e2e8f0", fontSize:11, lineHeight:1.5 }}>{outlook_30d}</div>
+          </div>
+        )}
+        {outlook_90d && (
+          <div style={{ background:"#0a1830", borderRadius:6, padding:"8px 12px" }}>
+            <div style={{ color:"#4a5568", fontSize:9, letterSpacing:1, marginBottom:4 }}>90-DAY OUTLOOK</div>
+            <div style={{ color:"#e2e8f0", fontSize:11, lineHeight:1.5 }}>{outlook_90d}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function ThreatMap() {
   const [apiKey] = useApiKey();
@@ -165,6 +291,8 @@ export default function ThreatMap() {
   const [briefResult, setBriefResult]   = useState(null);
   const [briefLoading, setBriefLoading] = useState(false);
   const [briefError, setBriefError]     = useState("");
+  const { stamp } = useLastAnalysis("threatmap");
+  const [tab, setTab] = useState("map");
   const [showCorr, setShowCorr] = useState(true);
   const [filterType,   setFilterType]   = useState(() => { try { return localStorage.getItem("sentinel-tm-type")   || "ALL"; } catch { return "ALL"; } });
   const [filterLevel,  setFilterLevel]  = useState(() => { try { return localStorage.getItem("sentinel-tm-level")  || "ALL"; } catch { return "ALL"; } });
@@ -191,11 +319,24 @@ export default function ThreatMap() {
   async function analyzeHotspot(h) {
     setAiResult(null); setAiError(""); setAiLoading(true);
     try {
-      const text = await callClaude(apiKey,
-        `You are a senior intelligence analyst (DIA/MI6 level). Provide a concise 4-5 sentence threat assessment for the following hotspot covering: (1) current operational situation, (2) key actor capabilities and intent, (3) immediate escalation triggers, (4) recommended intelligence collection priorities.\n\nHotspot: ${h.label} (${h.region})\nThreat type: ${h.type} | Level: ${h.level} | Trend: ${h.trend === "↑" ? "ESCALATING" : h.trend === "↓" ? "DE-ESCALATING" : "STABLE"}\nKey actors: ${h.actors}\nEscalation probability: ${h.escalation}\nKey risk: ${h.keyRisk}\nActive since: ${h.since}`
+      const result = await callClaude(apiKey,
+        `You are a senior intelligence analyst (DIA/MI6 level). Analyze the following threat hotspot.
+Hotspot: ${h.label} (${h.region})
+Type: ${h.type} | Level: ${h.level} | Trend: ${h.trend === "↑" ? "ESCALATING" : h.trend === "↓" ? "DE-ESCALATING" : "STABLE"}
+Key actors: ${h.actors} | Escalation: ${h.escalation} | Risk: ${h.keyRisk} | Active since: ${h.since}
+
+Return ONLY JSON (no markdown):
+{
+  "assessment": "4-5 sentence threat assessment covering operational situation, actor intent, and escalation triggers",
+  "key_vectors": [{"vector": "vector name", "description": "tactical detail", "probability": "HIGH|MEDIUM|LOW"}],
+  "intelligence_gaps": ["gap1", "gap2", "gap3"],
+  "collection_priorities": ["priority1", "priority2", "priority3"],
+  "outlook_30d": "brief 30-day outlook sentence"
+}`
       );
-      setAiResult(text);
-      try { localStorage.setItem("sentinel_prefill_threatmap", text.slice(0, 300)); } catch {}
+      setAiResult(result);
+      stamp();
+      try { localStorage.setItem("sentinel_prefill_threatmap", result.assessment?.slice(0, 300) || ""); } catch {}
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }
@@ -209,11 +350,27 @@ export default function ThreatMap() {
         const hs = HOTSPOTS.filter(h => h.region === r);
         return `${r}: ${hs.length} hotspots (${hs.filter(h => h.level === "CRITICAL").length} CRITICAL)`;
       }).join("; ");
-      const text = await callClaude(apiKey,
-        `You are the Director of National Intelligence briefing the National Security Council. Write a 6-8 sentence global threat landscape assessment covering: (1) most dangerous active hotspots and their escalation vectors; (2) interconnected threat clusters (e.g., PRC-DPRK, Russia-Iran-Houthi axis); (3) domains of greatest concern (cyber, maritime, kinetic); (4) regions requiring immediate collection posture adjustment; (5) 30-60-90 day outlook and key trigger events to monitor.\n\nCRITICAL HOTSPOTS: ${criticals}\nESCALATING TRENDS: ${escalating}\nREGIONAL SUMMARY: ${byRegion}\nTotal active hotspots: ${HOTSPOTS.length}\n\nWrite in NSC briefing style — authoritative, strategic, actionable.`,
-        1300
+      const result = await callClaude(apiKey,
+        `You are the Director of National Intelligence briefing the National Security Council.
+CRITICAL HOTSPOTS: ${criticals}
+ESCALATING: ${escalating}
+REGIONAL SUMMARY: ${byRegion}
+Total hotspots: ${HOTSPOTS.length}
+
+Return ONLY JSON (no markdown):
+{
+  "summary": "6-8 sentence strategic assessment covering most dangerous hotspots, threat clusters, domains of concern, and immediate priorities",
+  "critical_clusters": [{"name": "cluster name", "hotspots": ["label1", "label2"], "nexus": "what strategically links them"}],
+  "domain_priorities": [{"domain": "Cyber|Maritime|Kinetic|Hybrid", "assessment": "1-2 sentence assessment", "threat_level": "CRITICAL|HIGH|MEDIUM"}],
+  "trigger_events": ["event1 to monitor", "event2", "event3", "event4"],
+  "outlook_30d": "30-day strategic outlook sentence",
+  "outlook_90d": "90-day strategic outlook sentence"
+}`,
+        1500
       );
-      setBriefResult(text);
+      setBriefResult(result);
+      stamp();
+      setTab("brief");
     } catch (e) { setBriefError("Error: " + e.message); }
     setBriefLoading(false);
   }
@@ -221,6 +378,11 @@ export default function ThreatMap() {
   const criticalCount  = HOTSPOTS.filter(h => h.level === "CRITICAL").length;
   const highCount      = HOTSPOTS.filter(h => h.level === "HIGH").length;
   const escalatingCount = HOTSPOTS.filter(h => h.trend === "↑").length;
+
+  const TABS = [
+    { id: "map",   label: "Threat Map" },
+    ...(briefResult ? [{ id: "brief", label: "Global Brief" }] : []),
+  ];
 
   return (
     <div>
@@ -243,30 +405,22 @@ export default function ThreatMap() {
         { label:"Bio Signals",      value:"14",            color:"#00ff9d" },
       ]} />
 
-      {/* AI Global Brief */}
-      {apiKey && (
-        <Card style={{ marginBottom:12, padding:"12px 16px", border:"1px solid #ff4d4d22" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: briefResult ? 10 : 0 }}>
-            <div>
-              <div style={{ fontSize:10, color:"#4a5568", letterSpacing:2, marginBottom:2 }}>AI INTELLIGENCE SERVICE</div>
-              <div style={{ color:"#e2e8f0", fontSize:13, fontWeight:600 }}>Global Threat Landscape Brief — NSC Level</div>
-            </div>
-            <Btn onClick={generateGlobalBrief} disabled={briefLoading} color="#ff4d4d" size="sm">
-              {briefLoading ? "Generating..." : briefResult ? "Regenerate Brief" : "Generate Global Brief"}
-            </Btn>
-          </div>
-          {briefError && <div style={{ color:"#ff4d4d", fontSize:12, marginTop:8 }}>{briefError}</div>}
-          {briefResult && (
-            <div style={{ background:"#051220", border:"1px solid #ff4d4d33", borderLeft:"3px solid #ff4d4d", borderRadius:6, padding:14 }}>
-              <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:8 }}>
-                <LiveBadge />
-                <span style={{ color:"#4a5568", fontSize:10, letterSpacing:2 }}>GLOBAL THREAT BRIEF · SECRET/NOFORN · {new Date().toISOString().slice(0,10)}</span>
-              </div>
-              <div style={{ color:"#e2e8f0", fontSize:12, lineHeight:1.75, whiteSpace:"pre-wrap" }}>{briefResult}</div>
-            </div>
-          )}
-        </Card>
-      )}
+      {/* Tab bar */}
+      <div style={{ display:"flex", gap:6, marginBottom:12, flexWrap:"wrap", alignItems:"center" }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={tabStyle(tab === t.id)}>{t.label}</button>
+        ))}
+        {apiKey && (
+          <button onClick={generateGlobalBrief} disabled={briefLoading}
+            style={{ ...tabStyle(false, "#ffd700"), marginLeft:"auto", opacity: briefLoading ? 0.6 : 1 }}>
+            {briefLoading ? "⏳ Generating..." : "📊 NSC Brief"}
+          </button>
+        )}
+        <LastAnalysisTag toolId="threatmap" />
+      </div>
+      {briefError && <div style={{ color:"#ff4d4d", fontSize:12, marginBottom:8 }}>{briefError}</div>}
+
+      {tab === "map" && (<>
 
       {/* Map */}
       <Card style={{ padding:0, overflow:"hidden", marginBottom:14 }}>
@@ -430,13 +584,12 @@ export default function ThreatMap() {
           )}
           {aiError && <div style={{ color:"#ff4d4d", fontSize:12, marginTop:8 }}>{aiError}</div>}
           {aiResult && (
-            <div style={{ background:"#051220", border:"1px solid #4db8ff33", borderLeft:"3px solid #4db8ff", borderRadius:6, padding:14, marginTop:10 }}>
-              <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:8 }}>
-                <LiveBadge />
-                <span style={{ color:"#4a5568", fontSize:10, letterSpacing:2 }}>AI THREAT ASSESSMENT · {sel.label.toUpperCase()}</span>
+            <>
+              <AiHotspotPanel result={aiResult} hotspot={sel} />
+              <div style={{ marginTop:8 }}>
+                <ExportBtn data={{ hotspot: sel.label, region: sel.region, ...aiResult }} filename={`sentinel-threatmap-${sel.label.replace(/\s/g,"-").toLowerCase()}`} />
               </div>
-              <div style={{ color:"#e2e8f0", fontSize:12, lineHeight:1.75 }}>{aiResult}</div>
-            </div>
+            </>
           )}
         </Card>
       )}
@@ -505,8 +658,32 @@ export default function ThreatMap() {
           <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"28px 0", color:"#4a5568" }}>
             No hotspots match the selected filters.
           </div>
+
         )}
       </div>
+
+      </>)}
+
+      {tab === "brief" && (
+        briefResult ? (
+          <Card>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14, flexWrap:"wrap" }}>
+              <LiveBadge />
+              <ST icon="📊" label="Global Threat Landscape Brief" color="#ff4d4d" sub="NSC Level · SECRET/NOFORN" />
+              <ExportBtn data={briefResult} filename="sentinel-threatmap-brief" />
+            </div>
+            <GlobalBriefPanel result={briefResult} />
+          </Card>
+        ) : (
+          <Card>
+            <div style={{ textAlign:"center", padding:"40px 20px", color:"#4a5568" }}>
+              {briefLoading
+                ? "⏳ Generating global threat brief..."
+                : "Click 📊 NSC Brief to generate a structured global threat landscape assessment."}
+            </div>
+          </Card>
+        )
+      )}
     </div>
   );
 }
