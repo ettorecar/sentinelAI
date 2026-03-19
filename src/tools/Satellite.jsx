@@ -7,11 +7,12 @@ async function callClaude(apiKey, prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 700, messages: [{ role: "user", content: prompt }] }),
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1200, messages: [{ role: "user", content: prompt }] }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  return data.content.map(b => b.text || "").join("");
+  const text = data.content.map(b => b.text || "").join("");
+  return JSON.parse(text.replace(/```json|```/g, "").trim());
 }
 
 const PASSES = [
@@ -23,34 +24,81 @@ const PASSES = [
 const COV_HOURS = new Set([8, 10, 13, 15, 18]);
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
-// F2 — continent polygons in equirectangular 400×200 (x=(lon+180)/360*400, y=(90-lat)/180*200)
 const WORLD_POLYS = [
-  // North America
   "10,17 66,17 88,8 133,25 144,72 111,83 66,83 22,72 10,39",
-  // South America
   "111,85 159,94 155,139 128,161 111,122",
-  // Europe
   "189,22 233,22 244,33 233,50 222,61 194,61 189,44",
-  // Africa
   "178,59 264,59 264,111 233,136 211,136 178,100",
-  // Asia
   "229,8 400,8 400,89 311,89 267,83 244,50 229,44",
-  // Oceania
   "322,111 370,111 370,149 322,149",
-  // Greenland
   "116,7 187,7 187,33 116,33",
 ];
 
-// F2 — Ground track SVG: sinusoidal trace + animated position + day/night terminator
+const RISK_COLOR = { CRITICAL: "#ff4d4d", HIGH: "#ff9d00", MEDIUM: "#ffd700", LOW: "#00ff9d" };
+
+const tabStyle = (active, color = "#4db8ff") => ({
+  padding: "7px 16px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 400,
+  background: active ? color + "22" : "transparent",
+  color: active ? color : "#4a5568",
+  border: `1px solid ${active ? color + "44" : "transparent"}`,
+  transition: "all 0.15s",
+});
+
+function passScore(p) {
+  const resVal = { "0.5m": 100, "1.5m": 85, "10m": 60, "30m": 30 }[p.res] || 50;
+  const elVal = (parseInt(p.el) / 90) * 100;
+  const durVal = Math.min(100, parseInt(p.dur) * 14);
+  return Math.round(resVal * 0.5 + elVal * 0.3 + durVal * 0.2);
+}
+
+function PassScoreChart({ passes }) {
+  const W = 360, H = 130, PAD = { top: 10, right: 44, bottom: 22, left: 96 };
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
+  const barH = Math.floor(innerH / passes.length) - 6;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+      <defs>
+        {passes.map((p, i) => {
+          const col = RISK_COLOR[p.risk] || "#4db8ff";
+          return (
+            <linearGradient key={i} id={`sat-grd-${i}`} x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor={col} stopOpacity="0.7" />
+              <stop offset="100%" stopColor={col} stopOpacity="0.15" />
+            </linearGradient>
+          );
+        })}
+      </defs>
+      {passes.map((p, i) => {
+        const score = passScore(p);
+        const barW = (score / 100) * innerW;
+        const y = PAD.top + i * (barH + 6);
+        const col = RISK_COLOR[p.risk] || "#4db8ff";
+        const shortName = p.sat.replace("SENTINEL", "SEN").replace("LANDSAT", "LS")
+          .replace("PLEIADES", "PL");
+        return (
+          <g key={i}>
+            <text x={PAD.left - 5} y={y + barH / 2 + 4} textAnchor="end" fill="#9ca3af" fontSize="8.5">{shortName}</text>
+            <rect x={PAD.left} y={y} width={innerW} height={barH} fill="#0a1830" rx="2" />
+            <rect x={PAD.left} y={y} width={barW} height={barH} fill={`url(#sat-grd-${i})`} rx="2" />
+            <rect x={PAD.left + Math.max(0, barW - 2)} y={y} width={2} height={barH} fill={col} rx="1" />
+            <text x={PAD.left + barW + 5} y={y + barH / 2 + 4} fill={col} fontSize="9" fontWeight="700">{score}</text>
+          </g>
+        );
+      })}
+      <text x={PAD.left + innerW / 2} y={H - 3} textAnchor="middle" fill="#4a5568" fontSize="7">
+        Intel Value Score (0–100) · weighted: resolution 50% · elevation 30% · duration 20%
+      </text>
+    </svg>
+  );
+}
+
 function GroundTrackMap({ tick }) {
   const W = 400, H = 200;
   const toX = lon => ((lon + 180) / 360) * W;
   const toY = lat => ((90 - lat) / 180) * H;
-
-  const INC = 51.6;       // orbital inclination (degrees)
-  const PERIOD = 22.5;    // ground track period (degrees lon) ≈ 360/16 orbits
-
-  // Build ground track polyline for a given phase offset
+  const INC = 51.6;
+  const PERIOD = 22.5;
   function buildTrack(phaseOffset) {
     const pts = [];
     for (let i = 0; i <= 400; i++) {
@@ -60,8 +108,6 @@ function GroundTrackMap({ tick }) {
     }
     return pts.join(" ");
   }
-
-  // 3 adjacent tracks (primary + flanking for context)
   const tracks = [
     { pts: buildTrack(PERIOD * 2),  opacity: 0.2, width: 0.6 },
     { pts: buildTrack(PERIOD),      opacity: 0.4, width: 0.8 },
@@ -69,21 +115,16 @@ function GroundTrackMap({ tick }) {
     { pts: buildTrack(-PERIOD),     opacity: 0.4, width: 0.8 },
     { pts: buildTrack(-PERIOD * 2), opacity: 0.2, width: 0.6 },
   ];
-
-  // Animated satellite position on primary track
   const phase = (tick * 0.0015) % 1;
   const satLon = -180 + phase * 360;
   const satLat = INC * Math.sin((satLon / PERIOD) * 2 * Math.PI);
   const satX = toX(satLon);
   const satY = toY(satLat);
-
-  // Day/night terminator: approximate sun longitude from UTC time
   const now = new Date();
   const utcH = now.getUTCHours() + now.getUTCMinutes() / 60;
-  const sunLon = (utcH - 12) * 15; // 0° lon at 12:00 UTC, ±180 at 0/24 UTC
+  const sunLon = (utcH - 12) * 15;
   const nightCenterLon = sunLon + 180;
   const nightX = toX(((nightCenterLon + 180) % 360) - 180);
-
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", background: "#050d1a", borderRadius: 8, display: "block" }}>
       <defs>
@@ -96,47 +137,30 @@ function GroundTrackMap({ tick }) {
           <stop offset="100%" stopColor="#4db8ff" stopOpacity="0" />
         </radialGradient>
       </defs>
-
-      {/* Lat/lon grid */}
       {[-60, -30, 0, 30, 60].map(lat => (
         <line key={`lat${lat}`} x1={0} y1={toY(lat)} x2={W} y2={toY(lat)} stroke="#0a1830" strokeWidth="0.5" />
       ))}
       {[-120, -60, 0, 60, 120].map(lon => (
         <line key={`lon${lon}`} x1={toX(lon)} y1={0} x2={toX(lon)} y2={H} stroke="#0a1830" strokeWidth="0.5" />
       ))}
-
-      {/* Continents */}
       {WORLD_POLYS.map((pts, i) => (
         <polygon key={i} points={pts} fill="#0e2040" stroke="#1a3a6a" strokeWidth="0.7" />
       ))}
-
-      {/* Night-side overlay (centered on anti-solar point) */}
       <ellipse cx={nightX} cy={H / 2} rx={W / 2} ry={H / 2} fill="url(#night-grad)" />
-
-      {/* Ground tracks */}
       {tracks.map((t, i) => (
-        <polyline key={i} points={t.pts} fill="none"
-          stroke="#4db8ff" strokeWidth={t.width} opacity={t.opacity} />
+        <polyline key={i} points={t.pts} fill="none" stroke="#4db8ff" strokeWidth={t.width} opacity={t.opacity} />
       ))}
-
-      {/* Satellite glow */}
       <ellipse cx={satX} cy={satY} rx={14} ry={14} fill="url(#sat-glow)" />
-      {/* Satellite position */}
       <circle cx={satX} cy={satY} r="4" fill="#4db8ff" />
       <circle cx={satX} cy={satY} r="7" fill="none" stroke="#4db8ff" strokeWidth="1" opacity="0.5" />
-
-      {/* Equator label */}
       <text x={4} y={toY(0) + 4} fill="#1a3a6a" fontSize="6">EQ</text>
-      {/* Axis labels */}
       <text x={toX(0) + 2} y={H - 3} fill="#1a3a6a" fontSize="6">0°</text>
     </svg>
   );
 }
 
-// F2 — Countdown to next satellite pass
 function NextPassCountdown({ passes }) {
   const [secs, setSecs] = useState(0);
-
   useEffect(() => {
     function compute() {
       const now = new Date();
@@ -150,13 +174,11 @@ function NextPassCountdown({ passes }) {
     const t = setInterval(compute, 1000);
     return () => clearInterval(t);
   }, [passes]);
-
   const hh = Math.floor(secs / 3600);
   const mm = Math.floor((secs % 3600) / 60);
   const ss = secs % 60;
   const pad = n => String(n).padStart(2, "0");
-  const urgent = secs < 600; // < 10 min
-
+  const urgent = secs < 600;
   return (
     <div style={{ textAlign: "center", padding: "10px 0" }}>
       <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 2, marginBottom: 6 }}>NEXT PASS COUNTDOWN</div>
@@ -170,11 +192,7 @@ function NextPassCountdown({ passes }) {
       <div style={{ color: "#4a5568", fontSize: 10, marginTop: 4 }}>
         {passes[0].sat} · {passes[0].time} UTC · El {passes[0].el}
       </div>
-      {urgent && (
-        <div style={{ color: "#ff4d4d", fontSize: 10, marginTop: 4, fontWeight: 700 }}>
-          ⚠ IMMINENT PASS
-        </div>
-      )}
+      {urgent && <div style={{ color: "#ff4d4d", fontSize: 10, marginTop: 4, fontWeight: 700 }}>⚠ IMMINENT PASS</div>}
     </div>
   );
 }
@@ -187,28 +205,90 @@ function PassRow({ p }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? "#0f1a2e" : "#0d1626",
-        borderRadius: 7,
-        padding: "10px 14px",
-        marginBottom: 6,
-        border: `1px solid ${hovered ? "#2a3f5f" : "#1f2d45"}`,
-        borderLeft: `3px solid ${color}`,
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
+        background: hovered ? "#0f1a2e" : "#0d1626", borderRadius: 7, padding: "10px 14px", marginBottom: 6,
+        border: `1px solid ${hovered ? "#2a3f5f" : "#1f2d45"}`, borderLeft: `3px solid ${color}`,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
         transition: "background 0.15s, border-color 0.15s",
       }}
     >
       <div>
         <div style={{ fontWeight: 700, color: hovered ? "#ffffff" : "#e2e8f0", fontSize: 13 }}>{p.sat}</div>
-        <div style={{ color: "#9ca3af", fontSize: 11, marginTop: 2 }}>
-          {p.time} · {p.dur} · El: {p.el} · {p.type}
-        </div>
+        <div style={{ color: "#9ca3af", fontSize: 11, marginTop: 2 }}>{p.time} · {p.dur} · El: {p.el} · {p.type}</div>
       </div>
       <div style={{ textAlign: "right" }}>
         <BADGE text={p.risk} color={p.risk === "CRITICAL" || p.risk === "HIGH" ? "red" : "yellow"} />
         <div style={{ color: "#4a5568", fontSize: 10, marginTop: 4, fontFamily: "monospace" }}>Res: {p.res}</div>
       </div>
+    </div>
+  );
+}
+
+function AiBriefPanel({ result, zone }) {
+  const { brief, optimal_windows, sensor_recommendation, denial_indicators, key_features } = result;
+  return (
+    <div>
+      <div style={{ background: "#051220", border: "1px solid #4db8ff33", borderLeft: "3px solid #4db8ff", borderRadius: 6, padding: 14, marginBottom: 12 }}>
+        <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>INTELLIGENCE BRIEF · {zone || "AOI"}</div>
+        <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7 }}>{brief}</div>
+      </div>
+
+      {optimal_windows?.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>OPTIMAL COLLECTION WINDOWS</div>
+          {optimal_windows.map((w, i) => (
+            <div key={i} style={{
+              background: "#0a1830", border: "1px solid #1f2d45", borderRadius: 6, padding: "8px 12px", marginBottom: 6,
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <div>
+                <span style={{ fontFamily: "monospace", color: "#4db8ff", fontSize: 12, fontWeight: 700 }}>{w.time}</span>
+                <span style={{ color: "#9ca3af", fontSize: 11, marginLeft: 10 }}>{w.satellite}</span>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: "#00ff9d", fontSize: 11, fontWeight: 700 }}>Score: {w.score}/10</div>
+                <div style={{ color: "#4a5568", fontSize: 10 }}>{w.reason}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {sensor_recommendation && (
+        <div style={{ background: "#0a1830", borderRadius: 8, padding: 12, marginBottom: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div>
+            <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>PRIMARY SENSOR</div>
+            <div style={{ color: "#ffd700", fontWeight: 700, fontSize: 13 }}>{sensor_recommendation.primary}</div>
+          </div>
+          <div>
+            <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>SECONDARY</div>
+            <div style={{ color: "#9ca3af", fontSize: 12 }}>{sensor_recommendation.secondary}</div>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>RATIONALE</div>
+            <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{sensor_recommendation.rationale}</div>
+          </div>
+        </div>
+      )}
+
+      {denial_indicators?.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>DENIAL & DECEPTION INDICATORS</div>
+          {denial_indicators.map((d, i) => (
+            <div key={i} style={{ color: "#ff9d00", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #1f2d4520" }}>⚠ {d}</div>
+          ))}
+        </div>
+      )}
+
+      {key_features?.length > 0 && (
+        <div>
+          <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>KEY GROUND FEATURES TO MONITOR</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {key_features.map((f, i) => (
+              <span key={i} style={{ background: "#0a1830", border: "1px solid #1f2d45", borderRadius: 4, padding: "3px 8px", color: "#9ca3af", fontSize: 11 }}>{f}</span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -221,6 +301,7 @@ export default function Satellite() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [tab, setTab] = useState("track");
 
   useEffect(() => {
     if (!ran) return;
@@ -231,10 +312,19 @@ export default function Satellite() {
   async function generateBrief() {
     setAiResult(null); setAiError(""); setAiLoading(true);
     try {
-      const text = await callClaude(apiKey,
-        `You are a satellite intelligence analyst. Given the area of interest "${zone || "unspecified coordinates"}", write a brief 3-4 sentence satellite intelligence brief covering: optimal pass windows for today, recommended satellites for the mission type (optical/radar/SAR), key ground features to monitor, and any denial/deception considerations for the area.`
+      const result = await callClaude(apiKey,
+        `You are a satellite intelligence analyst. Given the area of interest "${zone || "unspecified coordinates"}", provide a structured satellite intelligence assessment.
+Return ONLY JSON (no markdown):
+{
+  "brief": "3-4 sentence satellite intel brief covering optimal passes, recommended sensors, key features, and deception risks",
+  "optimal_windows": [{"time": "HH:MM UTC", "satellite": "name", "score": 8, "reason": "brief reason"}],
+  "sensor_recommendation": {"primary": "sensor name", "secondary": "sensor name", "rationale": "why these sensors for this AOI"},
+  "denial_indicators": ["indicator 1", "indicator 2"],
+  "key_features": ["feature1", "feature2", "feature3", "feature4", "feature5"]
+}`
       );
-      setAiResult(text);
+      setAiResult(result);
+      setTab("brief");
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }
@@ -242,13 +332,20 @@ export default function Satellite() {
   const criticalCount = PASSES.filter(p => p.risk === "CRITICAL").length;
   const nextPass = PASSES[0].time;
 
+  const TABS = [
+    { id: "track",   label: "Ground Track" },
+    { id: "passes",  label: "Pass Schedule" },
+    { id: "profile", label: "Sensor Profile" },
+    ...(aiResult ? [{ id: "brief", label: "AI Brief" }] : []),
+  ];
+
   return (
     <div>
       <PageHeader icon="🛰️" title="Satellite Pass Planner" sub="Overflight windows and coverage analysis for reconnaissance satellites." accent="#4db8ff" dataMode={apiKey ? "hybrid" : "mock"} />
 
       <Card>
         <Input label="📍 Area of Interest" value={zone} onChange={setZone} placeholder="e.g. 44.4°N 8.9°E · Coordinates or location name" />
-        <Btn onClick={() => setRan(true)} color="#4db8ff">Calculate Pass Windows</Btn>
+        <Btn onClick={() => { setRan(true); setTab("track"); }} color="#4db8ff">Calculate Pass Windows</Btn>
       </Card>
 
       {ran && (
@@ -260,111 +357,145 @@ export default function Satellite() {
             { label: "Coverage Hours", value: String(COV_HOURS.size), color: "#ffd700" },
           ]} />
 
-          {/* F2 — Ground track map */}
-          <Card>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
-              <ST icon="🌍" label="Ground Track" color="#4db8ff" sub="Sinusoidal LEO trace · animated position · day/night terminator" />
-              <NextPassCountdown passes={PASSES} />
-            </div>
-            <GroundTrackMap tick={tick} />
-            <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 20, height: 2, background: "#4db8ff", opacity: 0.9 }} />
-                <span style={{ color: "#4a5568", fontSize: 10 }}>Primary track</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4db8ff" }} />
-                <span style={{ color: "#4a5568", fontSize: 10 }}>Current position</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div style={{ width: 12, height: 8, background: "#00001a", border: "1px solid #1a3a6a", borderRadius: 2, opacity: 0.8 }} />
-                <span style={{ color: "#4a5568", fontSize: 10 }}>Night side</span>
-              </div>
-            </div>
-          </Card>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12, marginBottom: 12 }}>
-            {/* Orbit viz */}
-            <Card>
-              <ST icon="🌐" label="Orbit Visualization" color="#4db8ff" sub="Live orbital tracking" />
-              <svg viewBox="0 0 200 140" style={{ width: "100%", background: "#050d1a", borderRadius: 8 }}>
-                {[[20,20],[180,15],[50,80],[170,90],[90,10],[140,50],[30,110],[160,30]].map(([sx,sy],i) =>
-                  <circle key={i} cx={sx} cy={sy} r={1} fill="#fff" opacity={0.3}/>
-                )}
-                <ellipse cx={100} cy={70} rx={55} ry={22} fill="none" stroke="#4db8ff" strokeWidth="0.5" strokeDasharray="3" opacity="0.35" />
-                <ellipse cx={100} cy={70} rx={45} ry={35} fill="none" stroke="#ffd700" strokeWidth="0.5" strokeDasharray="3" opacity="0.35" transform="rotate(90,100,70)" />
-                <circle cx={100} cy={70} r={28} fill="#0d2040" stroke="#1a3a6a" strokeWidth="1.5" />
-                <ellipse cx={92} cy={62} rx={10} ry={7} fill="#1a3a6a" opacity="0.8" />
-                <ellipse cx={112} cy={68} rx={8} ry={10} fill="#1a3a6a" opacity="0.8" />
-                <circle cx={100 + 55 * Math.cos((tick * 0.8 % 360) * Math.PI / 180)} cy={70 + 22 * Math.sin((tick * 0.8 % 360) * Math.PI / 180)} r={3} fill="#4db8ff" />
-                <circle cx={100 + 45 * Math.cos(((tick * 0.5 + 120) % 360 + 90) * Math.PI / 180)} cy={70 + 35 * Math.sin(((tick * 0.5 + 120) % 360 + 90) * Math.PI / 180)} r={3} fill="#ffd700" />
-                <text x={100} y={74} textAnchor="middle" fill="#00ff9d" fontSize="6" fontWeight="bold">TARGET</text>
-                <circle cx={18} cy={132} r={3} fill="#4db8ff" />
-                <text x={25} y={136} fill="#6b7a8d" fontSize="7">Optical</text>
-                <circle cx={68} cy={132} r={3} fill="#ffd700" />
-                <text x={75} y={136} fill="#6b7a8d" fontSize="7">Thermal</text>
-              </svg>
-            </Card>
-
-            {/* Coverage heatmap */}
-            <Card>
-              <ST icon="⏱️" label="24h Coverage Heatmap" color="#4db8ff" sub="Active pass windows highlighted" />
-              <div style={{ display: "flex", gap: 1, marginBottom: 6 }}>
-                {HOURS.map(h => (
-                  <div key={h} style={{ flex: 1 }}>
-                    <div style={{
-                      height: 28,
-                      background: COV_HOURS.has(h) ? "#ff4d4d" : "#0d1626",
-                      borderRadius: 2,
-                      border: `1px solid ${COV_HOURS.has(h) ? "#ff4d4d44" : "#1f2d45"}`,
-                      opacity: COV_HOURS.has(h) ? 0.9 : 0.7,
-                    }} />
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#4a5568", fontSize: 9, fontFamily: "monospace" }}>
-                {["00:00","06:00","12:00","18:00","24:00"].map(t => <span key={t}>{t}</span>)}
-              </div>
-              <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 10, height: 10, background: "#ff4d4d", borderRadius: 2 }} />
-                  <span style={{ color: "#9ca3af", fontSize: 10 }}>Pass Window</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 10, height: 10, background: "#0d1626", borderRadius: 2, border: "1px solid #1f2d45" }} />
-                  <span style={{ color: "#9ca3af", fontSize: 10 }}>No Coverage</span>
-                </div>
-              </div>
-            </Card>
+          <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={tabStyle(tab === t.id)}>{t.label}</button>
+            ))}
+            {apiKey && (
+              <button
+                onClick={generateBrief}
+                disabled={aiLoading}
+                style={{ ...tabStyle(false, "#ffd700"), marginLeft: "auto", opacity: aiLoading ? 0.6 : 1 }}
+              >
+                {aiLoading ? "⏳ Analyzing..." : "🛰️ AI Brief"}
+              </button>
+            )}
           </div>
 
-          {/* AI Brief */}
-          {apiKey && (
-            <Card>
-              <ST icon="🤖" label="AI Intelligence Brief" color="#4db8ff" />
-              <Btn onClick={generateBrief} disabled={aiLoading} color="#4db8ff" size="sm">
-                {aiLoading ? "⏳ Generating..." : "🛰️ Generate Satellite Intel Brief"}
-              </Btn>
-              {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
-              {aiResult && (
-                <div style={{ background: "#051220", border: "1px solid #4db8ff33", borderLeft: "3px solid #4db8ff", borderRadius: 6, padding: 12, marginTop: 10 }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-                    <LiveBadge />
-                    <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>
-                      AI SATELLITE INTEL BRIEF · {zone || "AOI"}
-                    </span>
-                  </div>
-                  <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7 }}>{aiResult}</div>
+          {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginBottom: 8 }}>{aiError}</div>}
+
+          {tab === "track" && (
+            <>
+              <Card>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
+                  <ST icon="🌍" label="Ground Track" color="#4db8ff" sub="Sinusoidal LEO trace · animated position · day/night terminator" />
+                  <NextPassCountdown passes={PASSES} />
                 </div>
-              )}
+                <GroundTrackMap tick={tick} />
+                <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 20, height: 2, background: "#4db8ff", opacity: 0.9 }} />
+                    <span style={{ color: "#4a5568", fontSize: 10 }}>Primary track</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4db8ff" }} />
+                    <span style={{ color: "#4a5568", fontSize: 10 }}>Current position</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 12, height: 8, background: "#00001a", border: "1px solid #1a3a6a", borderRadius: 2, opacity: 0.8 }} />
+                    <span style={{ color: "#4a5568", fontSize: 10 }}>Night side</span>
+                  </div>
+                </div>
+              </Card>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12, marginBottom: 12 }}>
+                <Card>
+                  <ST icon="🌐" label="Orbit Visualization" color="#4db8ff" sub="Live orbital tracking" />
+                  <svg viewBox="0 0 200 140" style={{ width: "100%", background: "#050d1a", borderRadius: 8 }}>
+                    {[[20,20],[180,15],[50,80],[170,90],[90,10],[140,50],[30,110],[160,30]].map(([sx,sy],i) =>
+                      <circle key={i} cx={sx} cy={sy} r={1} fill="#fff" opacity={0.3}/>
+                    )}
+                    <ellipse cx={100} cy={70} rx={55} ry={22} fill="none" stroke="#4db8ff" strokeWidth="0.5" strokeDasharray="3" opacity="0.35" />
+                    <ellipse cx={100} cy={70} rx={45} ry={35} fill="none" stroke="#ffd700" strokeWidth="0.5" strokeDasharray="3" opacity="0.35" transform="rotate(90,100,70)" />
+                    <circle cx={100} cy={70} r={28} fill="#0d2040" stroke="#1a3a6a" strokeWidth="1.5" />
+                    <ellipse cx={92} cy={62} rx={10} ry={7} fill="#1a3a6a" opacity="0.8" />
+                    <ellipse cx={112} cy={68} rx={8} ry={10} fill="#1a3a6a" opacity="0.8" />
+                    <circle cx={100 + 55 * Math.cos((tick * 0.8 % 360) * Math.PI / 180)} cy={70 + 22 * Math.sin((tick * 0.8 % 360) * Math.PI / 180)} r={3} fill="#4db8ff" />
+                    <circle cx={100 + 45 * Math.cos(((tick * 0.5 + 120) % 360 + 90) * Math.PI / 180)} cy={70 + 35 * Math.sin(((tick * 0.5 + 120) % 360 + 90) * Math.PI / 180)} r={3} fill="#ffd700" />
+                    <text x={100} y={74} textAnchor="middle" fill="#00ff9d" fontSize="6" fontWeight="bold">TARGET</text>
+                    <circle cx={18} cy={132} r={3} fill="#4db8ff" />
+                    <text x={25} y={136} fill="#6b7a8d" fontSize="7">Optical</text>
+                    <circle cx={68} cy={132} r={3} fill="#ffd700" />
+                    <text x={75} y={136} fill="#6b7a8d" fontSize="7">Thermal</text>
+                  </svg>
+                </Card>
+
+                <Card>
+                  <ST icon="⏱️" label="24h Coverage Heatmap" color="#4db8ff" sub="Active pass windows highlighted" />
+                  <div style={{ display: "flex", gap: 1, marginBottom: 6 }}>
+                    {HOURS.map(h => (
+                      <div key={h} style={{ flex: 1 }}>
+                        <div style={{
+                          height: 28,
+                          background: COV_HOURS.has(h) ? "#ff4d4d" : "#0d1626",
+                          borderRadius: 2,
+                          border: `1px solid ${COV_HOURS.has(h) ? "#ff4d4d44" : "#1f2d45"}`,
+                          opacity: COV_HOURS.has(h) ? 0.9 : 0.7,
+                        }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#4a5568", fontSize: 9, fontFamily: "monospace" }}>
+                    {["00:00","06:00","12:00","18:00","24:00"].map(t => <span key={t}>{t}</span>)}
+                  </div>
+                  <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: 10, height: 10, background: "#ff4d4d", borderRadius: 2 }} />
+                      <span style={{ color: "#9ca3af", fontSize: 10 }}>Pass Window</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <div style={{ width: 10, height: 10, background: "#0d1626", borderRadius: 2, border: "1px solid #1f2d45" }} />
+                      <span style={{ color: "#9ca3af", fontSize: 10 }}>No Coverage</span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </>
+          )}
+
+          {tab === "passes" && (
+            <Card>
+              <ST icon="🗓️" label="Pass Schedule" color="#4db8ff" sub="Sorted by window time · today's coverage" />
+              {PASSES.map((p, i) => <PassRow key={i} p={p} />)}
             </Card>
           )}
 
-          {/* Pass schedule */}
-          <Card>
-            <ST icon="🗓️" label="Pass Schedule" color="#4db8ff" sub="Sorted by window time · today's coverage" />
-            {PASSES.map((p, i) => <PassRow key={i} p={p} />)}
-          </Card>
+          {tab === "profile" && (
+            <Card>
+              <ST icon="📡" label="Sensor Profile & Intel Value" color="#4db8ff" sub="Composite score: resolution 50% · elevation 30% · duration 20%" />
+              <PassScoreChart passes={PASSES} />
+              <div style={{ marginTop: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 1fr 0.6fr", gap: 8, padding: "5px 0", marginBottom: 4, borderBottom: "1px solid #1f2d45" }}>
+                  {["Satellite","Type","Elevation","Resolution","Duration","Score"].map(h => (
+                    <span key={h} style={{ color: "#4a5568", fontSize: 9, letterSpacing: 0.5 }}>{h}</span>
+                  ))}
+                </div>
+                {PASSES.map((p, i) => {
+                  const col = RISK_COLOR[p.risk] || "#4db8ff";
+                  return (
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 1fr 0.6fr", gap: 8, padding: "8px 0", borderBottom: "1px solid #0d1626", alignItems: "center" }}>
+                      <span style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 600 }}>{p.sat}</span>
+                      <span style={{ color: "#4a5568", fontSize: 10 }}>{p.type}</span>
+                      <span style={{ color: "#4a5568", fontSize: 10 }}>{p.el}</span>
+                      <span style={{ color: "#4a5568", fontSize: 10 }}>{p.res}</span>
+                      <span style={{ color: "#4a5568", fontSize: 10 }}>{p.dur}</span>
+                      <span style={{ color: col, fontSize: 11, fontWeight: 700 }}>{passScore(p)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {tab === "brief" && aiResult && (
+            <Card>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                <LiveBadge />
+                <ST icon="🤖" label="AI Satellite Intelligence Brief" color="#4db8ff" />
+              </div>
+              <AiBriefPanel result={aiResult} zone={zone} />
+            </Card>
+          )}
         </>
       )}
     </div>

@@ -6,7 +6,7 @@ async function callClaude(apiKey, prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1400, messages: [{ role: "user", content: prompt }] }),
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1600, messages: [{ role: "user", content: prompt }] }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
@@ -19,6 +19,16 @@ const verdictBadge = v => v?.includes("DISINFORMATION") ? "red" : v === "SUSPICI
 const PLATFORM_COLORS = { Twitter: "#1DA1F2", Telegram: "#0088cc", Facebook: "#4267B2", TikTok: "#ff0050" };
 const DAY_FACTORS = [0.28, 0.40, 0.52, 0.64, 0.76, 0.89, 1.00];
 const DAYS_LABEL = ["D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Today"];
+
+function tabStyle(active, color = "#ff4d4d") {
+  return {
+    padding: "6px 14px", borderRadius: "5px 5px 0 0", fontSize: 12, fontWeight: active ? 700 : 500,
+    cursor: "pointer", border: "none", outline: "none", background: "transparent",
+    color: active ? color : "#4a5568",
+    borderBottom: active ? `2px solid ${color}` : "2px solid transparent",
+    transition: "color 0.15s, border-color 0.15s",
+  };
+}
 
 function TechniqueBar({ name, intensity }) {
   const [hovered, setHovered] = useState(false);
@@ -46,7 +56,6 @@ function TechniqueBar({ name, intensity }) {
   );
 }
 
-// E1 — Spread velocity sparkline (shown inside verdict card)
 function SpreadVelocitySparkline({ data }) {
   if (!data?.length) return null;
   const W = 110, H = 28;
@@ -77,7 +86,6 @@ function SpreadVelocitySparkline({ data }) {
   );
 }
 
-// E1 — 7-day campaign intensity bar chart per platform
 function CampaignIntensityChart({ pi }) {
   if (!pi) return null;
   const names = Object.keys(pi);
@@ -131,12 +139,135 @@ function CampaignIntensityChart({ pi }) {
   );
 }
 
+// Narrative propagation SVG flow graph: origin → platforms → amplifiers
+function NarrativePropagationGraph({ origin, pi }) {
+  if (!pi) return null;
+  const platforms = Object.keys(pi);
+  if (!platforms.length) return null;
+
+  const W = 420;
+  const rowH = 46;
+  const H = Math.max(180, (platforms.length + 1) * rowH);
+  const srcX = 50, srcY = H / 2;
+  const platX = 210;
+  const ampX = 375;
+  const ampNames = ["Media Outlets", "Policy Sphere"];
+  const ampY = [H * 0.33, H * 0.67];
+  const platYs = platforms.map((_, i) => (H / (platforms.length + 1)) * (i + 1));
+
+  return (
+    <div>
+      <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>NARRATIVE PROPAGATION FLOW</div>
+      <div style={{ overflowX: "auto" }}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 300, height: H }}>
+          {/* Source → Platform edges */}
+          {platforms.map((name, i) => {
+            const strength = pi[name] / 100;
+            const color = PLATFORM_COLORS[name] || "#4db8ff";
+            return (
+              <line key={`sp${i}`}
+                x1={srcX + 22} y1={srcY}
+                x2={platX - 20} y2={platYs[i]}
+                stroke={color} strokeWidth={1 + strength * 2.5}
+                strokeOpacity={0.35 + strength * 0.5}
+              />
+            );
+          })}
+          {/* Platform → Amplifier edges */}
+          {platforms.map((name, i) =>
+            ampNames.map((_, ai) => {
+              const s = pi[name] / 100;
+              const color = PLATFORM_COLORS[name] || "#4db8ff";
+              return (
+                <line key={`pa${i}${ai}`}
+                  x1={platX + 20} y1={platYs[i]}
+                  x2={ampX - 22} y2={ampY[ai]}
+                  stroke={color} strokeWidth={0.8}
+                  strokeOpacity={0.15 + s * 0.3}
+                />
+              );
+            })
+          )}
+
+          {/* Source node */}
+          <circle cx={srcX} cy={srcY} r={22} fill="#0a1628" stroke="#ff4d4d" strokeWidth={1.5} />
+          <text x={srcX} y={srcY - 5} textAnchor="middle" fill="#ff4d4d" fontSize="7" fontWeight="700">ORIGIN</text>
+          <text x={srcX} y={srcY + 6} textAnchor="middle" fill="#9ca3af" fontSize="5.5">
+            {(origin || "Unknown").slice(0, 12)}
+          </text>
+
+          {/* Platform nodes */}
+          {platforms.map((name, i) => {
+            const color = PLATFORM_COLORS[name] || "#4db8ff";
+            const r = 16 + (pi[name] / 100) * 7;
+            return (
+              <g key={name}>
+                <circle cx={platX} cy={platYs[i]} r={r} fill="#0a1628" stroke={color} strokeWidth={1.5} />
+                <text x={platX} y={platYs[i] - 3} textAnchor="middle" dominantBaseline="middle" fill={color} fontSize="7" fontWeight="700">{name}</text>
+                <text x={platX} y={platYs[i] + 7} textAnchor="middle" fill={color} fontSize="8.5" fontWeight="900">{pi[name]}%</text>
+              </g>
+            );
+          })}
+
+          {/* Amplifier nodes */}
+          {ampNames.map((name, i) => (
+            <g key={name}>
+              <rect x={ampX - 34} y={ampY[i] - 12} width={68} height={24} rx={5} fill="#0a1628" stroke="#4a5568" strokeWidth={1} />
+              <text x={ampX} y={ampY[i]} textAnchor="middle" dominantBaseline="middle" fill="#9ca3af" fontSize="7.5">{name}</text>
+            </g>
+          ))}
+
+          {/* Column labels */}
+          <text x={srcX} y={10} textAnchor="middle" fill="#2d3f55" fontSize="7">SOURCE</text>
+          <text x={platX} y={10} textAnchor="middle" fill="#2d3f55" fontSize="7">PLATFORMS</text>
+          <text x={ampX} y={10} textAnchor="middle" fill="#2d3f55" fontSize="7">AMPLIFIERS</text>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// Counter-narrative panel
+function CounterNarrativePanel({ items }) {
+  if (!items?.length) return (
+    <div style={{ color: "#4a5568", fontSize: 13, textAlign: "center", padding: "24px 0" }}>
+      No counter-narratives in analysis results.
+    </div>
+  );
+  const priorityColor = p => p === "HIGH" ? "#ff4d4d" : p === "MEDIUM" ? "#ffd700" : "#4db8ff";
+  const typeIcon = t => ({ "fact-check": "✅", "redirect": "↩️", "prebunking": "🛡️", "amplification": "📣" }[t] || "💬");
+  return (
+    <div>
+      {items.map((item, i) => (
+        <div key={i} style={{
+          background: "#0d1626", borderRadius: 7, padding: "10px 12px", marginBottom: 8,
+          border: "1px solid #1f2d45", borderLeft: `3px solid ${priorityColor(item.priority)}`,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ fontSize: 14 }}>{typeIcon(item.type)}</span>
+              <span style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 700 }}>
+                {(item.type || "").toUpperCase().replace("-", " ")}
+              </span>
+            </div>
+            <span style={{ color: priorityColor(item.priority), fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>
+              {item.priority}
+            </span>
+          </div>
+          <div style={{ color: "#9ca3af", fontSize: 12, lineHeight: 1.6 }}>{item.text}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Disinfo() {
   const [apiKey] = useApiKey();
   const [text, setText] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState("verdict");
   const { stamp } = useLastAnalysis("disinfo");
   function handleKey(e) { if (e.ctrlKey && e.key === "Enter") analyze(); }
 
@@ -151,13 +282,20 @@ Content to analyze:
 ${text}
 
 Return exactly this JSON structure:
-{"verdict":"LIKELY DISINFORMATION|CONFIRMED DISINFORMATION|SUSPICIOUS|LEGITIMATE","confidence":number_0_to_100,"narrative":"brief string describing the narrative","origin":"e.g. State-sponsored IO, Grassroots Campaign, Unknown actor, Pro-Kremlin network, etc.","techniques":[{"name":"string","intensity":number_0_to_100}],"platform_intensity":{"Twitter":number_0_to_100,"Telegram":number_0_to_100,"Facebook":number_0_to_100,"TikTok":number_0_to_100},"spread_velocity":[n0,n1,n2,n3,n4,n5,n6]}
+{"verdict":"LIKELY DISINFORMATION|CONFIRMED DISINFORMATION|SUSPICIOUS|LEGITIMATE","confidence":number_0_to_100,"narrative":"brief string describing the narrative","origin":"e.g. State-sponsored IO, Grassroots Campaign, Unknown actor, Pro-Kremlin network, etc.","techniques":[{"name":"string","intensity":number_0_to_100}],"platform_intensity":{"Twitter":number_0_to_100,"Telegram":number_0_to_100,"Facebook":number_0_to_100,"TikTok":number_0_to_100},"spread_velocity":[n0,n1,n2,n3,n4,n5,n6],"counter_narratives":[{"text":"string describing an actionable counter-strategy or fact-check approach","type":"fact-check|redirect|prebunking|amplification","priority":"HIGH|MEDIUM|LOW"}]}
 
-Include 4-6 specific techniques. spread_velocity is 7 numbers oldest→today (0-100) representing daily spread rate trend. platform_intensity is estimated current campaign strength per platform based on content style and reach signals.`;
-      setResult(await callClaude(apiKey, prompt)); stamp();
+Include 4-6 specific techniques. spread_velocity is 7 numbers oldest→today (0-100) representing daily spread rate trend. platform_intensity is estimated current campaign strength per platform. counter_narratives should include 3-4 ranked counter-strategies.`;
+      setResult(await callClaude(apiKey, prompt)); stamp(); setTab("verdict");
     } catch (e) { setError("Error: " + e.message); }
     setLoading(false);
   }
+
+  const TABS = [
+    { id: "verdict", label: "Verdict" },
+    { id: "techniques", label: "Techniques" },
+    { id: "spread", label: "Spread & Propagation" },
+    { id: "counter", label: "Counter-Narratives" },
+  ];
 
   return (
     <div>
@@ -174,41 +312,44 @@ Include 4-6 specific techniques. spread_velocity is 7 numbers oldest→today (0-
 
       {result && (
         <>
-          {/* Verdict card */}
-          <Card style={{ borderColor: verdictColor(result.verdict) + "55", borderLeft: `3px solid ${verdictColor(result.verdict)}` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-              <div>
-                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 5 }}>ANALYSIS VERDICT</div>
-                <div style={{ fontWeight: 900, fontSize: 18, color: verdictColor(result.verdict) }}>{result.verdict}</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <ExportBtn data={result} filename="sentinel-disinfo" />
-                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4, marginTop: 8 }}>CONFIDENCE</div>
-                <div style={{ color: "#ffd700", fontWeight: 800, fontSize: 26, lineHeight: 1 }}>{result.confidence}%</div>
-              </div>
-            </div>
+          {/* Tab navigation */}
+          <div style={{ display: "flex", borderBottom: "1px solid #1f2d45", marginBottom: 14, gap: 2, flexWrap: "wrap" }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={tabStyle(tab === t.id)}>{t.label}</button>
+            ))}
+          </div>
 
-            <div style={{ background: "#0d1626", borderRadius: 3, height: 6, marginBottom: 12 }}>
-              <div style={{ background: verdictColor(result.verdict), height: 6, borderRadius: 3, width: `${result.confidence}%`, transition: "width 0.4s" }} />
-            </div>
-
-            {/* E1 — spread velocity sparkline */}
-            <SpreadVelocitySparkline data={result.spread_velocity} />
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10 }}>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
-                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>NARRATIVE</div>
-                <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{result.narrative}</div>
+          {tab === "verdict" && (
+            <Card style={{ borderColor: verdictColor(result.verdict) + "55", borderLeft: `3px solid ${verdictColor(result.verdict)}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                <div>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 5 }}>ANALYSIS VERDICT</div>
+                  <div style={{ fontWeight: 900, fontSize: 18, color: verdictColor(result.verdict) }}>{result.verdict}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <ExportBtn data={result} filename="sentinel-disinfo" />
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4, marginTop: 8 }}>CONFIDENCE</div>
+                  <div style={{ color: "#ffd700", fontWeight: 800, fontSize: 26, lineHeight: 1 }}>{result.confidence}%</div>
+                </div>
               </div>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
-                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>ATTRIBUTED ORIGIN</div>
-                <div style={{ color: "#ffd700", fontSize: 12, lineHeight: 1.5 }}>{result.origin}</div>
+              <div style={{ background: "#0d1626", borderRadius: 3, height: 6, marginBottom: 12 }}>
+                <div style={{ background: verdictColor(result.verdict), height: 6, borderRadius: 3, width: `${result.confidence}%`, transition: "width 0.4s" }} />
               </div>
-            </div>
-          </Card>
+              <SpreadVelocitySparkline data={result.spread_velocity} />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 10 }}>
+                <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>NARRATIVE</div>
+                  <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.5 }}>{result.narrative}</div>
+                </div>
+                <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>ATTRIBUTED ORIGIN</div>
+                  <div style={{ color: "#ffd700", fontSize: 12, lineHeight: 1.5 }}>{result.origin}</div>
+                </div>
+              </div>
+            </Card>
+          )}
 
-          {/* Techniques */}
-          {result.techniques?.length > 0 && (
+          {tab === "techniques" && result.techniques?.length > 0 && (
             <Card>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <ST icon="📊" label="Technique Intensity" color="#ff4d4d" sub={`${result.techniques.length} techniques identified`} />
@@ -223,11 +364,29 @@ Include 4-6 specific techniques. spread_velocity is 7 numbers oldest→today (0-
             </Card>
           )}
 
-          {/* E1 — platform campaign intensity chart */}
-          {result.platform_intensity && (
+          {tab === "spread" && (
+            <>
+              {result.platform_intensity && (
+                <Card>
+                  <ST icon="📡" label="Platform Spread Analysis" color="#1DA1F2" sub="7-day campaign intensity across social platforms" style={{ marginBottom: 14 }} />
+                  <CampaignIntensityChart pi={result.platform_intensity} />
+                </Card>
+              )}
+              {result.platform_intensity && (
+                <Card>
+                  <ST icon="🌐" label="Narrative Propagation Graph" color="#ff4d4d"
+                    sub="Information flow: origin → platforms → downstream amplifiers" style={{ marginBottom: 14 }} />
+                  <NarrativePropagationGraph origin={result.origin} pi={result.platform_intensity} />
+                </Card>
+              )}
+            </>
+          )}
+
+          {tab === "counter" && (
             <Card>
-              <ST icon="📡" label="Platform Spread Analysis" color="#1DA1F2" sub="7-day campaign intensity across social platforms" style={{ marginBottom: 14 }} />
-              <CampaignIntensityChart pi={result.platform_intensity} />
+              <ST icon="🛡️" label="Counter-Narrative Strategies" color="#00ff9d"
+                sub="AI-generated counter-measures and fact-check priorities" style={{ marginBottom: 14 }} />
+              <CounterNarrativePanel items={result.counter_narratives} />
             </Card>
           )}
         </>

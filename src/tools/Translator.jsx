@@ -16,15 +16,22 @@ const LANGUAGES = [
 const CONTEXTS = ["Military / Battlefield", "Intelligence / Intercept", "Diplomatic", "Propaganda / PSYOP", "General"];
 
 const MOCK_TRANSLATIONS = {
-  ar: { translation: "وحدات العدو تتقدم من الجهة الشمالية. نطلب دعماً جوياً فورياً في الإحداثيات 44.2 شمالاً، 28.7 شرقاً.", analysis: "Military tactical communication. Contains: unit movement direction (north), support request (air), coordinates. Urgency: HIGH.", intent: "Coordination", confidence: 94 },
-  ru: { translation: "Противник использует шифрование на частоте 158.4. Группа Альфа — отступить на позицию Б.", analysis: "Tactical intercept. Contains: enemy radio frequency, unit designation (Alpha), movement order (fall back). Urgency: HIGH.", intent: "Tactical Order", confidence: 91 },
-  zh: { translation: "第三舰队已进入南海指定区域。开始侦察行动，保持无线电静默。", analysis: "Naval operational order. Contains: fleet designation (3rd), area (South China Sea), mission type (reconnaissance), comms protocol (radio silence). Urgency: MEDIUM.", intent: "Operational Order", confidence: 88 },
-  fa: { translation: "عملیات در مرحله دوم است. یگان‌های ویژه در موضع انتظار هستند. منتظر تأیید باشید.", analysis: "Special operations communication. Contains: operation phase (2nd), unit type (special), current status (standby), awaiting confirmation. Urgency: MEDIUM.", intent: "Status Report", confidence: 86 },
-  uk: { translation: "Позиція під вогнем. Потрібна евакуація пораненого особового складу. Сектор Дельта-7.", analysis: "Combat medical emergency. Contains: position status (under fire), request type (casualty evacuation), sector designation (Delta-7). Urgency: CRITICAL.", intent: "MEDEVAC Request", confidence: 97 },
-  ko: { translation: "북방 경계 구역에서 미상 항공기 탐지됨. 방공망 경보 발령. 전투기 즉시 출격 준비.", analysis: "Air defence alert. Contains: detection area (northern boundary), target type (unknown aircraft), action (air defence alert activated), response (scramble fighters). Urgency: CRITICAL.", intent: "Air Defence Alert", confidence: 93 },
-  tr: { translation: "Konvoy Güneydoğu güzergahına yönlendiriliyor. Yakıt ikmali noktası değiştirildi. Koordinatlar şifreli kanaldan gönderildi.", analysis: "Logistics communication. Contains: unit type (convoy), new route (southeast), logistic change (fuel point), security protocol (encrypted channel). Urgency: LOW.", intent: "Logistics Order", confidence: 82 },
-  fr: { translation: "Opération Mirage phase trois initiée. Équipes Alpha et Bravo en position. Neutralisation de la cible à 03h00.", analysis: "Special forces operation communication. Contains: operation name (Mirage), phase (3), unit designations (Alpha/Bravo), target action (neutralise), time (03:00). Urgency: HIGH.", intent: "SOCOM Directive", confidence: 90 },
+  ar: { translation: "وحدات العدو تتقدم من الجهة الشمالية. نطلب دعماً جوياً فورياً في الإحداثيات 44.2 شمالاً، 28.7 شرقاً.", analysis: "Military tactical communication. Contains: unit movement direction (north), support request (air), coordinates. Urgency: HIGH.", intent: "Coordination", confidence: 94, threat_level: "HIGH", key_signals: [{ text: "enemy units advancing north", type: "movement", significance: "Indicates active offensive operation" }, { text: "air support request", type: "fire", significance: "Unit under pressure, requesting CAS" }, { text: "coordinates 44.2N 28.7E", type: "location", significance: "Precise grid reference — Black Sea region" }] },
+  ru: { translation: "Противник использует шифрование на частоте 158.4. Группа Альфа — отступить на позицию Б.", analysis: "Tactical intercept. Contains: enemy radio frequency, unit designation (Alpha), movement order (fall back). Urgency: HIGH.", intent: "Tactical Order", confidence: 91, threat_level: "HIGH", key_signals: [{ text: "frequency 158.4", type: "communication", significance: "Active enemy comms channel identified" }, { text: "Alpha group", type: "personnel", significance: "Named unit — tracks force order of battle" }, { text: "fall back to position B", type: "movement", significance: "Tactical withdrawal in progress" }] },
+  zh: { translation: "第三舰队已进入南海指定区域。开始侦察行动，保持无线电静默。", analysis: "Naval operational order. Contains: fleet designation (3rd), area (South China Sea), mission type (reconnaissance), comms protocol (radio silence). Urgency: MEDIUM.", intent: "Operational Order", confidence: 88, threat_level: "MEDIUM", key_signals: [{ text: "3rd Fleet", type: "personnel", significance: "Major naval asset deployment" }, { text: "South China Sea", type: "location", significance: "Strategically contested maritime area" }, { text: "radio silence", type: "communication", significance: "EMCON enforced — covert operation likely" }] },
+  fa: { translation: "عملیات در مرحله دوم است. یگان‌های ویژه در موضع انتظار هستند. منتظر تأیید باشید.", analysis: "Special operations communication. Contains: operation phase (2nd), unit type (special), current status (standby), awaiting confirmation. Urgency: MEDIUM.", intent: "Status Report", confidence: 86, threat_level: "MEDIUM", key_signals: [{ text: "phase two", type: "movement", significance: "Multi-phase operation underway" }, { text: "special units on standby", type: "personnel", significance: "Elite forces pre-positioned" }] },
+  uk: { translation: "Позиція під вогнем. Потрібна евакуація пораненого особового складу. Сектор Дельта-7.", analysis: "Combat medical emergency. Contains: position status (under fire), request type (casualty evacuation), sector designation (Delta-7). Urgency: CRITICAL.", intent: "MEDEVAC Request", confidence: 97, threat_level: "CRITICAL", key_signals: [{ text: "position under fire", type: "fire", significance: "Active contact — immediate threat to life" }, { text: "casualty evacuation", type: "personnel", significance: "Wounded personnel requiring urgent extraction" }, { text: "sector Delta-7", type: "location", significance: "Specific tactical grid reference for MEDEVAC routing" }] },
+  ko: { translation: "북방 경계 구역에서 미상 항공기 탐지됨. 방공망 경보 발령. 전투기 즉시 출격 준비.", analysis: "Air defence alert. Contains: detection area (northern boundary), target type (unknown aircraft), action (air defence alert activated), response (scramble fighters). Urgency: CRITICAL.", intent: "Air Defence Alert", confidence: 93, threat_level: "CRITICAL", key_signals: [{ text: "unknown aircraft detected", type: "movement", significance: "Unidentified aerial intrusion — potential threat" }, { text: "air defence alert", type: "communication", significance: "National air defense activated" }, { text: "scramble fighters", type: "fire", significance: "Intercept order issued" }] },
+  tr: { translation: "Konvoy Güneydoğu güzergahına yönlendiriliyor. Yakıt ikmali noktası değiştirildi. Koordinatlar şifreli kanaldan gönderildi.", analysis: "Logistics communication. Contains: unit type (convoy), new route (southeast), logistic change (fuel point), security protocol (encrypted channel). Urgency: LOW.", intent: "Logistics Order", confidence: 82, threat_level: "LOW", key_signals: [{ text: "convoy rerouted southeast", type: "movement", significance: "Logistics line of communication shifted" }, { text: "fuel point changed", type: "logistics", significance: "Resupply chain alteration — possible threat avoidance" }] },
+  fr: { translation: "Opération Mirage phase trois initiée. Équipes Alpha et Bravo en position. Neutralisation de la cible à 03h00.", analysis: "Special forces operation communication. Contains: operation name (Mirage), phase (3), unit designations (Alpha/Bravo), target action (neutralise), time (03:00). Urgency: HIGH.", intent: "SOCOM Directive", confidence: 90, threat_level: "HIGH", key_signals: [{ text: "Operation Mirage phase three", type: "movement", significance: "Named operation at late execution stage" }, { text: "Alpha and Bravo teams", type: "personnel", significance: "Two special forces teams coordinated" }, { text: "neutralize target at 03:00", type: "fire", significance: "Time-sensitive strike operation" }] },
 };
+
+const TYPE_COLOR = {
+  movement: "#4db8ff", fire: "#ff4d4d", logistics: "#ffd700",
+  communication: "#00ff9d", personnel: "#ff9d00", location: "#b47fff",
+};
+
+const THREAT_COLOR = { CRITICAL: "#ff4d4d", HIGH: "#ff9d00", MEDIUM: "#ffd700", LOW: "#00ff9d" };
 
 function LangBtn({ lang, active, onClick }) {
   const [hovered, setHovered] = useState(false);
@@ -68,6 +75,71 @@ function ContextBtn({ label, active, onClick }) {
   );
 }
 
+// Arc gauge 0–100 for confidence score
+function ConfidenceGauge({ value }) {
+  const R = 42, CX = 60, CY = 62;
+  const startAngle = -210;
+  const sweepAngle = 240;
+  const toRad = d => d * Math.PI / 180;
+  const arcPath = (start, sweep) => {
+    const s = toRad(start);
+    const e = toRad(start + sweep);
+    const x1 = CX + R * Math.cos(s);
+    const y1 = CY + R * Math.sin(s);
+    const x2 = CX + R * Math.cos(e);
+    const y2 = CY + R * Math.sin(e);
+    const lg = Math.abs(sweep) > 180 ? 1 : 0;
+    return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 ${lg} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  };
+  const color = value >= 90 ? "#00ff9d" : value >= 70 ? "#ffd700" : value >= 50 ? "#ff9d00" : "#ff4d4d";
+  const label = value >= 90 ? "VERIFIED" : value >= 70 ? "HIGH CONF" : value >= 50 ? "MEDIUM" : "LOW CONF";
+  const fillSweep = (value / 100) * sweepAngle;
+  return (
+    <svg viewBox="0 0 120 96" style={{ width: "100%", maxWidth: 140, display: "block", margin: "0 auto" }}>
+      <path d={arcPath(startAngle, sweepAngle)} fill="none" stroke="#0a1830" strokeWidth="9" strokeLinecap="round" />
+      <path d={arcPath(startAngle, fillSweep)} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round" opacity="0.9" />
+      <text x={CX} y={CY + 5} textAnchor="middle" fill={color} fontSize="17" fontWeight="900" fontFamily="monospace">{value}%</text>
+      <text x={CX} y={CY + 18} textAnchor="middle" fill="#4a5568" fontSize="7" letterSpacing="0.5">CONFIDENCE</text>
+      <text x={CX} y={CY - 10} textAnchor="middle" fill={color} fontSize="8" fontWeight="700" letterSpacing="0.5">{label}</text>
+    </svg>
+  );
+}
+
+// Key intelligence signals extracted from the intercept
+function KeySignalsPanel({ signals }) {
+  if (!signals?.length) return null;
+  return (
+    <div>
+      {signals.map((s, i) => (
+        <div key={i} style={{
+          background: "#0a1830",
+          border: `1px solid ${(TYPE_COLOR[s.type] || "#4a5568") + "33"}`,
+          borderLeft: `3px solid ${TYPE_COLOR[s.type] || "#4a5568"}`,
+          borderRadius: 6, padding: "8px 12px", marginBottom: 7,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ color: TYPE_COLOR[s.type] || "#9ca3af", fontSize: 9, fontWeight: 700, letterSpacing: 1 }}>
+              {s.type?.toUpperCase()}
+            </span>
+          </div>
+          <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 600, marginBottom: 3, fontStyle: "italic" }}>
+            "{s.text}"
+          </div>
+          <div style={{ color: "#9ca3af", fontSize: 11, lineHeight: 1.4 }}>{s.significance}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const tabStyle = (active, color = "#4db8ff") => ({
+  padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: active ? 700 : 400,
+  background: active ? color + "22" : "transparent",
+  color: active ? color : "#4a5568",
+  border: `1px solid ${active ? color + "44" : "transparent"}`,
+  transition: "all 0.15s",
+});
+
 const HIST_KEY = "sentinel_translator_history";
 const MAX_HIST = 5;
 
@@ -89,7 +161,9 @@ export default function Translator() {
   const [error, setError] = useState("");
   const [history, setHistory] = useState(() => loadHistory());
   const [showHistory, setShowHistory] = useState(false);
+  const [tab, setTab] = useState("translation");
   const { stamp } = useLastAnalysis("translator");
+
   function handleKey(e) { if (e.ctrlKey && e.key === "Enter") translate(); }
 
   function pushHistory(entry) {
@@ -103,6 +177,7 @@ export default function Translator() {
     setSourceLang(h.lang?.code || sourceLang);
     setContext(h.context);
     setResult(h);
+    setTab("translation");
     setShowHistory(false);
   }
 
@@ -113,36 +188,53 @@ export default function Translator() {
     if (apiKey) {
       try {
         const lang = LANGUAGES.find(l => l.code === sourceLang);
-        const prompt = `You are a military intelligence translator. Translate the following ${lang.label} text to English, then provide a brief intelligence analysis.
+        const prompt = `You are a military intelligence translator. Translate the following ${lang.label} text to English and provide a structured intelligence assessment.
 Context: ${context}
 Source text: ${text}
 
-Return ONLY JSON (no markdown): {
+Return ONLY JSON (no markdown):
+{
   "translation": "English translation here",
   "analysis": "Brief intelligence analysis: what this communication reveals, key entities, urgency level",
   "intent": "Communication intent in 2-3 words",
-  "confidence": 85
+  "confidence": 85,
+  "threat_level": "HIGH",
+  "key_signals": [
+    {"text": "extracted signal phrase", "type": "movement|fire|communication|personnel|location|logistics", "significance": "why this matters for intel"}
+  ]
 }`;
         const res = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 800, messages: [{ role: "user", content: prompt }] }),
+          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error.message);
         const parsed = JSON.parse(data.content.map(b => b.text || "").join("").replace(/```json|```/g, "").trim());
         const r = { ...parsed, lang, context, sourceText: text, live: true, ts: Date.now() };
-        setResult(r); stamp(); pushHistory(r);
+        setResult(r);
+        setTab("translation");
+        stamp();
+        pushHistory(r);
       } catch (e) { setError("Error: " + e.message); }
     } else {
       await new Promise(r => setTimeout(r, 900));
       const mock = MOCK_TRANSLATIONS[sourceLang];
       const lang = LANGUAGES.find(l => l.code === sourceLang);
       const r = { ...mock, lang, context, sourceText: text, live: false, ts: Date.now() };
-      setResult(r); stamp(); pushHistory(r);
+      setResult(r);
+      setTab("translation");
+      stamp();
+      pushHistory(r);
     }
     setLoading(false);
   }
+
+  const RESULT_TABS = result ? [
+    { id: "translation", label: "Translation" },
+    { id: "analysis",    label: "Intel Analysis" },
+    { id: "signals",     label: `Signals (${result.key_signals?.length || 0})` },
+  ] : [];
 
   return (
     <div>
@@ -181,7 +273,7 @@ Return ONLY JSON (no markdown): {
         </div>
       </Card>
 
-      {/* History */}
+      {/* History toggle */}
       {history.length > 0 && (
         <div style={{ marginBottom: 10 }}>
           <button
@@ -232,8 +324,9 @@ Return ONLY JSON (no markdown): {
 
       {result && (
         <>
+          {/* Result header */}
           <Card style={{ borderColor: "#00ff9d33" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 22 }}>{result.lang.flag}</span>
                 <div>
@@ -241,41 +334,85 @@ Return ONLY JSON (no markdown): {
                   <div style={{ color: "#4a5568", fontSize: 12 }}>{result.context} · {result.lang.region}</div>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                 {result.live ? <LiveBadge /> : <><MockBadge /><span style={{ color: "#9ca3af", fontSize: 11 }}>Set API key for AI</span></>}
+                {result.threat_level && (
+                  <BADGE text={result.threat_level} color={result.threat_level === "CRITICAL" || result.threat_level === "HIGH" ? "red" : result.threat_level === "MEDIUM" ? "yellow" : "green"} />
+                )}
                 <BADGE text={`${result.confidence}% conf.`} color="blue" />
                 <ExportBtn data={result} filename={`sentinel-translation-${result.lang?.code || "xx"}`} />
               </div>
             </div>
 
-            <div style={{ background: "#0d1626", borderRadius: 8, padding: 14, marginBottom: 10 }}>
-              <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>SOURCE TEXT</div>
-              <div style={{ color: "#9ca3af", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{result.sourceText}</div>
-            </div>
-
-            <div style={{ background: "#051a0d", border: "1px solid #00ff9d33", borderLeft: "3px solid #00ff9d", borderRadius: 8, padding: 14 }}>
-              <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>ENGLISH TRANSLATION</div>
-              <div style={{ color: "#00ff9d", fontSize: 14, lineHeight: 1.7, fontWeight: 500 }}>{result.translation}</div>
+            {/* Tab bar */}
+            <div style={{ display: "flex", gap: 6, borderTop: "1px solid #1f2d45", paddingTop: 12 }}>
+              {RESULT_TABS.map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)} style={tabStyle(tab === t.id)}>{t.label}</button>
+              ))}
             </div>
           </Card>
 
-          <Card>
-            <ST icon="🔍" label="Intelligence Analysis" color="#ffd700" />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12, marginBottom: 12 }}>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
-                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>COMMUNICATION INTENT</div>
-                <div style={{ color: "#ffd700", fontWeight: 700, fontSize: 14 }}>{result.intent}</div>
+          {/* Translation tab */}
+          {tab === "translation" && (
+            <Card>
+              <div style={{ background: "#0d1626", borderRadius: 8, padding: 14, marginBottom: 10 }}>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>SOURCE TEXT</div>
+                <div style={{ color: "#9ca3af", fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>{result.sourceText}</div>
               </div>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
-                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>CONFIDENCE SCORE</div>
-                <div style={{ color: "#4db8ff", fontWeight: 800, fontSize: 22 }}>{result.confidence}%</div>
+              <div style={{ background: "#051a0d", border: "1px solid #00ff9d33", borderLeft: "3px solid #00ff9d", borderRadius: 8, padding: 14 }}>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>ENGLISH TRANSLATION</div>
+                <div style={{ color: "#00ff9d", fontSize: 14, lineHeight: 1.7, fontWeight: 500 }}>{result.translation}</div>
               </div>
-            </div>
-            <div style={{ background: "#0d1626", borderRadius: 8, padding: 14 }}>
-              <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>ANALYSIS</div>
-              <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{result.analysis}</div>
-            </div>
-          </Card>
+            </Card>
+          )}
+
+          {/* Intel Analysis tab */}
+          {tab === "analysis" && (
+            <Card>
+              <ST icon="🔍" label="Intelligence Analysis" color="#ffd700" />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: 12, marginBottom: 14 }}>
+                <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>INTENT</div>
+                  <div style={{ color: "#ffd700", fontWeight: 700, fontSize: 13 }}>{result.intent}</div>
+                </div>
+                <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px" }}>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>THREAT LEVEL</div>
+                  <div style={{ color: THREAT_COLOR[result.threat_level] || "#9ca3af", fontWeight: 700, fontSize: 13 }}>
+                    {result.threat_level || "—"}
+                  </div>
+                </div>
+                <div style={{ background: "#0d1626", borderRadius: 6, padding: "10px 12px", display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                  <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>CONFIDENCE</div>
+                  <ConfidenceGauge value={result.confidence} />
+                </div>
+              </div>
+              <div style={{ background: "#0d1626", borderRadius: 8, padding: 14 }}>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>ANALYSIS</div>
+                <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{result.analysis}</div>
+              </div>
+            </Card>
+          )}
+
+          {/* Key Signals tab */}
+          {tab === "signals" && (
+            <Card>
+              <ST icon="📡" label="Key Intelligence Signals" color="#4db8ff" sub="Extracted entities and tactical indicators" />
+              {result.key_signals?.length ? (
+                <>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                    {Object.entries(TYPE_COLOR).map(([type, color]) => (
+                      <span key={type} style={{ background: color + "18", border: `1px solid ${color}44`, borderRadius: 4, padding: "2px 8px", color, fontSize: 10 }}>
+                        {type}
+                      </span>
+                    ))}
+                  </div>
+                  <KeySignalsPanel signals={result.key_signals} />
+                </>
+              ) : (
+                <div style={{ color: "#4a5568", fontSize: 13, padding: "20px 0", textAlign: "center" }}>No signals extracted.</div>
+              )}
+            </Card>
+          )}
         </>
       )}
     </div>

@@ -5,6 +5,15 @@ import { useApiKey } from "../context/ApiKeyContext";
 
 const ACTORS = ["APT nation-state", "Hacktivist group", "Insider threat", "Criminal syndicate", "Terrorist cell"];
 
+const TEMPLATES = [
+  { label: "⚡ Power Grid",      target: "National electrical grid and SCADA control systems",           context: "Legacy PLCs, air-gapped OT network, recent contractor access logs exposed",       actor: "APT nation-state"   },
+  { label: "🏦 Bank SWIFT",     target: "International bank SWIFT messaging infrastructure",             context: "Underpatch middleware, third-party fintech integration, 24/7 ops center",         actor: "Criminal syndicate" },
+  { label: "🛢️ Oil Pipeline",   target: "Cross-border oil and gas pipeline control network",             context: "Remote OT sites, satellite comms, decades-old control systems with no MFA",       actor: "APT nation-state"   },
+  { label: "🏥 Hospital",       target: "Major hospital network and patient data systems",               context: "Connected medical devices, limited IT staff, no EDR on clinical workstations",     actor: "Criminal syndicate" },
+  { label: "🛰️ Satellite Ops",  target: "Commercial satellite ground station and telemetry systems",     context: "Internet-facing web portal, supplier chain access, FTP legacy systems active",      actor: "APT nation-state"   },
+  { label: "🗳️ Election Infra", target: "National election management systems and voter registration DB", context: "On-prem SQL servers, contracted IT support, publicly known vendor software stack", actor: "Hacktivist group"   },
+];
+
 // F1 — MITRE ATT&CK 11 enterprise tactics
 const MITRE_TACTICS = [
   "Initial Access", "Execution", "Persistence", "Privilege Escalation",
@@ -167,6 +176,15 @@ function KillChainFlow({ phases }) {
   );
 }
 
+const MAX_HISTORY = 5;
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem("sentinel-redteam-history") || "[]"); } catch { return []; }
+}
+function saveHistory(h) {
+  try { localStorage.setItem("sentinel-redteam-history", JSON.stringify(h.slice(0, MAX_HISTORY))); } catch {}
+}
+
 export default function RedTeam() {
   const [apiKey] = useApiKey();
   const [target, setTarget] = useState("");
@@ -175,6 +193,8 @@ export default function RedTeam() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState(loadHistory);
+  const [showHistory, setShowHistory] = useState(false);
   const { stamp } = useLastAnalysis("redteam");
   function handleKey(e) { if (e.ctrlKey && e.key === "Enter") generate(); }
 
@@ -197,8 +217,12 @@ For mitre_tactics, list only the techniques actually used in the scenario (0-4 p
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
-      setResult(JSON.parse(data.content.map(b => b.text || "").join("").replace(/```json|```/g, "").trim()));
+      const parsed = JSON.parse(data.content.map(b => b.text || "").join("").replace(/```json|```/g, "").trim());
+      setResult(parsed);
       stamp();
+      const entry = { target, actor, risk: parsed.risk_level, title: parsed.scenario_title, ts: new Date().toISOString() };
+      const newHistory = [entry, ...loadHistory()].slice(0, MAX_HISTORY);
+      setHistory(newHistory); saveHistory(newHistory);
     } catch (e) { setError("Error: " + e.message); }
     setLoading(false);
   }
@@ -207,9 +231,28 @@ For mitre_tactics, list only the techniques actually used in the scenario (0-4 p
     <div>
       <PageHeader icon="🤖" title="Red Team Scenario Generator" sub="AI-generated threat scenarios and attack paths for defensive planning." accent="#ff4d4d" dataMode="ai" />
 
+      {/* Quick-fill templates */}
+      <Card style={{ marginBottom: 12 }}>
+        <ST icon="⚡" label="Quick Templates" color="#ff9d00" sub="Click to pre-fill target and context" style={{ marginBottom: 10 }} />
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {TEMPLATES.map((t, i) => (
+            <button key={i} onClick={() => { setTarget(t.target); setContext(t.context); setActor(t.actor); }}
+              style={{
+                background: "#0d1626", border: "1px solid #1f2d45", borderRadius: 6,
+                color: "#9ca3af", fontSize: 11, padding: "5px 11px", cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#141e30"; e.currentTarget.style.borderColor = "#ff4d4d55"; e.currentTarget.style.color = "#ff9d00"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#0d1626"; e.currentTarget.style.borderColor = "#1f2d45"; e.currentTarget.style.color = "#9ca3af"; }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </Card>
+
       <Card>
         <Input label="🎯 Target" value={target} onChange={setTarget} placeholder="e.g. Nuclear power plant, pipeline infrastructure" maxLength={150} onClear={() => setTarget("")} onKeyDown={handleKey} />
-        <Input label="📋 Context (optional)" value={context} onChange={setContext} placeholder="e.g. Legacy SCADA, recent layoffs, public-facing admin panel" rows={2} maxLength={500} onKeyDown={handleKey} hint="Ctrl+Enter per generare" />
+        <Input label="📋 Context (optional)" value={context} onChange={setContext} placeholder="e.g. Legacy SCADA, recent layoffs, public-facing admin panel" rows={2} maxLength={500} onKeyDown={handleKey} hint="Ctrl+Enter to generate" />
         <ST icon="👤" label="Threat Actor" color="#ff4d4d" />
         <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
           {ACTORS.map(a => (
@@ -217,11 +260,36 @@ For mitre_tactics, list only the techniques actually used in the scenario (0-4 p
           ))}
         </div>
         {error && <div style={{ color: "#ff4d4d", marginBottom: 10, fontSize: 13 }}>{error}</div>}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <Btn onClick={generate} disabled={loading}>{loading ? "⏳ Generating..." : "⚡ Generate Scenario"}</Btn>
           <LastAnalysisTag toolId="redteam" />
+          {history.length > 0 && (
+            <button onClick={() => setShowHistory(x => !x)}
+              style={{ background: showHistory ? "#0f1a2e" : "transparent", border: "1px solid #1f2d45", borderRadius: 5, color: "#6b7a8d", fontSize: 11, padding: "5px 10px", cursor: "pointer" }}>
+              🕐 History ({history.length})
+            </button>
+          )}
         </div>
       </Card>
+
+      {/* Scenario history */}
+      {showHistory && history.length > 0 && (
+        <Card style={{ marginBottom: 14 }}>
+          <ST icon="🕐" label="Recent Scenarios" color="#4a5568" sub="Last 5 generated scenarios" style={{ marginBottom: 10 }} />
+          {history.map((h, i) => {
+            const rc = h.risk === "CRITICAL" ? "#ff0000" : h.risk === "HIGH" ? "#ff4d4d" : h.risk === "MEDIUM" ? "#ffd700" : "#00ff9d";
+            return (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 10px", borderRadius: 5, borderLeft: `2px solid ${rc}`, marginBottom: 5, background: "#0d1626" }}>
+                <div>
+                  <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 600 }}>{h.title || h.target}</div>
+                  <div style={{ color: "#4a5568", fontSize: 10 }}>{h.actor} · {new Date(h.ts).toLocaleDateString()}</div>
+                </div>
+                <BADGE text={h.risk} color={h.risk === "CRITICAL" || h.risk === "HIGH" ? "red" : "yellow"} />
+              </div>
+            );
+          })}
+        </Card>
+      )}
 
       {result && (
         <>

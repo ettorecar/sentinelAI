@@ -3,12 +3,12 @@ import { BADGE, Card, Btn, ST, Input, PageHeader, LiveBadge, ExportBtn, LastAnal
 import { useApiKey } from "../context/ApiKeyContext";
 
 const DOMAINS = [
-  { id: "kinetic",  label: "Kinetic / Military",    icon: "💥" },
-  { id: "cyber",    label: "Cyber Threats",          icon: "🔐" },
-  { id: "maritime", label: "Maritime / Chokepoints", icon: "🌊" },
-  { id: "energy",   label: "Energy Infrastructure",  icon: "⚡" },
-  { id: "bio",      label: "Bio-Threat",              icon: "🦠" },
-  { id: "disinfo",  label: "Disinformation",          icon: "📰" },
+  { id: "kinetic",  label: "Kinetic / Military",    icon: "💥", color: "#ff4d4d" },
+  { id: "cyber",    label: "Cyber Threats",          icon: "🔐", color: "#4db8ff" },
+  { id: "maritime", label: "Maritime / Chokepoints", icon: "🌊", color: "#38bdf8" },
+  { id: "energy",   label: "Energy Infrastructure",  icon: "⚡", color: "#ff9d00" },
+  { id: "bio",      label: "Bio-Threat",              icon: "🦠", color: "#00ff9d" },
+  { id: "disinfo",  label: "Disinformation",          icon: "📰", color: "#b47fff" },
 ];
 
 const CLASSIFICATIONS = ["UNCLASSIFIED", "RESTRICTED", "CONFIDENTIAL"];
@@ -70,6 +70,91 @@ function SmallToggle({ active, onClick, color = "#b47fff", children }) {
 
 const severityColor = s => s === "CRITICAL" ? "#ff0000" : s === "HIGH" ? "#ff4d4d" : s === "MEDIUM" ? "#ffd700" : "#00ff9d";
 const priorityColor = p => p === "IMMEDIATE" ? "#ff4d4d" : p === "SHORT_TERM" ? "#ffd700" : "#4db8ff";
+
+const CLASS_STYLE = {
+  "TOP SECRET":     { bg: "#2d0000", text: "#ff4d4d", border: "#ff4d4d" },
+  "SECRET":         { bg: "#1a0a00", text: "#ff9d00", border: "#ff9d00" },
+  "CONFIDENTIAL":   { bg: "#001a0a", text: "#00ff9d", border: "#00ff9d" },
+  "RESTRICTED":     { bg: "#0a0a1a", text: "#4db8ff", border: "#4db8ff" },
+  "UNCLASSIFIED":   { bg: "#0a1220", text: "#6b7a8d", border: "#2d3f55" },
+};
+
+function ClassificationBanner({ level, date, title }) {
+  const s = CLASS_STYLE[level] || CLASS_STYLE["RESTRICTED"];
+  return (
+    <div style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 14 }}>
+      <div style={{ background: s.border, padding: "4px 0", textAlign: "center" }}>
+        <span style={{ color: s.bg, fontSize: 10, fontWeight: 900, letterSpacing: 3 }}>{level}</span>
+      </div>
+      <div style={{ padding: "16px 20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+          <div>
+            <div style={{ color: s.text, fontSize: 9, letterSpacing: 2, marginBottom: 4, fontFamily: "monospace" }}>
+              SENTINEL INTELLIGENCE REPORT · {date}
+            </div>
+            <div style={{ fontWeight: 900, fontSize: 18, color: "#e2e8f0" }}>{title}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ color: s.text, fontSize: 9, letterSpacing: 1, marginBottom: 4 }}>HANDLE VIA COMINT CHANNELS ONLY</div>
+            <div style={{ color: "#4a5568", fontSize: 9, fontFamily: "monospace" }}>REF: SNT-{Math.floor(Math.random() * 9000 + 1000)}-{level.slice(0, 3)}</div>
+          </div>
+        </div>
+      </div>
+      <div style={{ background: s.border, padding: "4px 0", textAlign: "center" }}>
+        <span style={{ color: s.bg, fontSize: 10, fontWeight: 900, letterSpacing: 3 }}>{level}</span>
+      </div>
+    </div>
+  );
+}
+
+function FindingsChart({ findings, selectedDomains }) {
+  const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+  const domainCounts = {};
+  DOMAINS.filter(d => selectedDomains.includes(d.id)).forEach(d => {
+    domainCounts[d.id] = { label: d.label, icon: d.icon, color: d.color };
+    SEV_ORDER.forEach(s => { domainCounts[d.id][s] = 0; });
+  });
+  (findings || []).forEach(f => {
+    const key = (f.domain || "").toLowerCase().split(/[\s/]/)[0];
+    const match = DOMAINS.find(d => d.label.toLowerCase().includes(key) || d.id === key);
+    if (match && domainCounts[match.id]) domainCounts[match.id][f.severity] = (domainCounts[match.id][f.severity] || 0) + 1;
+  });
+  const maxTotal = Math.max(...Object.values(domainCounts).map(d => SEV_ORDER.reduce((s, k) => s + (d[k] || 0), 0)), 1);
+  return (
+    <div>
+      <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 10 }}>FINDINGS DISTRIBUTION BY DOMAIN</div>
+      {Object.values(domainCounts).map(d => {
+        const total = SEV_ORDER.reduce((s, k) => s + (d[k] || 0), 0);
+        if (total === 0) return null;
+        return (
+          <div key={d.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
+            <div style={{ minWidth: 120, color: d.color, fontSize: 10, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+              <span>{d.icon}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.label.split(" ")[0]}</span>
+            </div>
+            <div style={{ flex: 1, display: "flex", gap: 1, height: 18, borderRadius: 4, overflow: "hidden" }}>
+              {SEV_ORDER.map(sev => d[sev] > 0 ? (
+                <div key={sev} title={`${sev}: ${d[sev]}`}
+                  style={{ width: `${(d[sev] / maxTotal) * 100}%`, minWidth: d[sev] > 0 ? 12 : 0, background: severityColor(sev), display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {d[sev] > 0 && <span style={{ color: "#000", fontSize: 8, fontWeight: 700 }}>{d[sev]}</span>}
+                </div>
+              ) : null)}
+            </div>
+            <span style={{ color: "#9ca3af", fontSize: 11, minWidth: 16, textAlign: "right" }}>{total}</span>
+          </div>
+        );
+      })}
+      <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+        {SEV_ORDER.map(s => (
+          <div key={s} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ width: 8, height: 8, background: severityColor(s), borderRadius: 2 }} />
+            <span style={{ color: "#4a5568", fontSize: 9 }}>{s}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // F4 — Tab button
 function TabBtn({ active, onClick, children }) {
@@ -298,51 +383,35 @@ Return ONLY a JSON object (no markdown, no backticks):
 
       {result && (
         <>
-          {/* F4 — Report header */}
-          <Card style={{ borderColor: "#b47fff55", borderLeft: "3px solid #b47fff" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-              <div>
-                <div style={{ color: "#4a5568", fontSize: 10, fontFamily: "monospace", letterSpacing: 2, marginBottom: 5 }}>
-                  SENTINEL INTELLIGENCE REPORT · {result.date}
-                </div>
-                <div style={{ fontWeight: 900, fontSize: 17, color: "#e2e8f0" }}>{result.title}</div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}>
-                <BADGE text={result.classification} color="red" />
-                <BADGE text={`Confidence: ${result.confidence_level}`} color={result.confidence_level === "HIGH" ? "green" : result.confidence_level === "MEDIUM" ? "yellow" : "red"} />
-                <LiveBadge />
-                <ExportBtn data={result} filename={`sentinel-intelreport-${result.date?.replace(/\s/g,"-") || "report"}`} />
-              </div>
-            </div>
+          {/* Classified document header */}
+          <ClassificationBanner level={result.classification || classification} date={result.date} title={result.title} />
 
-            {/* F4 — 3 KPI cards */}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-              <KpiCard
-                label="PEAK SEVERITY"
-                value={result.key_findings?.reduce((max, f) => {
-                  const order = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
-                  return (order[f.severity] || 0) > (order[max] || 0) ? f.severity : max;
-                }, "LOW")}
-                color={severityColor(result.key_findings?.reduce((max, f) => {
-                  const order = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
-                  return (order[f.severity] || 0) > (order[max] || 0) ? f.severity : max;
-                }, "LOW"))}
-                sub="highest finding"
-              />
-              <KpiCard
-                label="CONFIDENCE"
-                value={result.confidence_level}
-                color={result.confidence_level === "HIGH" ? "#00ff9d" : result.confidence_level === "MEDIUM" ? "#ffd700" : "#ff4d4d"}
-                sub="analyst assessment"
-              />
-              <KpiCard
-                label="TOTAL FINDINGS"
-                value={String(result.key_findings?.length ?? 0)}
-                color="#b47fff"
-                sub={`${selectedDomains.length} domain${selectedDomains.length !== 1 ? "s" : ""}`}
-              />
-            </div>
-          </Card>
+          {/* KPI strip */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+            {(() => {
+              const order = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+              const peak = (result.key_findings || []).reduce((max, f) => (order[f.severity] || 0) > (order[max] || 0) ? f.severity : max, "LOW");
+              return [
+                { label: "PEAK SEVERITY", value: peak, color: severityColor(peak), sub: "highest finding" },
+                { label: "CONFIDENCE", value: result.confidence_level, color: result.confidence_level === "HIGH" ? "#00ff9d" : result.confidence_level === "MEDIUM" ? "#ffd700" : "#ff4d4d", sub: "analyst assessment" },
+                { label: "TOTAL FINDINGS", value: String(result.key_findings?.length ?? 0), color: "#b47fff", sub: `${selectedDomains.length} domain${selectedDomains.length !== 1 ? "s" : ""}` },
+                { label: "ACTIONS REQUIRED", value: String((result.recommended_actions || []).filter(a => a.priority === "IMMEDIATE").length), color: "#ff4d4d", sub: "immediate priority" },
+              ].map(k => <KpiCard key={k.label} label={k.label} value={k.value} color={k.color} sub={k.sub} />);
+            })()}
+          </div>
+
+          {/* Findings distribution chart */}
+          {result.key_findings?.length > 0 && (
+            <Card style={{ marginBottom: 14 }}>
+              <FindingsChart findings={result.key_findings} selectedDomains={selectedDomains} />
+            </Card>
+          )}
+
+          {/* Export */}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginBottom: 14 }}>
+            <LiveBadge />
+            <ExportBtn data={result} filename={`sentinel-intelreport-${result.date?.replace(/\s/g, "-") || "report"}`} />
+          </div>
 
           {/* F4 — Tabbed output */}
           <Card style={{ paddingTop: 0 }}>
@@ -433,6 +502,17 @@ Return ONLY a JSON object (no markdown, no backticks):
             )}
           </Card>
 
+          {/* Bottom classification banner */}
+          {(() => {
+            const s = CLASS_STYLE[result.classification || classification] || CLASS_STYLE["RESTRICTED"];
+            return (
+              <div style={{ background: s.border, borderRadius: 6, padding: "6px 0", textAlign: "center", marginBottom: 14 }}>
+                <span style={{ color: s.bg, fontSize: 10, fontWeight: 900, letterSpacing: 3 }}>
+                  {result.classification || classification} — HANDLE VIA AUTHORISED CHANNELS ONLY
+                </span>
+              </div>
+            );
+          })()}
           <div style={{ display: "flex", gap: 10 }}>
             <Btn onClick={() => window.print()} color="#4db8ff" size="sm">🖨 Export / Print</Btn>
             <Btn onClick={() => { setResult(null); setActiveTab("summary"); }} color="#4a5568" size="sm">🔄 New Report</Btn>

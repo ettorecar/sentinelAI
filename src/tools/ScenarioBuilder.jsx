@@ -72,6 +72,84 @@ function domainInfo(id) {
   return DOMAINS.find(d => d.id === (id || "").toLowerCase()) || { label: id, icon: "•", color: "#9ca3af" };
 }
 
+function DomainCoverageBar({ events }) {
+  const counts = {};
+  (events || []).forEach(e => { counts[e.domain] = (counts[e.domain] || 0) + 1; });
+  const active = DOMAINS.filter(d => counts[d.id] > 0);
+  const max = Math.max(...Object.values(counts), 1);
+  if (!active.length) return null;
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      {DOMAINS.map(d => {
+        const n = counts[d.id] || 0;
+        const isActive = n > 0;
+        return (
+          <div key={d.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, opacity: isActive ? 1 : 0.3 }}>
+            <div style={{ width: 32, background: "#0d1626", borderRadius: "3px 3px 0 0", position: "relative", height: 36, display: "flex", alignItems: "flex-end" }}>
+              <div style={{ width: "100%", background: d.color, borderRadius: "3px 3px 0 0", height: isActive ? `${Math.max(20, (n / max) * 100)}%` : 2, transition: "height 0.4s" }} />
+            </div>
+            <span style={{ fontSize: 14 }}>{d.icon}</span>
+            {isActive && <span style={{ color: d.color, fontSize: 9, fontWeight: 700 }}>{n}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CascadeFlowGraph({ cascades }) {
+  if (!cascades?.length) return null;
+  // Build unique domain nodes and edges from cascade data
+  const nodeSet = new Set();
+  cascades.forEach(c => {
+    if (c.trigger_domain) nodeSet.add(c.trigger_domain.toLowerCase());
+    if (c.cascades_to) nodeSet.add(c.cascades_to.toLowerCase());
+  });
+  const nodeList = [...nodeSet].slice(0, 8);
+  const n = nodeList.length;
+  const cx = 220, cy = 150, r = 110;
+  const nodePos = nodeList.map((id, i) => ({
+    id,
+    x: cx + r * Math.cos((2 * Math.PI * i) / n - Math.PI / 2),
+    y: cy + r * Math.sin((2 * Math.PI * i) / n - Math.PI / 2),
+    info: domainInfo(id),
+  }));
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <svg viewBox="0 0 440 300" style={{ width: "100%", background: "#070e1c", borderRadius: 10, maxHeight: 260 }}>
+        {/* Edges */}
+        {cascades.map((c, i) => {
+          const from = nodePos.find(n => n.id === (c.trigger_domain || "").toLowerCase());
+          const to = nodePos.find(n => n.id === (c.cascades_to || "").toLowerCase());
+          if (!from || !to || from === to) return null;
+          const pc = c.probability === "HIGH" ? "#ff4d4d" : c.probability === "MEDIUM" ? "#ffd700" : "#4db8ff";
+          const mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2 - 18;
+          return (
+            <g key={i}>
+              <path d={`M ${from.x} ${from.y} Q ${mx} ${my} ${to.x} ${to.y}`} fill="none" stroke={pc + "77"} strokeWidth="2" />
+              <path d={`M ${to.x} ${to.y}`} fill={pc + "77"} />
+            </g>
+          );
+        })}
+        {/* Nodes */}
+        {nodePos.map((n, i) => (
+          <g key={i}>
+            <circle cx={n.x} cy={n.y} r={22} fill={`${n.info.color}18`} stroke={n.info.color} strokeWidth="1.5" />
+            <text x={n.x} y={n.y + 1} textAnchor="middle" dominantBaseline="middle" fontSize="14">{n.info.icon}</text>
+            <text x={n.x} y={n.y + 30} textAnchor="middle" fill={n.info.color} fontSize="7" fontWeight="bold">
+              {n.info.label.split(" ")[0].toUpperCase().slice(0, 8)}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div style={{ color: "#2d3f55", fontSize: 9, marginTop: 6 }}>
+        Arrow = cascade direction · color = probability (red=HIGH, yellow=MEDIUM, blue=LOW)
+      </div>
+    </div>
+  );
+}
+
 const TEMPLATES = [
   {
     label: "🚢 Hormuz Blockade",
@@ -665,13 +743,9 @@ Return ONLY this JSON structure:
                   })}
                 </div>
               </div>
-              <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {DOMAINS.filter(d => events.some(e => e.domain === d.id)).map(d => (
-                  <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: d.color }} />
-                    <span style={{ color: "#9ca3af", fontSize: 11 }}>{d.icon} {d.label}</span>
-                  </div>
-                ))}
+              <div style={{ marginTop: 12 }}>
+                <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>DOMAIN ACTIVATION</div>
+                <DomainCoverageBar events={events} />
               </div>
             </Card>
           )}
@@ -755,6 +829,14 @@ Return ONLY this JSON structure:
                   <div style={{ color: "#e2e8f0", fontSize: 14, lineHeight: 1.75 }}>{analysis.scenario_overview}</div>
                 </div>
               </Card>
+
+              {/* Cascade flow graph */}
+              {analysis.cascade_effects?.length > 0 && (
+                <Card>
+                  <ST icon="🕸️" label="Cascade Flow Graph" color={ACCENT} sub="Domain propagation network · arrow = cascade direction" style={{ marginBottom: 12 }} />
+                  <CascadeFlowGraph cascades={analysis.cascade_effects} />
+                </Card>
+              )}
 
               {/* Cascade effects */}
               <Card>

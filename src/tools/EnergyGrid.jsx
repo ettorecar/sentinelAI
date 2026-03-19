@@ -25,11 +25,100 @@ async function callClaude(apiKey, prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 800, messages: [{ role: "user", content: prompt }] }),
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1200, messages: [{ role: "user", content: prompt }] }),
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  return data.content.map(b => b.text || "").join("");
+  return JSON.parse(data.content.map(b => b.text || "").join("").replace(/```json|```/g, "").trim());
+}
+
+function tabStyle(active, color = "#ff9d00") {
+  return {
+    padding: "6px 14px", borderRadius: "5px 5px 0 0", fontSize: 12, fontWeight: active ? 700 : 500,
+    cursor: "pointer", border: "none", outline: "none", background: "transparent",
+    color: active ? color : "#4a5568",
+    borderBottom: active ? `2px solid ${color}` : "2px solid transparent",
+    transition: "color 0.15s, border-color 0.15s",
+  };
+}
+
+// Economic impact sector bars
+function EconomicImpactChart({ impact }) {
+  if (!impact) return null;
+  const sectors = impact.affected_sectors || [];
+  const sevColor = s => s === "CRITICAL" ? "#ff4d4d" : s === "HIGH" ? "#ffd700" : "#4db8ff";
+  return (
+    <div>
+      {impact.estimate_bn_eur !== undefined && (
+        <div style={{ display: "flex", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
+          <div style={{ background: "#0a1628", borderRadius: 7, padding: "10px 16px", flex: 1 }}>
+            <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 1, marginBottom: 4 }}>ESTIMATED ECONOMIC LOSS</div>
+            <div style={{ color: "#ff4d4d", fontSize: 24, fontWeight: 900 }}>€{impact.estimate_bn_eur}B</div>
+          </div>
+          {impact.affected_population_pct !== undefined && (
+            <div style={{ background: "#0a1628", borderRadius: 7, padding: "10px 16px", flex: 1 }}>
+              <div style={{ color: "#4a5568", fontSize: 9, letterSpacing: 1, marginBottom: 4 }}>POPULATION AFFECTED</div>
+              <div style={{ color: "#ffd700", fontSize: 24, fontWeight: 900 }}>{impact.affected_population_pct}%</div>
+            </div>
+          )}
+        </div>
+      )}
+      {sectors.length > 0 && (
+        <>
+          <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>SECTOR IMPACT BREAKDOWN</div>
+          {sectors.map((s, i) => {
+            const color = sevColor(s.severity);
+            return (
+              <div key={i} style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ color: "#e2e8f0", fontSize: 11 }}>{s.sector}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ color, fontSize: 10, fontWeight: 700 }}>{s.severity}</span>
+                    <span style={{ color, fontSize: 11, fontWeight: 700 }}>{s.impact_pct}%</span>
+                  </div>
+                </div>
+                <div style={{ background: "#1f2d45", borderRadius: 3, height: 7 }}>
+                  <div style={{ background: color, height: 7, borderRadius: 3, width: `${s.impact_pct}%`, transition: "width 0.8s" }} />
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+}
+
+// Recovery phase horizontal timeline
+function RecoveryPhaseTimeline({ phases }) {
+  if (!phases?.length) return null;
+  const PHASE_COLORS = ["#ff4d4d", "#ffd700", "#4db8ff", "#00ff9d"];
+  return (
+    <div>
+      <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 10 }}>RECOVERY PHASES</div>
+      {phases.map((phase, i) => {
+        const color = PHASE_COLORS[i % PHASE_COLORS.length];
+        const priorityColor = phase.priority === "CRITICAL" ? "#ff4d4d" : phase.priority === "HIGH" ? "#ffd700" : "#4db8ff";
+        return (
+          <div key={i} style={{
+            background: "#0d1626", borderRadius: 7, padding: "10px 12px", marginBottom: 8,
+            border: "1px solid #1f2d45", borderLeft: `3px solid ${color}`,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ color, fontSize: 12, fontWeight: 700 }}>{phase.phase}</span>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {phase.priority && <span style={{ color: priorityColor, fontSize: 9, fontWeight: 700 }}>{phase.priority}</span>}
+                <span style={{ color: "#ffd700", fontSize: 11 }}>{phase.duration}</span>
+              </div>
+            </div>
+            {phase.actions?.map((action, ai) => (
+              <div key={ai} style={{ color: "#9ca3af", fontSize: 11, marginBottom: 2 }}>• {action}</div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 const COUNTRIES = ["Germany", "France", "Italy", "Poland", "Ukraine", "UK"];
@@ -163,11 +252,12 @@ export default function EnergyGrid() {
     try { return localStorage.getItem("sentinel-energygrid-country") || "Germany"; } catch { return "Germany"; }
   });
   const [ran, setRan] = useState(false);
+  const [gridTab, setGridTab] = useState("topology");
   const [simScenario, setSimScenario] = useState(null);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
-  const [simStep, setSimStep] = useState(0); // 0=idle, 1=trigger, 2=cascade, 3=impact
+  const [simStep, setSimStep] = useState(0);
   const d = GRID_DATA[country];
 
   function runSimulation(scenario) {
@@ -186,13 +276,29 @@ export default function EnergyGrid() {
   async function analyzeCascade(scenario) {
     setAiResult(null); setAiError(""); setAiLoading(true);
     try {
-      const text = await callClaude(apiKey, `You are a critical infrastructure analyst. Analyze this grid cascade failure scenario in 3-4 sentences covering: cascading effect chain, economic and social impact, recovery challenges, and resilience recommendations. Country: ${country}. Scenario trigger: ${scenario.trigger}. Affected zones: ${scenario.affected.join(", ")}. Estimated blackout: ${scenario.blackout_pct}% of population. Recovery: ${scenario.recovery}.`);
-      setAiResult(text);
+      const result = await callClaude(apiKey,
+        `You are a critical infrastructure analyst. Analyze this grid cascade failure scenario. Return ONLY a JSON object (no markdown, no backticks).
+
+Country: ${country}. Trigger: ${scenario.trigger}. Affected: ${scenario.affected.join(", ")}. Blackout: ${scenario.blackout_pct}% of population. Recovery: ${scenario.recovery}.
+
+Return exactly:
+{"cascade_analysis":"3-4 sentence analysis of cascading effects, root causes, and propagation chain","economic_impact":{"estimate_bn_eur":number,"affected_population_pct":${scenario.blackout_pct},"affected_sectors":[{"sector":"string","severity":"CRITICAL|HIGH|MEDIUM","impact_pct":number}]},"recovery_phases":[{"phase":"string","duration":"string","priority":"CRITICAL|HIGH|MEDIUM","actions":["string"]}],"resilience_recommendations":["string"]}
+
+Include 3-4 affected sectors, 3-4 recovery phases in order, and 3-4 resilience recommendations.`
+      );
+      setAiResult(result); setGridTab("analysis");
     } catch (e) { setAiError("Error: " + e.message); }
     setAiLoading(false);
   }
 
   const mixColors = { renewables: "#00ff9d", fossil: "#ff9d00", nuclear: "#b47fff", import: "#4db8ff" };
+
+  const GRID_TABS = [
+    { id: "topology", label: "Grid Topology" },
+    { id: "mix", label: "Mix & Vulnerabilities" },
+    { id: "cascade", label: "Cascade Simulator" },
+    ...(aiResult ? [{ id: "analysis", label: "AI Analysis" }] : []),
+  ];
 
   return (
     <div>
@@ -203,12 +309,12 @@ export default function EnergyGrid() {
         <ST icon="🌍" label="Select Grid" color="#ff9d00" />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {COUNTRIES.map(c => (
-            <button key={c} onClick={() => { setCountry(c); setRan(false); setSimScenario(null); setSimStep(0); try { localStorage.setItem("sentinel-energygrid-country", c); } catch {} }}
+            <button key={c} onClick={() => { setCountry(c); setRan(false); setSimScenario(null); setSimStep(0); setAiResult(null); setGridTab("topology"); try { localStorage.setItem("sentinel-energygrid-country", c); } catch {} }}
               style={{ background: country === c ? "#ff9d00" : "#1f2d45", color: country === c ? "#0a0f1e" : "#9ca3af", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: country === c ? 700 : 400 }}>{c}</button>
           ))}
         </div>
         <div style={{ marginTop: 14 }}>
-          <Btn onClick={() => { setRan(true); setSimScenario(null); }} color="#ff9d00">⚡ Load Grid Model</Btn>
+          <Btn onClick={() => { setRan(true); setSimScenario(null); setGridTab("topology"); }} color="#ff9d00">⚡ Load Grid Model</Btn>
         </div>
       </Card>
 
@@ -229,10 +335,16 @@ export default function EnergyGrid() {
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 14, marginBottom: 14 }}>
-            {/* Grid topology */}
+          {/* Sub-tabs */}
+          <div style={{ display: "flex", borderBottom: "1px solid #1f2d45", marginBottom: 14, gap: 2, flexWrap: "wrap" }}>
+            {GRID_TABS.map(t => (
+              <button key={t.id} onClick={() => setGridTab(t.id)} style={tabStyle(gridTab === t.id)}>{t.label}</button>
+            ))}
+          </div>
+
+          {gridTab === "topology" && (
             <Card>
-              <ST icon="🔌" label="Grid Topology" color="#ff9d00" />
+              <ST icon="🔌" label="Grid Topology" color="#ff9d00" sub={`${d.nodes.length} nodes · ${d.links.length} connections`} />
               <svg viewBox="0 0 280 250" style={{ width: "100%", background: "#0d1626", borderRadius: 8 }}>
                 {d.links.map(([a, b], i) => (
                   <line key={i}
@@ -254,161 +366,189 @@ export default function EnergyGrid() {
                     </g>
                   );
                 })}
-                <text x={140} y={242} textAnchor="middle" fill="#9ca3af" fontSize="7">Node load % shown · Click scenario to simulate</text>
+                <text x={140} y={242} textAnchor="middle" fill="#9ca3af" fontSize="7">Node load % · Go to Cascade Simulator to run failure scenarios</text>
               </svg>
-            </Card>
-
-            {/* Energy mix */}
-            <Card>
-              <ST icon="🔋" label="Generation Mix" color="#ff9d00" />
-              <div style={{ marginBottom: 16 }}>
-                {[
-                  ["Renewables", d.renewables_pct, mixColors.renewables],
-                  ["Fossil Fuels", d.fossil_pct, mixColors.fossil],
-                  ["Nuclear", d.nuclear_pct, mixColors.nuclear],
-                  ["Net Import", d.import_pct, mixColors.import],
-                ].map(([l, v, c]) => (
-                  <div key={l} style={{ marginBottom: 10 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                      <span style={{ color: "#e2e8f0", fontSize: 12 }}>{l}</span>
-                      <span style={{ color: c, fontWeight: 700 }}>{v}%</span>
-                    </div>
-                    <div style={{ background: "#1f2d45", borderRadius: 4, height: 8 }}>
-                      <div style={{ background: c, height: 8, borderRadius: 4, width: `${v}%`, transition: "width 0.8s" }} />
-                    </div>
+              {/* Node legend */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+                {d.nodes.map(n => (
+                  <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: riskColor(n.risk) }} />
+                    <span style={{ color: "#9ca3af", fontSize: 9 }}>{n.name}</span>
+                    <span style={{ color: riskColor(n.risk), fontSize: 9, fontWeight: 700 }}>{n.load}%</span>
                   </div>
                 ))}
               </div>
-              <ST icon="⚠️" label="Vulnerabilities" color="#ff4d4d" />
-              {d.vulnerabilities.map((v, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0d1626", borderRadius: 6, padding: "7px 10px", marginBottom: 6, borderLeft: `3px solid ${riskColor(v.severity)}` }}>
-                  <div style={{ color: "#e2e8f0", fontSize: 12, flex: 1 }}>{v.name}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
-                    <span style={{ color: "#ffd700", fontSize: 11, fontWeight: 700 }}>{v.prob}%</span>
-                    <BADGE text={v.severity} color={riskBadgeColor(v.severity)} />
-                  </div>
-                </div>
-              ))}
             </Card>
-          </div>
+          )}
 
-          {/* Cascade simulator */}
-          <Card>
-            <ST icon="💥" label="Cascade Failure Simulator" color="#ff4d4d" />
-            <p style={{ color: "#9ca3af", fontSize: 13, marginTop: -6, marginBottom: 14 }}>
-              Select a scenario to simulate the cascading effect on the national grid.
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12, marginBottom: 16 }}>
-              {d.cascade_scenarios.map((s, i) => (
-                <ScenarioCard key={i} s={s} active={simScenario?.trigger === s.trigger} onClick={() => runSimulation(s)}>
-                  <div style={{ fontWeight: 700, color: "#ffd700", marginBottom: 6 }}>💥 {s.trigger}</div>
-                  <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>Affected: <span style={{ color: "#e2e8f0" }}>{s.affected.join(", ")}</span></div>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <div><span style={{ color: "#9ca3af", fontSize: 10 }}>BLACKOUT EST. </span><span style={{ color: "#ff4d4d", fontWeight: 700 }}>{s.blackout_pct}%</span></div>
-                    <div><span style={{ color: "#9ca3af", fontSize: 10 }}>RECOVERY </span><span style={{ color: "#ffd700" }}>{s.recovery}</span></div>
-                  </div>
-                </ScenarioCard>
-              ))}
-            </div>
-
-            {simScenario && (
-              <div style={{ background: "#1a0a00", border: "1px solid #ff4d4d55", borderRadius: 8, padding: 16 }}>
-                {/* Sim step progress bar */}
-                <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 16 }}>
-                  {[["⚡ Trigger", 1], ["🔗 Cascade", 2], ["📊 Impact", 3]].map(([label, step], i) => {
-                    const done = simStep >= step;
-                    const current = simStep === step;
-                    return (
-                      <div key={step} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : "none" }}>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                          <div style={{
-                            width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
-                            background: done ? "#ff4d4d" : "#1f2d45",
-                            color: done ? "#fff" : "#4a5568",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 12, fontWeight: 700,
-                            boxShadow: current ? "0 0 10px #ff4d4d44" : "none",
-                            border: current && simStep < 3 ? "2px solid #ff4d4d" : "2px solid transparent",
-                            transition: "all 0.3s",
-                          }}>{done ? "✓" : step}</div>
-                          <span style={{ color: done ? "#ff9d00" : "#4a5568", fontSize: 9, fontWeight: done ? 700 : 400, whiteSpace: "nowrap" }}>{label}</span>
-                        </div>
-                        {i < 2 && <div style={{ flex: 1, height: 2, background: simStep > step ? "#ff4d4d" : "#1f2d45", marginBottom: 16, transition: "background 0.4s" }} />}
+          {gridTab === "mix" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 14 }}>
+              <Card>
+                <ST icon="🔋" label="Generation Mix" color="#ff9d00" />
+                <div style={{ marginBottom: 16 }}>
+                  {[
+                    ["Renewables", d.renewables_pct, mixColors.renewables],
+                    ["Fossil Fuels", d.fossil_pct, mixColors.fossil],
+                    ["Nuclear", d.nuclear_pct, mixColors.nuclear],
+                    ["Net Import", d.import_pct, mixColors.import],
+                  ].map(([l, v, c]) => (
+                    <div key={l} style={{ marginBottom: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                        <span style={{ color: "#e2e8f0", fontSize: 12 }}>{l}</span>
+                        <span style={{ color: c, fontWeight: 700 }}>{v}%</span>
                       </div>
-                    );
-                  })}
+                      <div style={{ background: "#1f2d45", borderRadius: 4, height: 8 }}>
+                        <div style={{ background: c, height: 8, borderRadius: 4, width: `${v}%`, transition: "width 0.8s" }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                {/* Step 1: Trigger */}
-                {simStep >= 1 && (
-                  <div style={{ marginBottom: 12, animation: simStep === 1 ? "none" : "none" }}>
-                    <div style={{ color: "#ff4d4d", fontWeight: 800, fontSize: 14, marginBottom: 6 }}>🔴 {simStep < 3 ? "TRIGGER DETECTED" : "SIMULATION COMPLETE"} — {simScenario.trigger}</div>
-                    <div style={{ color: "#9ca3af", fontSize: 12 }}>Cascade propagation initiated in <span style={{ color: "#ff9d00", fontWeight: 700 }}>{country}</span> grid.</div>
-                  </div>
-                )}
-
-                {/* Step 2: Cascade zones going dark */}
-                {simStep >= 2 && (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ color: "#9ca3af", fontSize: 11, letterSpacing: 1, marginBottom: 6 }}>CASCADE ZONES AFFECTED:</div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {simScenario.affected.map((z, i) => (
-                        <BADGE key={i} text={`⚡ ${z}`} color="red" />
-                      ))}
+              </Card>
+              <Card>
+                <ST icon="⚠️" label="Grid Vulnerabilities" color="#ff4d4d" sub="Probability-weighted risk factors" />
+                {d.vulnerabilities.map((v, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0d1626", borderRadius: 6, padding: "7px 10px", marginBottom: 6, borderLeft: `3px solid ${riskColor(v.severity)}` }}>
+                    <div style={{ color: "#e2e8f0", fontSize: 12, flex: 1 }}>{v.name}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
+                      <span style={{ color: "#ffd700", fontSize: 11, fontWeight: 700 }}>{v.prob}%</span>
+                      <BADGE text={v.severity} color={riskBadgeColor(v.severity)} />
                     </div>
                   </div>
-                )}
+                ))}
+              </Card>
+            </div>
+          )}
 
-                {/* Step 3: Full impact */}
-                {simStep >= 3 && (
-                  <>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 120px), 1fr))", gap: 10, marginBottom: 14, marginTop: 14 }}>
-                      <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
-                        <div style={{ fontSize: 22, fontWeight: 800, color: "#ff4d4d" }}>{simScenario.blackout_pct}%</div>
-                        <div style={{ color: "#9ca3af", fontSize: 11 }}>Population Affected</div>
-                      </div>
-                      <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: "#ffd700" }}>{simScenario.recovery}</div>
-                        <div style={{ color: "#9ca3af", fontSize: 11 }}>Est. Recovery Time</div>
-                      </div>
-                      <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
-                        <div style={{ fontSize: 22, fontWeight: 800, color: "#ff9d00" }}>{100 - simScenario.blackout_pct}%</div>
-                        <div style={{ color: "#9ca3af", fontSize: 11 }}>Grid Stability</div>
-                      </div>
+          {gridTab === "cascade" && (
+            <Card>
+              <ST icon="💥" label="Cascade Failure Simulator" color="#ff4d4d" />
+              <p style={{ color: "#9ca3af", fontSize: 13, marginTop: -6, marginBottom: 14 }}>
+                Select a scenario to simulate the cascading effect on the national grid.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12, marginBottom: 16 }}>
+                {d.cascade_scenarios.map((s, i) => (
+                  <ScenarioCard key={i} s={s} active={simScenario?.trigger === s.trigger} onClick={() => runSimulation(s)}>
+                    <div style={{ fontWeight: 700, color: "#ffd700", marginBottom: 6 }}>💥 {s.trigger}</div>
+                    <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>Affected: <span style={{ color: "#e2e8f0" }}>{s.affected.join(", ")}</span></div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <div><span style={{ color: "#9ca3af", fontSize: 10 }}>BLACKOUT EST. </span><span style={{ color: "#ff4d4d", fontWeight: 700 }}>{s.blackout_pct}%</span></div>
+                      <div><span style={{ color: "#9ca3af", fontSize: 10 }}>RECOVERY </span><span style={{ color: "#ffd700" }}>{s.recovery}</span></div>
                     </div>
-                    {/* Stability bar */}
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ color: "#9ca3af", fontSize: 11 }}>GRID STABILITY INDEX</span>
-                        <span style={{ color: "#ff4d4d", fontSize: 11 }}>Disrupted: {simScenario.blackout_pct}%</span>
-                      </div>
-                      <div style={{ background: "#1f2d45", borderRadius: 6, height: 12, overflow: "hidden" }}>
-                        <div style={{ background: "linear-gradient(90deg, #ff4d4d, #ff9d00)", height: 12, borderRadius: 6, width: `${100 - simScenario.blackout_pct}%`, transition: "width 1.2s ease-out" }} />
-                      </div>
-                    </div>
-                    {/* AI analysis */}
-                    {apiKey && (
-                      <div style={{ marginBottom: 6 }}>
-                        <Btn onClick={() => analyzeCascade(simScenario)} disabled={aiLoading} color="#ff9d00" size="sm">
-                          {aiLoading ? "⏳ Analyzing cascade..." : "🤖 AI Cascade Analysis"}
-                        </Btn>
-                        {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
-                        {aiResult && (
-                          <div style={{ background: "#0a0c00", border: "1px solid #ff9d0033", borderLeft: "3px solid #ff9d00", borderRadius: 6, padding: 12, marginTop: 10 }}>
-                            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-                              <LiveBadge />
-                              <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI CASCADE ANALYSIS · {country}</span>
-                            </div>
-                            <div style={{ color: "#e2e8f0", fontSize: 12, lineHeight: 1.7 }}>{aiResult}</div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
+                  </ScenarioCard>
+                ))}
               </div>
-            )}
-          </Card>
+
+              {simScenario && (
+                <div style={{ background: "#1a0a00", border: "1px solid #ff4d4d55", borderRadius: 8, padding: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 16 }}>
+                    {[["⚡ Trigger", 1], ["🔗 Cascade", 2], ["📊 Impact", 3]].map(([label, step], i) => {
+                      const done = simStep >= step;
+                      const current = simStep === step;
+                      return (
+                        <div key={step} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : "none" }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                            <div style={{
+                              width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                              background: done ? "#ff4d4d" : "#1f2d45",
+                              color: done ? "#fff" : "#4a5568",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 12, fontWeight: 700,
+                              boxShadow: current ? "0 0 10px #ff4d4d44" : "none",
+                              border: current && simStep < 3 ? "2px solid #ff4d4d" : "2px solid transparent",
+                              transition: "all 0.3s",
+                            }}>{done ? "✓" : step}</div>
+                            <span style={{ color: done ? "#ff9d00" : "#4a5568", fontSize: 9, fontWeight: done ? 700 : 400, whiteSpace: "nowrap" }}>{label}</span>
+                          </div>
+                          {i < 2 && <div style={{ flex: 1, height: 2, background: simStep > step ? "#ff4d4d" : "#1f2d45", marginBottom: 16, transition: "background 0.4s" }} />}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {simStep >= 1 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ color: "#ff4d4d", fontWeight: 800, fontSize: 14, marginBottom: 6 }}>🔴 {simStep < 3 ? "TRIGGER DETECTED" : "SIMULATION COMPLETE"} — {simScenario.trigger}</div>
+                      <div style={{ color: "#9ca3af", fontSize: 12 }}>Cascade propagation initiated in <span style={{ color: "#ff9d00", fontWeight: 700 }}>{country}</span> grid.</div>
+                    </div>
+                  )}
+
+                  {simStep >= 2 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ color: "#9ca3af", fontSize: 11, letterSpacing: 1, marginBottom: 6 }}>CASCADE ZONES AFFECTED:</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {simScenario.affected.map((z, i) => (
+                          <BADGE key={i} text={`⚡ ${z}`} color="red" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {simStep >= 3 && (
+                    <>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 120px), 1fr))", gap: 10, marginBottom: 14, marginTop: 14 }}>
+                        <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
+                          <div style={{ fontSize: 22, fontWeight: 800, color: "#ff4d4d" }}>{simScenario.blackout_pct}%</div>
+                          <div style={{ color: "#9ca3af", fontSize: 11 }}>Population Affected</div>
+                        </div>
+                        <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: "#ffd700" }}>{simScenario.recovery}</div>
+                          <div style={{ color: "#9ca3af", fontSize: 11 }}>Est. Recovery Time</div>
+                        </div>
+                        <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, textAlign: "center" }}>
+                          <div style={{ fontSize: 22, fontWeight: 800, color: "#ff9d00" }}>{100 - simScenario.blackout_pct}%</div>
+                          <div style={{ color: "#9ca3af", fontSize: 11 }}>Grid Stability</div>
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                          <span style={{ color: "#9ca3af", fontSize: 11 }}>GRID STABILITY INDEX</span>
+                          <span style={{ color: "#ff4d4d", fontSize: 11 }}>Disrupted: {simScenario.blackout_pct}%</span>
+                        </div>
+                        <div style={{ background: "#1f2d45", borderRadius: 6, height: 12, overflow: "hidden" }}>
+                          <div style={{ background: "linear-gradient(90deg, #ff4d4d, #ff9d00)", height: 12, borderRadius: 6, width: `${100 - simScenario.blackout_pct}%`, transition: "width 1.2s ease-out" }} />
+                        </div>
+                      </div>
+                      {apiKey && (
+                        <div style={{ marginBottom: 6 }}>
+                          <Btn onClick={() => analyzeCascade(simScenario)} disabled={aiLoading} color="#ff9d00" size="sm">
+                            {aiLoading ? "⏳ Analyzing cascade..." : "🤖 AI Cascade Analysis"}
+                          </Btn>
+                          {aiError && <div style={{ color: "#ff4d4d", fontSize: 12, marginTop: 8 }}>{aiError}</div>}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {gridTab === "analysis" && aiResult && (
+            <>
+              <Card style={{ borderColor: "#ff9d0033", borderLeft: "3px solid #ff9d00" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                  <LiveBadge />
+                  <span style={{ color: "#4a5568", fontSize: 10, letterSpacing: 2 }}>AI CASCADE ANALYSIS · {country}</span>
+                </div>
+                <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.7, marginBottom: 14 }}>{aiResult.cascade_analysis}</div>
+                <EconomicImpactChart impact={aiResult.economic_impact} />
+              </Card>
+              {aiResult.recovery_phases?.length > 0 && (
+                <Card>
+                  <ST icon="🔄" label="Recovery Plan" color="#4db8ff" sub="Phase-by-phase restoration roadmap" style={{ marginBottom: 12 }} />
+                  <RecoveryPhaseTimeline phases={aiResult.recovery_phases} />
+                </Card>
+              )}
+              {aiResult.resilience_recommendations?.length > 0 && (
+                <Card>
+                  <ST icon="🛡️" label="Resilience Recommendations" color="#00ff9d" style={{ marginBottom: 10 }} />
+                  {aiResult.resilience_recommendations.map((r, i) => (
+                    <div key={i} style={{ color: "#e2e8f0", fontSize: 12, marginBottom: 6 }}>• {r}</div>
+                  ))}
+                </Card>
+              )}
+            </>
+          )}
         </>
       )}
     </div>

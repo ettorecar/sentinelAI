@@ -143,6 +143,87 @@ function ComparisonChart({ compareList }) {
   );
 }
 
+function tabStyle(active, color = "#ff9d00") {
+  return {
+    padding: "6px 14px", borderRadius: "5px 5px 0 0", fontSize: 12, fontWeight: active ? 700 : 500,
+    cursor: "pointer", border: "none", outline: "none", background: "transparent",
+    color: active ? color : "#4a5568",
+    borderBottom: active ? `2px solid ${color}` : "2px solid transparent",
+    transition: "color 0.15s, border-color 0.15s",
+  };
+}
+
+// 4-axis risk radar comparing selected country vs. peer average
+const RADAR_DIMS = [
+  { key: "import_dep",       label: "Import Dep.", invert: true  },
+  { key: "resilience_score", label: "Resilience",  invert: false },
+  { key: "storage_days",     label: "Storage",     invert: false },
+  { key: "alt_score",        label: "Alt Supply",  invert: false },
+];
+
+function RiskRadar({ country, allCountries }) {
+  const n = RADAR_DIMS.length;
+  const cx = 100, cy = 100, R = 72;
+  const angle = i => (i / n) * 2 * Math.PI - Math.PI / 2;
+  const pt = (ang, r) => [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
+
+  // Country values (normalize to 0-100, invert import_dep so lower = better = larger polygon)
+  const countryProf = profiles[country];
+  const peerAvg = {};
+  RADAR_DIMS.forEach(d => {
+    const vals = allCountries.map(c => profiles[c]?.[d.key] || 0);
+    peerAvg[d.key] = vals.reduce((s, v) => s + v, 0) / vals.length;
+  });
+
+  const toVal = (dim, prof) => {
+    let v = (prof[dim.key] || 0);
+    if (dim.key === "storage_days") v = Math.min(100, v);
+    if (dim.invert) v = 100 - v;
+    return v / 100;
+  };
+
+  const countryVals = RADAR_DIMS.map(d => toVal(d, countryProf));
+  const peerVals = RADAR_DIMS.map(d => toVal(d, peerAvg));
+
+  const countryPts = countryVals.map((v, i) => pt(angle(i), R * v).join(",")).join(" ");
+  const peerPts = peerVals.map((v, i) => pt(angle(i), R * v).join(",")).join(" ");
+
+  return (
+    <svg viewBox="0 0 200 200" style={{ width: "100%", maxWidth: 200, height: "auto" }}>
+      {[0.25, 0.5, 0.75, 1.0].map((ring, ri) => (
+        <polygon key={ri}
+          points={RADAR_DIMS.map((_, i) => pt(angle(i), R * ring).join(",")).join(" ")}
+          fill="none" stroke={ri === 3 ? "#1f2d45" : "#111d2e"}
+          strokeWidth={ri === 3 ? "1" : "0.6"} />
+      ))}
+      {[25, 50, 75].map(v => (
+        <text key={v} x={cx + 3} y={cy - (v / 100) * R + 3}
+          fill="#2d3f55" fontSize="6" textAnchor="start">{v}</text>
+      ))}
+      {RADAR_DIMS.map((_, i) => {
+        const [x, y] = pt(angle(i), R);
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#1f2d45" strokeWidth="0.8" />;
+      })}
+      {/* Peer average polygon */}
+      <polygon points={peerPts} fill="#4db8ff0a" stroke="#4db8ff" strokeWidth="1" strokeDasharray="3 2" />
+      {/* Country polygon */}
+      <polygon points={countryPts} fill="#ff9d0018" stroke="#ff9d00" strokeWidth="1.8" />
+      {countryVals.map((v, i) => {
+        const [x, y] = pt(angle(i), R * v);
+        return <circle key={i} cx={x} cy={y} r="3" fill="#ff9d00" />;
+      })}
+      {RADAR_DIMS.map((d, i) => {
+        const [x, y] = pt(angle(i), R + 15);
+        return (
+          <text key={i} x={x} y={y} textAnchor="middle" dominantBaseline="middle"
+            fill="#9ca3af" fontSize="7" fontWeight="600">{d.label}</text>
+        );
+      })}
+      <circle cx={cx} cy={cy} r="3" fill="#ff9d00" opacity="0.5" />
+    </svg>
+  );
+}
+
 function CountryBtn({ label, active, onClick }) {
   const [hovered, setHovered] = useState(false);
   return (
@@ -216,10 +297,10 @@ export default function EnergyRisk() {
   const [apiKey] = useApiKey();
   const [country, setCountry] = useState("Germany");
   const [ran, setRan] = useState(false);
+  const [riskTab, setRiskTab] = useState("profile");
   const [aiAssessment, setAiAssessment] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  // E4 — comparison mode state (max 3 countries)
   const [compareSet, setCompareSet] = useState(new Set());
   const [compareOpen, setCompareOpen] = useState(false);
 
@@ -235,16 +316,18 @@ export default function EnergyRisk() {
 
   async function analyze() {
     setRan(true);
+    setRiskTab("profile");
     setAiAssessment(null);
     setError("");
-    if (!apiKey) return; // show static data only without API key
+    if (!apiKey) return;
     setLoading(true);
     try {
       const prof = profiles[country];
       const prompt = `You are a senior energy security analyst. Provide a current intelligence assessment for ${country}'s energy supply chain risk. Context: import dependency ${prof.import_dep}%, vulnerability rated ${prof.vulnerability}, ${prof.storage_days} days strategic reserves, resilience score ${prof.resilience_score}/100, exposed to chokepoints: ${prof.chokepoint_exposure.join(", ")}. Top suppliers: ${prof.top_suppliers.map(s => `${s.name} ${s.pct}% (${s.risk} risk)`).join(", ")}. Return ONLY a JSON object (no markdown, no backticks):
 {"geopolitical_context":"string (2-3 sentences on current geopolitical situation affecting energy security)","immediate_threats":["string"],"long_term_risks":["string"],"recommended_actions":["string"],"trend":"IMPROVING|STABLE|DETERIORATING","analyst_note":"string (1-2 sentence expert opinion)"}
 Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
-      setAiAssessment(await callClaude(apiKey, prompt));
+      const assessment = await callClaude(apiKey, prompt);
+      setAiAssessment(assessment); setRiskTab("assessment");
     } catch (e) { setError("AI assessment error: " + e.message); }
     setLoading(false);
   }
@@ -264,11 +347,10 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
         </div>
         {error && <div style={{ color: "#ff4d4d", marginTop: 10, fontSize: 13 }}>{error}</div>}
         <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <Btn onClick={analyze} disabled={loading} color="#ff9d00">
+          <Btn onClick={() => { analyze(); }} disabled={loading} color="#ff9d00">
             {loading ? "⏳ Analyzing..." : "⚡ Analyze Risk Profile"}
           </Btn>
-          {/* E4 — compare toggle */}
-          <button onClick={() => setCompareOpen(x => !x)} style={{
+          <button onClick={() => { setCompareOpen(x => !x); if (!compareOpen && ran) setRiskTab("compare"); }} style={{
             background: compareOpen ? "#ff9d0022" : "transparent",
             border: `1px solid ${compareOpen ? "#ff9d00" : "#1f2d45"}`,
             borderRadius: 6, padding: "7px 14px", cursor: "pointer",
@@ -280,45 +362,16 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
         </div>
       </Card>
 
-      {/* E4 — compare country picker + chart */}
-      {compareOpen && (
-        <Card>
-          <ST icon="📊" label="Country Risk Comparison" color="#ff9d00"
-            sub="Select up to 3 countries to compare side by side" style={{ marginBottom: 10 }} />
-          <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
-            {countries.map(c => {
-              const inSet = compareSet.has(c);
-              const disabled = !inSet && compareSet.size >= 3;
-              return (
-                <button key={c} onClick={() => !disabled && toggleCompare(c)} style={{
-                  background: inSet ? `${COMPARE_COLORS[Array.from(compareSet).indexOf(c)]}22` : "transparent",
-                  border: `1px solid ${inSet ? COMPARE_COLORS[Array.from(compareSet).indexOf(c)] : "#1f2d45"}`,
-                  borderRadius: 6, padding: "5px 12px", cursor: disabled ? "not-allowed" : "pointer",
-                  color: inSet ? COMPARE_COLORS[Array.from(compareSet).indexOf(c)] : disabled ? "#2d3f55" : "#9ca3af",
-                  fontSize: 12, opacity: disabled ? 0.4 : 1, transition: "all 0.15s",
-                }}>
-                  {inSet ? "✓ " : ""}{c}
-                </button>
-              );
-            })}
-            {compareSet.size > 0 && (
-              <button onClick={() => setCompareSet(new Set())} style={{
-                background: "transparent", border: "1px solid #1f2d45", borderRadius: 6,
-                padding: "5px 10px", cursor: "pointer", color: "#4a5568", fontSize: 11,
-              }}>Clear</button>
-            )}
-          </div>
-          {compareSet.size >= 2
-            ? <ComparisonChart compareList={Array.from(compareSet)} />
-            : <div style={{ color: "#2d3f55", fontSize: 12, textAlign: "center", padding: "16px 0" }}>Select at least 2 countries to see comparison</div>
-          }
-        </Card>
-      )}
-
       {ran && p && (
         <>
+          {/* KPI strip */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))", gap: 10, marginBottom: 14 }}>
-            {[["Import Dependency", p.import_dep + "%", "#ff9d00"], ["Vulnerability", p.vulnerability, riskColor(p.vulnerability)], ["Storage Days", p.storage_days + "d", "#4db8ff"], ["Resilience Score", p.resilience_score + "/100", p.resilience_score > 65 ? "#00ff9d" : p.resilience_score > 45 ? "#ffd700" : "#ff4d4d"]].map(([l, v, c]) => (
+            {[
+              ["Import Dependency", p.import_dep + "%", "#ff9d00"],
+              ["Vulnerability", p.vulnerability, riskColor(p.vulnerability)],
+              ["Storage Days", p.storage_days + "d", "#4db8ff"],
+              ["Resilience Score", p.resilience_score + "/100", p.resilience_score > 65 ? "#00ff9d" : p.resilience_score > 45 ? "#ffd700" : "#ff4d4d"],
+            ].map(([l, v, c]) => (
               <Card key={l} style={{ textAlign: "center", padding: 12 }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: c }}>{v}</div>
                 <div style={{ color: "#9ca3af", fontSize: 11 }}>{l}</div>
@@ -326,7 +379,84 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 14 }}>
+          {/* Sub-tabs */}
+          {(() => {
+            const RISK_TABS = [
+              { id: "profile", label: "Risk Profile" },
+              { id: "suppliers", label: "Supplier Mix" },
+              { id: "scenarios", label: "Scenarios" },
+              ...(compareOpen ? [{ id: "compare", label: "Comparison" }] : []),
+              ...(aiAssessment ? [{ id: "assessment", label: "AI Assessment" }] : []),
+            ];
+            return (
+              <div style={{ display: "flex", borderBottom: "1px solid #1f2d45", marginBottom: 14, gap: 2, flexWrap: "wrap" }}>
+                {RISK_TABS.map(t => (
+                  <button key={t.id} onClick={() => setRiskTab(t.id)} style={tabStyle(riskTab === t.id)}>{t.label}</button>
+                ))}
+              </div>
+            );
+          })()}
+
+          {riskTab === "profile" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 14 }}>
+              {/* Risk radar */}
+              <Card>
+                <ST icon="🎯" label="Risk Profile Radar" color="#ff9d00"
+                  sub={`${country} vs. peer average (dashed)`} style={{ marginBottom: 10 }} />
+                <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+                  <div style={{ flexShrink: 0 }}>
+                    <RiskRadar country={country} allCountries={countries} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 140 }}>
+                    {RADAR_DIMS.map(d => (
+                      <div key={d.key} style={{ marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                          <span style={{ color: "#9ca3af", fontSize: 11 }}>{d.label}</span>
+                          <span style={{ color: "#ff9d00", fontSize: 11, fontWeight: 700 }}>{p[d.key]}{d.key === "storage_days" ? "d" : ""}</span>
+                        </div>
+                        <div style={{ background: "#1f2d45", borderRadius: 3, height: 5 }}>
+                          <div style={{ background: "#ff9d00", height: 5, borderRadius: 3, width: `${d.invert ? 100 - p[d.key] : Math.min(100, p[d.key])}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ color: "#9ca3af", fontSize: 10, marginBottom: 5 }}>CHOKEPOINT EXPOSURE</div>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {p.chokepoint_exposure.map((c, i) => <BADGE key={i} text={c} color="orange" />)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Resilience breakdown */}
+              <Card>
+                <ST icon="🛡️" label="Resilience Assessment" color="#00ff9d" />
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ color: "#9ca3af", fontSize: 12 }}>Overall Resilience Score</span>
+                    <span style={{ color: p.resilience_score > 65 ? "#00ff9d" : p.resilience_score > 45 ? "#ffd700" : "#ff4d4d", fontWeight: 800 }}>{p.resilience_score}/100</span>
+                  </div>
+                  <div style={{ background: "#1f2d45", borderRadius: 6, height: 14 }}>
+                    <div style={{ background: p.resilience_score > 65 ? "#00ff9d" : p.resilience_score > 45 ? "#ffd700" : "#ff4d4d", height: 14, borderRadius: 6, width: `${p.resilience_score}%`, transition: "width 1s" }} />
+                  </div>
+                </div>
+                {[["Alternative Supply Score", p.alt_score], ["Storage Coverage", Math.min(100, p.storage_days)], ["Diversification", 100 - p.top_suppliers[0].pct]].map(([l, v]) => (
+                  <div key={l} style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                      <span style={{ color: "#9ca3af", fontSize: 11 }}>{l}</span>
+                      <span style={{ color: "#e2e8f0", fontSize: 11 }}>{v}/100</span>
+                    </div>
+                    <div style={{ background: "#1f2d45", borderRadius: 3, height: 6 }}>
+                      <div style={{ background: "#4db8ff", height: 6, borderRadius: 3, width: `${v}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </Card>
+            </div>
+          )}
+
+          {riskTab === "suppliers" && (
             <Card>
               <ST icon="🥧" label="Supplier Mix" color="#ff9d00" />
               <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
@@ -346,98 +476,105 @@ Include 3-4 immediate threats, 3-4 long-term risks, 3-4 actions.`;
                   ))}
                 </div>
               </div>
-              {/* E4 — supply chain network SVG */}
               <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #1f2d45" }}>
                 <div style={{ color: "#4a5568", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>SUPPLY CHAIN DEPENDENCY NETWORK</div>
                 <SupplyNetworkSVG country={country} suppliers={p.top_suppliers} />
               </div>
             </Card>
+          )}
 
+          {riskTab === "scenarios" && (
             <Card>
-              <ST icon="🛡️" label="Resilience Assessment" color="#00ff9d" />
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ color: "#9ca3af", fontSize: 12 }}>Overall Resilience Score</span>
-                  <span style={{ color: p.resilience_score > 65 ? "#00ff9d" : p.resilience_score > 45 ? "#ffd700" : "#ff4d4d", fontWeight: 800 }}>{p.resilience_score}/100</span>
-                </div>
-                <div style={{ background: "#1f2d45", borderRadius: 6, height: 14 }}>
-                  <div style={{ background: p.resilience_score > 65 ? "#00ff9d" : p.resilience_score > 45 ? "#ffd700" : "#ff4d4d", height: 14, borderRadius: 6, width: `${p.resilience_score}%`, transition: "width 1s" }} />
-                </div>
-              </div>
-              {[["Alternative Supply Score", p.alt_score], ["Storage Coverage", Math.min(100, p.storage_days)], ["Diversification", 100 - p.top_suppliers[0].pct]].map(([l, v]) => (
-                <div key={l} style={{ marginBottom: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                    <span style={{ color: "#9ca3af", fontSize: 11 }}>{l}</span>
-                    <span style={{ color: "#e2e8f0", fontSize: 11 }}>{v}/100</span>
-                  </div>
-                  <div style={{ background: "#1f2d45", borderRadius: 3, height: 6 }}>
-                    <div style={{ background: "#4db8ff", height: 6, borderRadius: 3, width: `${v}%` }} />
-                  </div>
-                </div>
+              <ST icon="💥" label="Disruption Scenarios" color="#ff4d4d" sub="Modeled disruption scenarios with GDP impact" />
+              {p.scenarios.map((s, i) => (
+                <ScenarioRow key={i} s={s} />
               ))}
-              <div style={{ marginTop: 10 }}>
-                <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 5 }}>CHOKEPOINT EXPOSURE</div>
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  {p.chokepoint_exposure.map((c, i) => <BADGE key={i} text={c} color="orange" />)}
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          <Card>
-            <ST icon="💥" label="Disruption Scenarios" color="#ff4d4d" sub="Click to explore scenario details" />
-            {p.scenarios.map((s, i) => (
-              <ScenarioRow key={i} s={s} />
-            ))}
-          </Card>
-
-          {/* AI Intelligence Assessment — shown only when API key provided */}
-          {loading && (
-            <Card style={{ borderColor: "#ff9d00", textAlign: "center", color: "#9ca3af" }}>
-              ⏳ Generating AI intelligence assessment…
             </Card>
           )}
 
-          {aiAssessment && (
-            <Card style={{ borderColor: "#ff9d00" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <ST icon="🤖" label="AI Intelligence Assessment" color="#ff9d00" />
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: "#9ca3af", fontSize: 11 }}>TREND</span>
-                  <BADGE text={aiAssessment.trend} color={aiAssessment.trend === "IMPROVING" ? "green" : aiAssessment.trend === "DETERIORATING" ? "red" : "yellow"} />
-                </div>
+          {riskTab === "compare" && compareOpen && (
+            <Card>
+              <ST icon="📊" label="Country Risk Comparison" color="#ff9d00"
+                sub="Select up to 3 countries to compare side by side" style={{ marginBottom: 10 }} />
+              <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+                {countries.map(c => {
+                  const inSet = compareSet.has(c);
+                  const disabled = !inSet && compareSet.size >= 3;
+                  return (
+                    <button key={c} onClick={() => !disabled && toggleCompare(c)} style={{
+                      background: inSet ? `${COMPARE_COLORS[Array.from(compareSet).indexOf(c)]}22` : "transparent",
+                      border: `1px solid ${inSet ? COMPARE_COLORS[Array.from(compareSet).indexOf(c)] : "#1f2d45"}`,
+                      borderRadius: 6, padding: "5px 12px", cursor: disabled ? "not-allowed" : "pointer",
+                      color: inSet ? COMPARE_COLORS[Array.from(compareSet).indexOf(c)] : disabled ? "#2d3f55" : "#9ca3af",
+                      fontSize: 12, opacity: disabled ? 0.4 : 1, transition: "all 0.15s",
+                    }}>
+                      {inSet ? "✓ " : ""}{c}
+                    </button>
+                  );
+                })}
+                {compareSet.size > 0 && (
+                  <button onClick={() => setCompareSet(new Set())} style={{
+                    background: "transparent", border: "1px solid #1f2d45", borderRadius: 6,
+                    padding: "5px 10px", cursor: "pointer", color: "#4a5568", fontSize: 11,
+                  }}>Clear</button>
+                )}
               </div>
-              <div style={{ background: "#0d1626", borderRadius: 6, padding: 12, marginBottom: 12 }}>
-                <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>GEOPOLITICAL CONTEXT</div>
-                <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{aiAssessment.geopolitical_context}</div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={{ color: "#ff4d4d", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>⚡ Immediate Threats</div>
-                  {aiAssessment.immediate_threats?.map((t, i) => (
-                    <div key={i} style={{ color: "#e2e8f0", fontSize: 12, marginBottom: 5 }}>• {t}</div>
-                  ))}
-                </div>
-                <div>
-                  <div style={{ color: "#ffd700", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🔭 Long-term Risks</div>
-                  {aiAssessment.long_term_risks?.map((r, i) => (
-                    <div key={i} style={{ color: "#e2e8f0", fontSize: 12, marginBottom: 5 }}>• {r}</div>
-                  ))}
-                </div>
-              </div>
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ color: "#00ff9d", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🛡️ Recommended Actions</div>
-                {aiAssessment.recommended_actions?.map((a, i) => (
-                  <div key={i} style={{ color: "#e2e8f0", fontSize: 12, marginBottom: 5 }}>• {a}</div>
-                ))}
-              </div>
-              {aiAssessment.analyst_note && (
-                <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, borderLeft: `3px solid ${trendColor(aiAssessment.trend)}` }}>
-                  <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 3 }}>ANALYST NOTE</div>
-                  <div style={{ color: "#e2e8f0", fontSize: 13, fontStyle: "italic" }}>{aiAssessment.analyst_note}</div>
-                </div>
-              )}
+              {compareSet.size >= 2
+                ? <ComparisonChart compareList={Array.from(compareSet)} />
+                : <div style={{ color: "#2d3f55", fontSize: 12, textAlign: "center", padding: "16px 0" }}>Select at least 2 countries to see comparison</div>
+              }
             </Card>
+          )}
+
+          {riskTab === "assessment" && (
+            <>
+              {loading && (
+                <Card style={{ borderColor: "#ff9d00", textAlign: "center", color: "#9ca3af" }}>
+                  ⏳ Generating AI intelligence assessment…
+                </Card>
+              )}
+              {aiAssessment && (
+                <Card style={{ borderColor: "#ff9d00" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <ST icon="🤖" label="AI Intelligence Assessment" color="#ff9d00" />
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ color: "#9ca3af", fontSize: 11 }}>TREND</span>
+                      <BADGE text={aiAssessment.trend} color={aiAssessment.trend === "IMPROVING" ? "green" : aiAssessment.trend === "DETERIORATING" ? "red" : "yellow"} />
+                    </div>
+                  </div>
+                  <div style={{ background: "#0d1626", borderRadius: 6, padding: 12, marginBottom: 12 }}>
+                    <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>GEOPOLITICAL CONTEXT</div>
+                    <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6 }}>{aiAssessment.geopolitical_context}</div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12, marginBottom: 12 }}>
+                    <div>
+                      <div style={{ color: "#ff4d4d", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>⚡ Immediate Threats</div>
+                      {aiAssessment.immediate_threats?.map((t, i) => (
+                        <div key={i} style={{ color: "#e2e8f0", fontSize: 12, marginBottom: 5 }}>• {t}</div>
+                      ))}
+                    </div>
+                    <div>
+                      <div style={{ color: "#ffd700", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🔭 Long-term Risks</div>
+                      {aiAssessment.long_term_risks?.map((r, i) => (
+                        <div key={i} style={{ color: "#e2e8f0", fontSize: 12, marginBottom: 5 }}>• {r}</div>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ color: "#00ff9d", fontSize: 12, fontWeight: 700, marginBottom: 6 }}>🛡️ Recommended Actions</div>
+                    {aiAssessment.recommended_actions?.map((a, i) => (
+                      <div key={i} style={{ color: "#e2e8f0", fontSize: 12, marginBottom: 5 }}>• {a}</div>
+                    ))}
+                  </div>
+                  {aiAssessment.analyst_note && (
+                    <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, borderLeft: `3px solid ${trendColor(aiAssessment.trend)}` }}>
+                      <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 3 }}>ANALYST NOTE</div>
+                      <div style={{ color: "#e2e8f0", fontSize: 13, fontStyle: "italic" }}>{aiAssessment.analyst_note}</div>
+                    </div>
+                  )}
+                </Card>
+              )}
+            </>
           )}
         </>
       )}
