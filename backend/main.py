@@ -85,6 +85,7 @@ def status():
 # Free registration: https://www.barentswatch.no/
 BW_CLIENT_ID     = os.getenv("BW_CLIENT_ID", "")
 BW_CLIENT_SECRET = os.getenv("BW_CLIENT_SECRET", "")
+BW_SCOPE         = os.getenv("BW_SCOPE", "api")
 BW_TOKEN_URL     = "https://id.barentswatch.no/connect/token"
 BW_AIS_URL       = "https://live.ais.barentswatch.no/v1/latest/combined"
 
@@ -99,7 +100,7 @@ def _get_bw_token() -> str:
         "grant_type":    "client_credentials",
         "client_id":     BW_CLIENT_ID,
         "client_secret": BW_CLIENT_SECRET,
-        "scope":         "ais",
+        "scope":         BW_SCOPE,
     }, timeout=10)
     resp.raise_for_status()
     payload = resp.json()
