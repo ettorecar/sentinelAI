@@ -102,7 +102,10 @@ def _get_bw_token() -> str:
         "client_secret": BW_CLIENT_SECRET,
         "scope":         BW_SCOPE,
     }, timeout=10)
-    resp.raise_for_status()
+    if not resp.is_success:
+        raise RuntimeError(
+            f"BW token error {resp.status_code}: {resp.text}"
+        )
     payload = resp.json()
     _bw_token["access_token"] = payload["access_token"]
     _bw_token["expires_at"]   = time.time() + payload.get("expires_in", 3600)
