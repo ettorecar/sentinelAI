@@ -228,14 +228,15 @@ function VesselCard({ v, selected, onClick }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 // ── Data source badge ─────────────────────────────────────────────────────────
 const DS_CFG = {
-  live:         { bg: "#020e06", border: "#00ff9d33", dot: "#00ff9d", pulse: "sentinelPulse 2s ease-in-out infinite",   icon: "🛰️",  label: "LIVE FEED",   text: "AIS vessel data from backend service" },
+  live:         { bg: "#020e06", border: "#00ff9d33", dot: "#00ff9d", pulse: "sentinelPulse 2s ease-in-out infinite",   icon: "🛰️",  label: "LIVE FEED",   text: "Real AIS vessel data from BarentsWatch" },
+  live_empty:   { bg: "#050e08", border: "#00ff9d22", dot: "#00ff9d", pulse: "none",                                    icon: "🛰️",  label: "LIVE FEED",   text: "BarentsWatch connected — 0 vessels returned (filter)" },
   checking:     { bg: "#05080f", border: "#38bdf833", dot: "#38bdf8", pulse: "sentinelPulse 0.7s ease-in-out infinite", icon: "⏳",  label: "CONNECTING",  text: "Reaching backend AIS service…" },
-  demo:         { bg: "#06060e", border: "#a78bfa33", dot: "#a78bfa", pulse: "none",                                    icon: "🗄️",  label: "DEMO DATA",   text: "Backend connected — serving demo dataset" },
+  demo:         { bg: "#06060e", border: "#a78bfa33", dot: "#a78bfa", pulse: "none",                                    icon: "🗄️",  label: "DEMO DATA",   text: "Backend connected — serving demo dataset (no BarentsWatch key)" },
   mock:         { bg: "#0e0800", border: "#ff9d0033", dot: "#ff9d00", pulse: "none",                                    icon: "⚠️",  label: "MOCK DATA",   text: "Backend not reachable — showing static dataset" },
   unconfigured: { bg: "#06060e", border: "#2d3f5533", dot: "#3a4a5c", pulse: "none",                                    icon: "📦",  label: "LOCAL DATA",  text: "No backend configured — using built-in dataset" },
 };
 
-function DataSourceBadge({ source }) {
+function DataSourceBadge({ source, vesselCount }) {
   const c = DS_CFG[source] ?? DS_CFG.unconfigured;
   return (
     <div style={{
@@ -248,8 +249,13 @@ function DataSourceBadge({ source }) {
       <span style={{ color: c.dot, fontSize: 10, fontWeight: 700, fontFamily: "monospace", letterSpacing: 1 }}>{c.label}</span>
       <span style={{ color: "#2d3f55", fontSize: 10 }}>—</span>
       <span style={{ color: "#6b7a8d", fontSize: 10 }}>{c.text}</span>
-      {source === "live" && (
-        <span style={{ marginLeft: "auto", color: "#3a4a5c", fontSize: 9, fontFamily: "monospace" }}>
+      {(source === "live" || source === "live_empty") && (
+        <span style={{ marginLeft: "auto", color: "#3a4a5c", fontSize: 9, fontFamily: "monospace", display: "flex", gap: 10 }}>
+          {vesselCount != null && (
+            <span style={{ color: source === "live" ? "#00ff9d" : "#ff9d00" }}>
+              {vesselCount} VESSELS
+            </span>
+          )}
           BACKEND ACTIVE · {BE_URL.replace(/https?:\/\//, "")}
         </span>
       )}
@@ -278,6 +284,7 @@ export default function Maritime() {
   const [vessels, setVessels]       = useState(VESSELS);
   const [sigintFeed, setSigintFeed] = useState(SIGINT_FEED);
   const [dataSource, setDataSource] = useState(BE_URL ? "checking" : "unconfigured");
+  const [liveVesselCount, setLiveVesselCount] = useState(null);
   const vesselsRef = useRef(VESSELS);
 
   useEffect(() => {
@@ -286,13 +293,16 @@ export default function Maritime() {
     beFetch("/api/maritime/vessels", { signal: ctrl.signal })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(data => {
-        if (data.vessels?.length) {
-          setVessels(data.vessels);
-          vesselsRef.current = data.vessels;
-          setProgress(data.vessels.map((_, i) => i / data.vessels.length));
+        const isLive = data.source === "live";
+        const bvessels = data.vessels ?? [];
+        if (bvessels.length) {
+          setVessels(bvessels);
+          vesselsRef.current = bvessels;
+          setProgress(bvessels.map((_, i) => i / bvessels.length));
         }
         if (data.sigint?.length) setSigintFeed(data.sigint);
-        setDataSource(data.source === "live" ? "live" : "demo");
+        if (isLive) setLiveVesselCount(bvessels.length);
+        setDataSource(isLive ? (bvessels.length ? "live" : "live_empty") : "demo");
       })
       .catch(() => setDataSource("mock"));
     return () => ctrl.abort();
@@ -372,7 +382,7 @@ export default function Maritime() {
         classification="SECRET"
       />
 
-      <DataSourceBadge source={dataSource} />
+      <DataSourceBadge source={dataSource} vesselCount={liveVesselCount} />
 
       <StatBar stats={[
         { label: "Vessels Tracked", value: String(vessels.length),       color: "#38bdf8" },
