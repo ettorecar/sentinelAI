@@ -86,7 +86,7 @@ def status():
 BW_CLIENT_ID     = os.getenv("BW_CLIENT_ID", "")
 BW_CLIENT_SECRET = os.getenv("BW_CLIENT_SECRET", "")
 BW_TOKEN_URL     = "https://id.barentswatch.no/connect/token"
-BW_AIS_URL       = "https://www.barentswatch.no/bwapi/v2/combined"
+BW_AIS_URL       = "https://live.ais.barentswatch.no/v1/latest/combined"
 
 _bw_token: dict = {"access_token": None, "expires_at": 0.0}
 
