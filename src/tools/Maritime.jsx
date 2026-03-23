@@ -278,7 +278,14 @@ function DataSourceBadge({ source, vesselCount }) {
 function ProviderPanel({ activeSources, onToggle, activeKeys = [] }) {
   return (
     <div style={{ marginBottom: 10, padding: "10px 14px", background: "#05080f", border: "1px solid #1a2535", borderRadius: 6 }}>
-      <div style={{ fontSize: 9, color: "#4a5568", letterSpacing: 2, marginBottom: 8 }}>AIS DATA SOURCES</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 9, color: "#4a5568", letterSpacing: 2 }}>AIS DATA SOURCES</span>
+        <span style={{ fontSize: 9, color: "#2d3f55" }}>—</span>
+        <span style={{ fontSize: 9, color: "#3a4a5c" }}>
+          {activeSources.filter(k => PROVIDERS_UI.find(p => p.key === k && p.live)).length} active
+          {" · puoi attivarne più di uno"}
+        </span>
+      </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {PROVIDERS_UI.map(p => {
           const isSelected = activeSources.includes(p.key);
@@ -287,26 +294,37 @@ function ProviderPanel({ activeSources, onToggle, activeKeys = [] }) {
             <button
               key={p.key}
               onClick={() => p.live && onToggle(p.key)}
-              title={!p.live ? "Requires API key — not yet configured" : undefined}
+              title={!p.live ? "Requires API key — not yet configured" : isSelected ? "Click to deactivate" : "Click to activate"}
               style={{
-                background:  isSelected && p.live ? p.color + "18" : "#0a0f1a",
-                border:      `1px solid ${isSelected && p.live ? p.color + "55" : "#1a2535"}`,
-                borderRadius: 20,
-                padding:     "4px 10px",
-                color:       isSelected && p.live ? p.color : p.live ? "#3a4a5c" : "#1e2d3d",
-                fontSize:    10,
-                cursor:      p.live ? "pointer" : "not-allowed",
-                opacity:     p.live ? 1 : 0.4,
-                display:     "flex", alignItems: "center", gap: 5,
-                fontFamily:  "monospace",
-                transition:  "all 0.15s",
+                background:   isSelected && p.live ? p.color + "22" : "#0a0f1a",
+                border:       `1px solid ${isSelected && p.live ? p.color + "77" : "#1a2535"}`,
+                borderRadius: 6,
+                padding:      "5px 11px",
+                color:        isSelected && p.live ? p.color : p.live ? "#3a4a5c" : "#1e2d3d",
+                fontSize:     10,
+                cursor:       p.live ? "pointer" : "not-allowed",
+                opacity:      p.live ? 1 : 0.38,
+                display:      "flex", alignItems: "center", gap: 6,
+                fontFamily:   "monospace",
+                transition:   "all 0.15s",
+                userSelect:   "none",
               }}
             >
+              {/* ON/OFF checkbox */}
+              <span style={{
+                width: 12, height: 12, borderRadius: 3, flexShrink: 0,
+                border: `1px solid ${isSelected && p.live ? p.color : "#2d3f55"}`,
+                background: isSelected && p.live ? p.color + "33" : "transparent",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 8, color: p.color,
+              }}>
+                {isSelected && p.live ? "✓" : ""}
+              </span>
               <span>{p.icon}</span>
-              <span>{p.label}</span>
-              <span style={{ fontSize: 8, opacity: 0.45 }}>{p.region}</span>
+              <span style={{ fontWeight: isSelected && p.live ? 600 : 400 }}>{p.label}</span>
+              <span style={{ fontSize: 8, opacity: 0.4 }}>{p.region}</span>
               {!p.live && <span style={{ fontSize: 7, color: "#2d3f55", border: "1px solid #1a2535", borderRadius: 3, padding: "0 3px" }}>KEY</span>}
-              {hasData  && <span style={{ width: 5, height: 5, borderRadius: "50%", background: p.color, display: "inline-block", flexShrink: 0 }} />}
+              {hasData  && <span style={{ width: 5, height: 5, borderRadius: "50%", background: p.color, display: "inline-block", flexShrink: 0 }} title="returning data" />}
             </button>
           );
         })}
