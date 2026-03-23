@@ -170,6 +170,18 @@ const PORTS = [
   { id: "ODR", name: "Odesa / Pivdennyi",    country: "Ukraine",           status: "RESTRICTED",  traffic: "-61%", lat: 46.5, lon: 30.7, detail: "Ukrainian grain corridor under naval escort. Russian mining threat — 8 safe passage violations in 2025. Insurance surcharge +420% vs 2021." },
 ];
 
+// ── AIS provider catalogue ────────────────────────────────────────────────────
+const PROVIDERS_UI = [
+  { key: "barentsWatch",   label: "BarentsWatch",   icon: "🛰️",  color: "#00ff9d", region: "Global",     free: true,  live: true  },
+  { key: "noaa",           label: "NOAA Cadastre",  icon: "🇺🇸",  color: "#38bdf8", region: "USA Waters", free: true,  live: true  },
+  { key: "marineTraffic",  label: "MarineTraffic",  icon: "📡",  color: "#a78bfa", region: "Global",     free: false, live: false },
+  { key: "vesselFinder",   label: "VesselFinder",   icon: "🔭",  color: "#ffd700", region: "Global",     free: false, live: false },
+  { key: "myShipTracking", label: "MyShipTracking", icon: "📍",  color: "#ff9d00", region: "Global",     free: false, live: false },
+  { key: "fleetMon",       label: "FleetMon",       icon: "🌐",  color: "#4db8ff", region: "Global",     free: false, live: false },
+  { key: "spire",          label: "Spire Maritime", icon: "🛸",  color: "#c084fc", region: "SAT-AIS",    free: false, live: false },
+  { key: "exactEarth",     label: "exactEarth",     icon: "🌍",  color: "#fb923c", region: "SAT-AIS",    free: false, live: false },
+];
+
 // ── Style helpers ─────────────────────────────────────────────────────────────
 const riskColor   = r => r === "HIGH" ? "#ff4d4d" : r === "MEDIUM" ? "#ffd700" : "#00ff9d";
 const statusColor = s => s === "CLOSED" || s === "DANGER" ? "#ff4d4d" : s === "CAUTION" || s === "RESTRICTED" ? "#ff9d00" : "#00ff9d";
@@ -263,6 +275,46 @@ function DataSourceBadge({ source, vesselCount }) {
   );
 }
 
+function ProviderPanel({ activeSources, onToggle, activeKeys = [] }) {
+  return (
+    <div style={{ marginBottom: 10, padding: "10px 14px", background: "#05080f", border: "1px solid #1a2535", borderRadius: 6 }}>
+      <div style={{ fontSize: 9, color: "#4a5568", letterSpacing: 2, marginBottom: 8 }}>AIS DATA SOURCES</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {PROVIDERS_UI.map(p => {
+          const isSelected = activeSources.includes(p.key);
+          const hasData    = activeKeys.includes(p.key);
+          return (
+            <button
+              key={p.key}
+              onClick={() => p.live && onToggle(p.key)}
+              title={!p.live ? "Requires API key — not yet configured" : undefined}
+              style={{
+                background:  isSelected && p.live ? p.color + "18" : "#0a0f1a",
+                border:      `1px solid ${isSelected && p.live ? p.color + "55" : "#1a2535"}`,
+                borderRadius: 20,
+                padding:     "4px 10px",
+                color:       isSelected && p.live ? p.color : p.live ? "#3a4a5c" : "#1e2d3d",
+                fontSize:    10,
+                cursor:      p.live ? "pointer" : "not-allowed",
+                opacity:     p.live ? 1 : 0.4,
+                display:     "flex", alignItems: "center", gap: 5,
+                fontFamily:  "monospace",
+                transition:  "all 0.15s",
+              }}
+            >
+              <span>{p.icon}</span>
+              <span>{p.label}</span>
+              <span style={{ fontSize: 8, opacity: 0.45 }}>{p.region}</span>
+              {!p.live && <span style={{ fontSize: 7, color: "#2d3f55", border: "1px solid #1a2535", borderRadius: 3, padding: "0 3px" }}>KEY</span>}
+              {hasData  && <span style={{ width: 5, height: 5, borderRadius: "50%", background: p.color, display: "inline-block", flexShrink: 0 }} />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Maritime() {
   const [apiKey]  = useApiKey();
   const [sel, setSel]           = useState(null);
@@ -285,12 +337,20 @@ export default function Maritime() {
   const [sigintFeed, setSigintFeed] = useState(SIGINT_FEED);
   const [dataSource, setDataSource] = useState(BE_URL ? "checking" : "unconfigured");
   const [liveVesselCount, setLiveVesselCount] = useState(null);
+  const [activeSources, setActiveSources]     = useState(["barentsWatch", "noaa"]);
+  const [activeProviderKeys, setActiveProviderKeys] = useState([]);
   const vesselsRef = useRef(VESSELS);
+
+  function toggleSource(key) {
+    setActiveSources(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  }
 
   useEffect(() => {
     if (!BE_URL) return;
+    setDataSource("checking");
     const ctrl = new AbortController();
-    beFetch("/api/maritime/vessels", { signal: ctrl.signal })
+    const qs = activeSources.map(s => `sources=${encodeURIComponent(s)}`).join("&");
+    beFetch(`/api/maritime/vessels${qs ? "?" + qs : ""}`, { signal: ctrl.signal })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(data => {
         const isLive = data.source === "live";
@@ -301,12 +361,13 @@ export default function Maritime() {
           setProgress(bvessels.map((_, i) => i / bvessels.length));
         }
         if (data.sigint?.length) setSigintFeed(data.sigint);
+        if (data.providers?.length) setActiveProviderKeys(data.providers);
         if (isLive) setLiveVesselCount(bvessels.length);
         setDataSource(isLive ? (bvessels.length ? "live" : "live_empty") : "demo");
       })
       .catch(() => setDataSource("mock"));
     return () => ctrl.abort();
-  }, []);
+  }, [activeSources]);
 
   useEffect(() => {
     const SPEED = 0.000045;
@@ -383,6 +444,7 @@ export default function Maritime() {
       />
 
       <DataSourceBadge source={dataSource} vesselCount={liveVesselCount} />
+      <ProviderPanel activeSources={activeSources} onToggle={toggleSource} activeKeys={activeProviderKeys} />
 
       <StatBar stats={[
         { label: "Vessels Tracked", value: String(vessels.length),       color: "#38bdf8" },
