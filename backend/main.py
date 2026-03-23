@@ -1,7 +1,8 @@
 import time
 import os
 import httpx
-from fastapi import FastAPI, Depends, Header, HTTPException
+from fastapi import FastAPI, Depends, Header, HTTPException, Query
+from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Sentinel AI Backend", version="0.1.0")
@@ -75,7 +76,10 @@ def status():
         },
         "services": {
             "api": "online",
-            "maritime": "live" if (BW_CLIENT_ID and BW_CLIENT_SECRET) else "mock",
+            "maritime": {
+                p: ("configured" if cfg["enabled"]() else "not_configured")
+                for p, cfg in PROVIDERS.items()
+            },
         },
     }
 
@@ -166,6 +170,55 @@ def fetch_barentswatch() -> list[dict]:
     raw = resp.json()
     # Filter out vessels with no position and limit to 100
     return [_map_vessel(v) for v in raw if v.get("latitude") and v.get("longitude")][:100]
+
+
+# ── Provider registry ──────────────────────────────────────────────────────────
+# To add a new provider: add an entry with "label", "enabled" callable, "fetch" callable.
+# "fetch" must return list[dict] in the standard vessel schema.
+PROVIDERS: dict[str, dict] = {
+    "barentsWatch": {
+        "label":   "BarentsWatch AIS",
+        "enabled": lambda: bool(BW_CLIENT_ID and BW_CLIENT_SECRET),
+        "fetch":   fetch_barentswatch,
+    },
+    # "fleetMon": {
+    #     "label":   "FleetMon",
+    #     "enabled": lambda: bool(os.getenv("FLEETMON_API_KEY")),
+    #     "fetch":   fetch_fleetmon,
+    # },
+}
+
+DEFAULT_PROVIDERS = list(PROVIDERS.keys())
+
+
+def _fetch_providers(requested: list[str] | None) -> tuple[list[dict], list[str], list[dict]]:
+    """
+    Try each requested provider (or all defaults when None).
+    Returns (vessels, active_labels, errors).
+    """
+    to_try = requested if requested else DEFAULT_PROVIDERS
+    all_vessels: list[dict] = []
+    active: list[str] = []
+    errors: list[dict] = []
+
+    for name in to_try:
+        provider = PROVIDERS.get(name)
+        if not provider:
+            errors.append({"provider": name, "error": "Unknown provider"})
+            continue
+        if not provider["enabled"]():
+            errors.append({"provider": name, "error": "Not configured"})
+            continue
+        try:
+            vessels = provider["fetch"]()
+            for v in vessels:
+                v["provider"] = name
+            all_vessels.extend(vessels)
+            active.append(provider["label"])
+        except Exception as exc:
+            errors.append({"provider": name, "error": str(exc)})
+
+    return all_vessels, active, errors
 
 
 # ── Protected routes (/api/*) ─────────────────────────────────────────────────
@@ -295,41 +348,46 @@ _SIGINT = [
 
 
 @app.get("/api/maritime/vessels")
-def maritime_vessels(_: None = Depends(require_auth)):
-    key = "maritime_vessels"
-    cached = cache_get(key)
-    if cached:
-        return {**cached, "cache_hit": True, "cache_age_seconds": cache_age(key)}
+def maritime_vessels(
+    sources: Optional[list[str]] = Query(default=None),
+    _: None = Depends(require_auth),
+):
+    """
+    Return vessel list from one or more data providers.
 
-    if BW_CLIENT_ID and BW_CLIENT_SECRET:
-        try:
-            vessels = fetch_barentswatch()
-            data = {
-                "vessels": vessels,
-                "sigint":  _SIGINT,
-                "source":  "live",
-                "provider": "BarentsWatch AIS",
-                "fetched_at": time.time(),
-                "cache_hit": False,
-            }
-        except Exception as exc:
-            # Credentials set but fetch failed — return mock with error note
-            data = {
-                "vessels": _VESSELS,
-                "sigint":  _SIGINT,
-                "source":  "mock",
-                "error":   str(exc),
-                "fetched_at": time.time(),
-                "cache_hit": False,
-            }
+    - `sources` (optional, repeatable): provider keys to query, e.g.
+      `?sources=barentsWatch&sources=fleetMon`.
+      When omitted, all configured providers are tried.
+    - If no provider is reachable the response falls back to mock data.
+    """
+    cache_key = "vessels:" + (",".join(sorted(sources)) if sources else "default")
+    cached = cache_get(cache_key)
+    if cached:
+        return {**cached, "cache_hit": True, "cache_age_seconds": cache_age(cache_key)}
+
+    vessels, active_providers, errors = _fetch_providers(sources)
+
+    if vessels:
+        data: dict = {
+            "vessels":   vessels,
+            "sigint":    _SIGINT,
+            "source":    "live",
+            "providers": active_providers,
+            "fetched_at": time.time(),
+            "cache_hit": False,
+        }
     else:
         data = {
-            "vessels": _VESSELS,
-            "sigint":  _SIGINT,
-            "source":  "mock",
+            "vessels":   _VESSELS,
+            "sigint":    _SIGINT,
+            "source":    "mock",
+            "providers": [],
             "fetched_at": time.time(),
             "cache_hit": False,
         }
 
-    cache_set(key, data)
+    if errors:
+        data["errors"] = errors
+
+    cache_set(cache_key, data)
     return data
