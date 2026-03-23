@@ -270,8 +270,8 @@ def fetch_digitraffic() -> list[dict]:
 # Public ArcGIS REST service — no API key required.
 # Covers US coastal waters; data is near-historical (USCG receiver network).
 NOAA_AIS_URL = (
-    "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services"
-    "/AIS_Vessel_Tracks_2023/FeatureServer/0/query"
+    "https://coast.noaa.gov/arcgis/rest/services"
+    "/MarineCadastre/AISVesselTracks2023/MapServer/0/query"
 )
 
 
