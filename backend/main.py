@@ -1,7 +1,8 @@
 import time
 import os
 import httpx
-from fastapi import FastAPI, Depends, Header, HTTPException
+from fastapi import FastAPI, Depends, Header, HTTPException, Query
+from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Sentinel AI Backend", version="0.1.0")
@@ -75,7 +76,10 @@ def status():
         },
         "services": {
             "api": "online",
-            "maritime": "live" if (BW_CLIENT_ID and BW_CLIENT_SECRET) else "mock",
+            "maritime": {
+                p: ("configured" if cfg["enabled"]() else "not_configured")
+                for p, cfg in PROVIDERS.items()
+            },
         },
     }
 
@@ -166,6 +170,179 @@ def fetch_barentswatch() -> list[dict]:
     raw = resp.json()
     # Filter out vessels with no position and limit to 100
     return [_map_vessel(v) for v in raw if v.get("latitude") and v.get("longitude")][:100]
+
+
+# ── NOAA Marine Cadastre AIS integration ──────────────────────────────────────
+# Public ArcGIS REST service — no API key required.
+# Covers US coastal waters; data is near-historical (USCG receiver network).
+NOAA_AIS_URL = (
+    "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services"
+    "/AIS_Vessel_Tracks_2023/FeatureServer/0/query"
+)
+
+
+def _noaa_ship_type(code) -> str:
+    try:
+        c = int(code or 0)
+    except (ValueError, TypeError):
+        c = 0
+    if 70 <= c <= 79: return "Cargo"
+    if 80 <= c <= 89: return "Tanker"
+    if 60 <= c <= 69: return "Passenger"
+    if c == 30:       return "Fishing"
+    if c == 52:       return "Tug"
+    return "Other"
+
+
+def _noaa_nav_status(code) -> str:
+    try:
+        c = int(code or 15)
+    except (ValueError, TypeError):
+        c = 15
+    return {0: "UNDERWAY", 1: "ANCHORED", 5: "MOORED", 6: "AGROUND", 8: "UNDERWAY"}.get(c, "UNKNOWN")
+
+
+def _map_noaa_vessel(attrs: dict) -> dict:
+    lat = attrs.get("LAT") or 0.0
+    lon = attrs.get("LON") or 0.0
+    sog = attrs.get("SOG") or 0.0
+    cog = attrs.get("COG")
+    return {
+        "mmsi":      str(attrs.get("MMSI") or ""),
+        "name":      (attrs.get("VesselName") or "UNKNOWN").strip(),
+        "flag":      "🇺🇸",
+        "type":      _noaa_ship_type(attrs.get("VesselType")),
+        "darkFleet": False,
+        "anomaly":   "None detected",
+        "risk":      "LOW",
+        "speed":     f"{sog:.1f} kn",
+        "course":    f"{cog:.0f}°" if cog is not None else "N/A",
+        "draft":     f"{attrs.get('Draft', 0):.1f}m" if attrs.get("Draft") else "N/A",
+        "dwt":       "N/A",
+        "lastPort":  "N/A",
+        "nextPort":  "N/A",
+        "status":    _noaa_nav_status(attrs.get("Status")),
+        "zone":      None,
+        "track":     [[lat, lon]],
+        "sigint":    None,
+    }
+
+
+def fetch_noaa() -> list[dict]:
+    """Query NOAA Marine Cadastre AIS via ArcGIS REST (public, no API key).
+    Covers US coastal waters; updated periodically by USCG receiver network.
+    """
+    params = {
+        "where":             "SOG > 0 AND LAT IS NOT NULL AND LON IS NOT NULL",
+        "outFields":         "MMSI,VesselName,VesselType,SOG,COG,LAT,LON,Status,Draft,Length",
+        "returnGeometry":    "false",
+        "orderByFields":     "BaseDateTime DESC",
+        "resultRecordCount": 100,
+        "f":                 "json",
+    }
+    resp = httpx.get(NOAA_AIS_URL, params=params, timeout=20)
+    resp.raise_for_status()
+    data = resp.json()
+    if "error" in data:
+        raise RuntimeError(f"NOAA ArcGIS error: {data['error']}")
+    features = data.get("features") or []
+    return [
+        _map_noaa_vessel(f["attributes"])
+        for f in features
+        if f.get("attributes", {}).get("LAT") and f.get("attributes", {}).get("LON")
+    ][:100]
+
+
+# ── Provider registry ──────────────────────────────────────────────────────────
+# To add a new provider: add an entry with "label", "enabled" callable, "fetch" callable.
+# "fetch" must return list[dict] in the standard vessel schema.
+# "enabled" must return True only when the required credentials are available.
+
+def _stub(name: str):
+    """Placeholder fetch for providers not yet implemented."""
+    def _fn():
+        raise NotImplementedError(f"{name} provider is not yet implemented")
+    return _fn
+
+
+PROVIDERS: dict[str, dict] = {
+    # ── Live (no API key required) ─────────────────────────────────────────────
+    "barentsWatch": {
+        "label":   "BarentsWatch AIS",
+        "enabled": lambda: bool(BW_CLIENT_ID and BW_CLIENT_SECRET),
+        "fetch":   fetch_barentswatch,
+    },
+    "noaa": {
+        "label":   "NOAA Marine Cadastre",
+        "enabled": lambda: True,          # public ArcGIS endpoint, no credentials needed
+        "fetch":   fetch_noaa,
+    },
+    # ── Free tier (API key required — set matching env var to enable) ──────────
+    "marineTraffic": {
+        "label":   "MarineTraffic",
+        "enabled": lambda: bool(os.getenv("MARINE_TRAFFIC_API_KEY")),
+        "fetch":   _stub("MarineTraffic"),
+    },
+    "vesselFinder": {
+        "label":   "VesselFinder",
+        "enabled": lambda: bool(os.getenv("VESSEL_FINDER_API_KEY")),
+        "fetch":   _stub("VesselFinder"),
+    },
+    "myShipTracking": {
+        "label":   "MyShipTracking",
+        "enabled": lambda: bool(os.getenv("MY_SHIP_TRACKING_API_KEY")),
+        "fetch":   _stub("MyShipTracking"),
+    },
+    "fleetMon": {
+        "label":   "FleetMon",
+        "enabled": lambda: bool(os.getenv("FLEET_MON_API_KEY")),
+        "fetch":   _stub("FleetMon"),
+    },
+    # ── Commercial (API token required) ───────────────────────────────────────
+    "spire": {
+        "label":   "Spire Maritime",
+        "enabled": lambda: bool(os.getenv("SPIRE_API_TOKEN")),
+        "fetch":   _stub("Spire"),
+    },
+    "exactEarth": {
+        "label":   "exactEarth",
+        "enabled": lambda: bool(os.getenv("EXACT_EARTH_API_KEY")),
+        "fetch":   _stub("exactEarth"),
+    },
+}
+
+DEFAULT_PROVIDERS = list(PROVIDERS.keys())
+
+
+def _fetch_providers(requested: list[str] | None) -> tuple[list[dict], list[str], list[dict]]:
+    """
+    Try each requested provider (or all defaults when None).
+    Returns (vessels, active_keys, errors).
+    active_keys contains the provider key (not label) for each successful fetch.
+    """
+    to_try = requested if requested else DEFAULT_PROVIDERS
+    all_vessels: list[dict] = []
+    active: list[str] = []
+    errors: list[dict] = []
+
+    for name in to_try:
+        provider = PROVIDERS.get(name)
+        if not provider:
+            errors.append({"provider": name, "error": "Unknown provider"})
+            continue
+        if not provider["enabled"]():
+            errors.append({"provider": name, "error": "Not configured"})
+            continue
+        try:
+            vessels = provider["fetch"]()
+            for v in vessels:
+                v["provider"] = name
+            all_vessels.extend(vessels)
+            active.append(name)   # return key, not label
+        except Exception as exc:
+            errors.append({"provider": name, "error": str(exc)})
+
+    return all_vessels, active, errors
 
 
 # ── Protected routes (/api/*) ─────────────────────────────────────────────────
@@ -295,41 +472,46 @@ _SIGINT = [
 
 
 @app.get("/api/maritime/vessels")
-def maritime_vessels(_: None = Depends(require_auth)):
-    key = "maritime_vessels"
-    cached = cache_get(key)
-    if cached:
-        return {**cached, "cache_hit": True, "cache_age_seconds": cache_age(key)}
+def maritime_vessels(
+    sources: Optional[list[str]] = Query(default=None),
+    _: None = Depends(require_auth),
+):
+    """
+    Return vessel list from one or more data providers.
 
-    if BW_CLIENT_ID and BW_CLIENT_SECRET:
-        try:
-            vessels = fetch_barentswatch()
-            data = {
-                "vessels": vessels,
-                "sigint":  _SIGINT,
-                "source":  "live",
-                "provider": "BarentsWatch AIS",
-                "fetched_at": time.time(),
-                "cache_hit": False,
-            }
-        except Exception as exc:
-            # Credentials set but fetch failed — return mock with error note
-            data = {
-                "vessels": _VESSELS,
-                "sigint":  _SIGINT,
-                "source":  "mock",
-                "error":   str(exc),
-                "fetched_at": time.time(),
-                "cache_hit": False,
-            }
+    - `sources` (optional, repeatable): provider keys to query, e.g.
+      `?sources=barentsWatch&sources=fleetMon`.
+      When omitted, all configured providers are tried.
+    - If no provider is reachable the response falls back to mock data.
+    """
+    cache_key = "vessels:" + (",".join(sorted(sources)) if sources else "default")
+    cached = cache_get(cache_key)
+    if cached:
+        return {**cached, "cache_hit": True, "cache_age_seconds": cache_age(cache_key)}
+
+    vessels, active_providers, errors = _fetch_providers(sources)
+
+    if vessels:
+        data: dict = {
+            "vessels":   vessels,
+            "sigint":    _SIGINT,
+            "source":    "live",
+            "providers": active_providers,
+            "fetched_at": time.time(),
+            "cache_hit": False,
+        }
     else:
         data = {
-            "vessels": _VESSELS,
-            "sigint":  _SIGINT,
-            "source":  "mock",
+            "vessels":   _VESSELS,
+            "sigint":    _SIGINT,
+            "source":    "mock",
+            "providers": [],
             "fetched_at": time.time(),
             "cache_hit": False,
         }
 
-    cache_set(key, data)
+    if errors:
+        data["errors"] = errors
+
+    cache_set(cache_key, data)
     return data
