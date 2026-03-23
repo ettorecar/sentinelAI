@@ -172,6 +172,100 @@ def fetch_barentswatch() -> list[dict]:
     return [_map_vessel(v) for v in raw if v.get("latitude") and v.get("longitude")][:100]
 
 
+# ── Digitraffic (Finnish Transport and Communications Agency) AIS integration ─
+# Public REST API — no API key required.
+# Real-time AIS positions for vessels in Finnish waters (Baltic Sea).
+# Two endpoints joined by MMSI: /locations (positions) + /vessels (metadata).
+DIGITRAFFIC_LOCATIONS_URL = "https://meri.digitraffic.fi/api/ais/v1/locations"
+DIGITRAFFIC_VESSELS_URL   = "https://meri.digitraffic.fi/api/ais/v1/vessels"
+
+_DIGITRAFFIC_SHIP_TYPE = {
+    range(70, 80): "Cargo",
+    range(80, 90): "Tanker",
+    range(60, 70): "Passenger",
+    range(30, 31): "Fishing",
+    range(50, 60): "Other",
+}
+
+
+def _digitraffic_ship_type(code) -> str:
+    try:
+        c = int(code or 0)
+    except (ValueError, TypeError):
+        return "Other"
+    for r, label in _DIGITRAFFIC_SHIP_TYPE.items():
+        if c in r:
+            return label
+    return "Other"
+
+
+def _digitraffic_nav_status(nav_stat) -> str:
+    try:
+        c = int(nav_stat or 15)
+    except (ValueError, TypeError):
+        c = 15
+    return {0: "UNDERWAY", 1: "ANCHORED", 5: "MOORED", 6: "AGROUND", 8: "UNDERWAY"}.get(c, "UNKNOWN")
+
+
+def fetch_digitraffic() -> list[dict]:
+    """Fetch real-time AIS from Digitraffic (Finnish Transport Agency).
+    Joins /locations (positions) with /vessels (metadata) by MMSI.
+    Completely public — no API key required.
+    """
+    # Fetch both endpoints concurrently
+    with httpx.Client(timeout=20) as client:
+        loc_resp  = client.get(DIGITRAFFIC_LOCATIONS_URL)
+        meta_resp = client.get(DIGITRAFFIC_VESSELS_URL)
+    loc_resp.raise_for_status()
+    meta_resp.raise_for_status()
+
+    # Build metadata lookup: mmsi -> {name, shipType, draught, destination, ...}
+    meta_by_mmsi: dict[int, dict] = {}
+    for v in (meta_resp.json() or []):
+        m = v.get("mmsi")
+        if m:
+            meta_by_mmsi[int(m)] = v
+
+    # Parse location GeoJSON FeatureCollection
+    geo = loc_resp.json()
+    features = geo.get("features") or []
+
+    vessels = []
+    for feat in features[:100]:
+        mmsi = feat.get("mmsi")
+        if not mmsi:
+            continue
+        coords = (feat.get("geometry") or {}).get("coordinates")
+        if not coords or len(coords) < 2:
+            continue
+        lon, lat = coords[0], coords[1]
+        props = feat.get("properties") or {}
+        meta  = meta_by_mmsi.get(int(mmsi), {})
+
+        sog = props.get("sog") or 0.0
+        cog = props.get("cog")
+        vessels.append({
+            "mmsi":      str(mmsi),
+            "name":      (meta.get("name") or f"MMSI-{mmsi}").strip(),
+            "flag":      "🇫🇮",
+            "type":      _digitraffic_ship_type(meta.get("shipType")),
+            "darkFleet": False,
+            "anomaly":   "None detected",
+            "risk":      "LOW",
+            "speed":     f"{sog:.1f} kn",
+            "course":    f"{cog:.0f}°" if cog is not None else "N/A",
+            "draft":     f"{meta.get('draught', 0):.1f}m" if meta.get("draught") else "N/A",
+            "dwt":       "N/A",
+            "lastPort":  "N/A",
+            "nextPort":  (meta.get("destination") or "N/A").strip() or "N/A",
+            "status":    _digitraffic_nav_status(props.get("navStat")),
+            "zone":      None,
+            "track":     [[lat, lon]],
+            "sigint":    None,
+        })
+    return vessels
+
+
 # ── NOAA Marine Cadastre AIS integration ──────────────────────────────────────
 # Public ArcGIS REST service — no API key required.
 # Covers US coastal waters; data is near-historical (USCG receiver network).
@@ -276,6 +370,11 @@ PROVIDERS: dict[str, dict] = {
         "label":   "NOAA Marine Cadastre",
         "enabled": lambda: True,          # public ArcGIS endpoint, no credentials needed
         "fetch":   fetch_noaa,
+    },
+    "digitraffic": {
+        "label":   "Digitraffic (FIN)",
+        "enabled": lambda: True,          # public endpoint, no credentials needed
+        "fetch":   fetch_digitraffic,
     },
     # ── Free tier (API key required — set matching env var to enable) ──────────
     "marineTraffic": {
