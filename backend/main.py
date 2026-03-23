@@ -296,9 +296,7 @@ def _noaa_nav_status(code) -> str:
     return {0: "UNDERWAY", 1: "ANCHORED", 5: "MOORED", 6: "AGROUND", 8: "UNDERWAY"}.get(c, "UNKNOWN")
 
 
-def _map_noaa_vessel(attrs: dict) -> dict:
-    lat = attrs.get("LAT") or 0.0
-    lon = attrs.get("LON") or 0.0
+def _map_noaa_vessel(attrs: dict, lat: float, lon: float) -> dict:
     sog = attrs.get("SOG") or 0.0
     cog = attrs.get("COG")
     return {
@@ -325,12 +323,16 @@ def _map_noaa_vessel(attrs: dict) -> dict:
 def fetch_noaa() -> list[dict]:
     """Query NOAA Marine Cadastre AIS via ArcGIS REST (public, no API key).
     Covers US coastal waters; updated periodically by USCG receiver network.
+
+    Coordinates are extracted from the ArcGIS geometry object (returnGeometry=true)
+    rather than LAT/LON attribute fields, which may not exist in all track datasets.
+    Handles both Point {x, y} and Polyline {paths} geometry types.
     """
     params = {
-        "where":             "SOG > 0 AND LAT IS NOT NULL AND LON IS NOT NULL",
-        "outFields":         "MMSI,VesselName,VesselType,SOG,COG,LAT,LON,Status,Draft,Length",
-        "returnGeometry":    "false",
-        "orderByFields":     "BaseDateTime DESC",
+        "where":             "SOG > 0",   # removed LAT/LON field refs — coords come from geometry
+        "outFields":         "MMSI,VesselName,VesselType,SOG,COG,Status,Draft,Length",
+        "returnGeometry":    "true",
+        "outSR":             "4326",      # ensure WGS-84
         "resultRecordCount": 100,
         "f":                 "json",
     }
@@ -340,11 +342,26 @@ def fetch_noaa() -> list[dict]:
     if "error" in data:
         raise RuntimeError(f"NOAA ArcGIS error: {data['error']}")
     features = data.get("features") or []
-    return [
-        _map_noaa_vessel(f["attributes"])
-        for f in features
-        if f.get("attributes", {}).get("LAT") and f.get("attributes", {}).get("LON")
-    ][:100]
+    vessels = []
+    for f in features:
+        attrs = f.get("attributes") or {}
+        geom  = f.get("geometry")  or {}
+        # Point feature: geometry = {x: lon, y: lat}
+        if "x" in geom and "y" in geom:
+            lon, lat = float(geom["x"]), float(geom["y"])
+        # Polyline track: geometry = {paths: [[[lon, lat], ...], ...]}
+        # Use last point of last path as most-recent position in the track
+        elif geom.get("paths"):
+            last_pt = geom["paths"][-1][-1]
+            lon, lat = float(last_pt[0]), float(last_pt[1])
+        else:
+            # last resort: attribute-based LAT/LON (older datasets)
+            lat = float(attrs.get("LAT") or 0.0)
+            lon = float(attrs.get("LON") or 0.0)
+        if not lat or not lon:
+            continue
+        vessels.append(_map_noaa_vessel(attrs, lat, lon))
+    return vessels[:100]
 
 
 # ── Provider registry ──────────────────────────────────────────────────────────
