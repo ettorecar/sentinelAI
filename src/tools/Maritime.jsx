@@ -177,7 +177,7 @@ const PROVIDERS_UI = [
   { key: "aisstream",      label: "AISStream.io",   icon: "📶",  color: "#38bdf8", region: "Global",     free: true,  live: true  },
   { key: "digitraffic",    label: "Digitraffic",    icon: "🇫🇮",  color: "#60a5fa", region: "Baltic Sea", free: true,  live: true  },
   // ── Paid / API key required ──────────────────────────────────────────────────
-  { key: "marineTraffic",  label: "MarineTraffic",  icon: "📡",  color: "#a78bfa", region: "Global",     free: false, live: true  },
+  { key: "marineTraffic",  label: "MarineTraffic",  icon: "📡",  color: "#a78bfa", region: "Global",     free: false, live: false },
   { key: "vesselFinder",   label: "VesselFinder",   icon: "🔭",  color: "#ffd700", region: "Global",     free: false, live: false },
   { key: "myShipTracking", label: "MyShipTracking", icon: "📍",  color: "#ff9d00", region: "Global",     free: false, live: false },
   { key: "fleetMon",       label: "FleetMon",       icon: "🌊",  color: "#4db8ff", region: "Global",     free: false, live: false },
