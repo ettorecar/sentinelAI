@@ -369,6 +369,98 @@ def fetch_aisstream() -> list[dict]:
         loop.close()
 
 
+# ── MarineTraffic integration ─────────────────────────────────────────────────
+# Real-time vessel positions via MarineTraffic API v2 (PS07 — active vessels).
+# Paid plan required. Register at https://www.marinetraffic.com/en/ais-api-services
+# Set MARINE_TRAFFIC_API_KEY in Railway env vars to enable.
+MARINE_TRAFFIC_API_KEY = os.getenv("MARINE_TRAFFIC_API_KEY", "")
+_MT_BASE = "https://services.marinetraffic.com/api/exportvessel/v:8/{key}"
+
+
+def _mt_ship_type(type_id) -> str:
+    try:
+        c = int(type_id or 0)
+    except (ValueError, TypeError):
+        c = 0
+    if 70 <= c <= 79: return "Cargo"
+    if 80 <= c <= 89: return "Tanker"
+    if 60 <= c <= 69: return "Passenger"
+    if c == 30:       return "Fishing"
+    if c in (31, 32, 52): return "Tug"
+    return "Other"
+
+
+def _mt_nav_status(code) -> str:
+    try:
+        c = int(code or 15)
+    except (ValueError, TypeError):
+        c = 15
+    return {0: "UNDERWAY", 1: "ANCHORED", 5: "MOORED", 6: "AGROUND", 8: "UNDERWAY"}.get(c, "UNDERWAY")
+
+
+def _map_mt_vessel(v: dict) -> dict | None:
+    mmsi = str(v.get("MMSI") or "")
+    if not mmsi:
+        return None
+    try:
+        lat = float(v.get("LAT") or 0.0)
+        lon = float(v.get("LON") or 0.0)
+    except (ValueError, TypeError):
+        return None
+    if not lat or not lon:
+        return None
+    try:
+        sog = float(v.get("SPEED") or 0.0)
+    except (ValueError, TypeError):
+        sog = 0.0
+    cog = v.get("COURSE")
+    dwt = v.get("DWT")
+    draught = v.get("DRAUGHT")
+    return {
+        "mmsi":      mmsi,
+        "name":      (v.get("SHIP_NAME") or "UNKNOWN").strip(),
+        "flag":      "🌐",
+        "type":      _mt_ship_type(v.get("SHIPTYPE")),
+        "darkFleet": False,
+        "anomaly":   "None detected",
+        "risk":      "LOW",
+        "speed":     f"{sog:.1f} kn",
+        "course":    f"{int(float(cog))}°" if cog is not None else "N/A",
+        "draft":     f"{float(draught):.1f}m" if draught else "N/A",
+        "dwt":       f"{int(float(dwt)):,}t" if dwt else "N/A",
+        "lastPort":  v.get("LAST_PORT") or "N/A",
+        "nextPort":  v.get("NEXT_PORT_NAME") or v.get("DESTINATION") or "N/A",
+        "status":    _mt_nav_status(v.get("STATUS")),
+        "zone":      None,
+        "track":     [[lat, lon]],
+        "sigint":    None,
+    }
+
+
+def fetch_marinetraffic() -> list[dict]:
+    """Fetch vessel positions from MarineTraffic API v2 — PS07 active vessels.
+    Returns last-known positions for vessels active in the past 60 minutes.
+    Requires paid API plan. Register at https://www.marinetraffic.com/en/ais-api-services
+    Set MARINE_TRAFFIC_API_KEY in Railway env vars.
+    """
+    url = _MT_BASE.format(key=MARINE_TRAFFIC_API_KEY)
+    resp = httpx.get(url, params={
+        "msgtype":  "simple",
+        "protocol": "jsono",
+        "timespan": 60,
+    }, timeout=20)
+    resp.raise_for_status()
+    data = resp.json()
+    if isinstance(data, dict) and "errors" in data:
+        raise RuntimeError(f"MarineTraffic API error: {data['errors']}")
+    vessels = []
+    for v in (data if isinstance(data, list) else []):
+        mapped = _map_mt_vessel(v)
+        if mapped:
+            vessels.append(mapped)
+    return vessels[:100]
+
+
 # ── Provider registry ──────────────────────────────────────────────────────────
 # To add a new provider: add an entry with "label", "enabled" callable, "fetch" callable.
 # "fetch" must return list[dict] in the standard vessel schema.
@@ -401,8 +493,8 @@ PROVIDERS: dict[str, dict] = {
     # ── Free tier (API key required — set matching env var to enable) ──────────
     "marineTraffic": {
         "label":   "MarineTraffic",
-        "enabled": lambda: bool(os.getenv("MARINE_TRAFFIC_API_KEY")),
-        "fetch":   _stub("MarineTraffic"),
+        "enabled": lambda: bool(MARINE_TRAFFIC_API_KEY),
+        "fetch":   fetch_marinetraffic,
     },
     "vesselFinder": {
         "label":   "VesselFinder",
@@ -621,7 +713,19 @@ def maritime_vessels(
             "fetched_at": time.time(),
             "cache_hit": False,
         }
+    elif sources:
+        # Sources were explicitly requested but all failed — return empty, NOT mock.
+        # The frontend must show an empty live view, not fall back to demo vessels.
+        data = {
+            "vessels":   [],
+            "sigint":    [],
+            "source":    "live_empty",
+            "providers": [],
+            "fetched_at": time.time(),
+            "cache_hit": False,
+        }
     else:
+        # No sources specified at all → demo/mock mode
         data = {
             "vessels":   _VESSELS,
             "sigint":    _SIGINT,
