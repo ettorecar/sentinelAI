@@ -369,15 +369,25 @@ def fetch_aisstream() -> list[dict]:
         loop.close()
 
 
-# ── MarineTraffic integration ─────────────────────────────────────────────────
-# Real-time vessel positions via MarineTraffic API v2 (PS07 — active vessels).
-# Paid plan required. Register at https://www.marinetraffic.com/en/ais-api-services
-# Set MARINE_TRAFFIC_API_KEY in Railway env vars to enable.
-MARINE_TRAFFIC_API_KEY = os.getenv("MARINE_TRAFFIC_API_KEY", "")
-_MT_BASE = "https://services.marinetraffic.com/api/exportvessel/v:8/{key}"
+# ── VesselFinder integration ──────────────────────────────────────────────────
+# Real-time vessel positions via geographic area query (livedata endpoint).
+# Free tier: 100 req/day. Register at https://www.vesselfinder.com/api
+# Set VESSEL_FINDER_API_KEY in Railway env vars to enable.
+# Optionally set VESSEL_FINDER_BBOX="latmin,latmax,lonmin,lonmax" (default: global).
+VESSEL_FINDER_API_KEY = os.getenv("VESSEL_FINDER_API_KEY", "")
+_VF_LIVEDATA_URL      = "https://api.vesselfinder.com/livedata"
+_VF_BBOX_DEFAULT      = "-90,90,-180,180"   # global; narrow down to save credits
 
 
-def _mt_ship_type(type_id) -> str:
+def _vf_nav_status(code) -> str:
+    try:
+        c = int(code or 15)
+    except (ValueError, TypeError):
+        c = 15
+    return {0: "UNDERWAY", 1: "ANCHORED", 5: "MOORED", 6: "AGROUND", 8: "UNDERWAY"}.get(c, "UNDERWAY")
+
+
+def _vf_ship_type(type_id) -> str:
     try:
         c = int(type_id or 0)
     except (ValueError, TypeError):
@@ -390,72 +400,170 @@ def _mt_ship_type(type_id) -> str:
     return "Other"
 
 
-def _mt_nav_status(code) -> str:
-    try:
-        c = int(code or 15)
-    except (ValueError, TypeError):
-        c = 15
-    return {0: "UNDERWAY", 1: "ANCHORED", 5: "MOORED", 6: "AGROUND", 8: "UNDERWAY"}.get(c, "UNDERWAY")
-
-
-def _map_mt_vessel(v: dict) -> dict | None:
-    mmsi = str(v.get("MMSI") or "")
+def _map_vf_vessel(entry: dict) -> dict | None:
+    ais  = entry.get("AIS", {})
+    mast = entry.get("MASTERDATA", {})
+    voy  = entry.get("VOYAGE", {})
+    mmsi = str(ais.get("MMSI") or "")
     if not mmsi:
         return None
     try:
-        lat = float(v.get("LAT") or 0.0)
-        lon = float(v.get("LON") or 0.0)
+        lat = float(ais.get("LATITUDE") or 0.0)
+        lon = float(ais.get("LONGITUDE") or 0.0)
     except (ValueError, TypeError):
         return None
     if not lat or not lon:
         return None
+    sog     = ais.get("SPEED")
+    cog     = ais.get("COURSE")
+    draught = ais.get("DRAUGHT")
+    dwt     = mast.get("DWT")
     try:
-        sog = float(v.get("SPEED") or 0.0)
+        sog_f = float(sog or 0.0)
     except (ValueError, TypeError):
-        sog = 0.0
-    cog = v.get("COURSE")
-    dwt = v.get("DWT")
-    draught = v.get("DRAUGHT")
+        sog_f = 0.0
     return {
         "mmsi":      mmsi,
-        "name":      (v.get("SHIP_NAME") or "UNKNOWN").strip(),
+        "name":      (ais.get("NAME") or "UNKNOWN").strip(),
         "flag":      "🌐",
-        "type":      _mt_ship_type(v.get("SHIPTYPE")),
+        "type":      _vf_ship_type(ais.get("TYPE")),
         "darkFleet": False,
         "anomaly":   "None detected",
         "risk":      "LOW",
-        "speed":     f"{sog:.1f} kn",
+        "speed":     f"{sog_f:.1f} kn",
         "course":    f"{int(float(cog))}°" if cog is not None else "N/A",
         "draft":     f"{float(draught):.1f}m" if draught else "N/A",
         "dwt":       f"{int(float(dwt)):,}t" if dwt else "N/A",
-        "lastPort":  v.get("LAST_PORT") or "N/A",
-        "nextPort":  v.get("NEXT_PORT_NAME") or v.get("DESTINATION") or "N/A",
-        "status":    _mt_nav_status(v.get("STATUS")),
+        "lastPort":  voy.get("LASTPORT") or "N/A",
+        "nextPort":  ais.get("DESTINATION") or "N/A",
+        "status":    _vf_nav_status(ais.get("NAVSTAT")),
         "zone":      None,
         "track":     [[lat, lon]],
         "sigint":    None,
     }
 
 
-def fetch_marinetraffic() -> list[dict]:
-    """Fetch vessel positions from MarineTraffic API v2 — PS07 active vessels.
-    Returns last-known positions for vessels active in the past 60 minutes.
-    Requires paid API plan. Register at https://www.marinetraffic.com/en/ais-api-services
-    Set MARINE_TRAFFIC_API_KEY in Railway env vars.
+def fetch_vesselfinder() -> list[dict]:
+    """Fetch vessel positions from VesselFinder livedata (area query).
+    Default bounding box: global. Set VESSEL_FINDER_BBOX env var to narrow down
+    and save free-tier credits (e.g. '30,47,-5,42' for Mediterranean).
+    Register free at https://www.vesselfinder.com/api — set VESSEL_FINDER_API_KEY.
     """
-    url = _MT_BASE.format(key=MARINE_TRAFFIC_API_KEY)
-    resp = httpx.get(url, params={
-        "msgtype":  "simple",
-        "protocol": "jsono",
-        "timespan": 60,
+    bbox = os.getenv("VESSEL_FINDER_BBOX", _VF_BBOX_DEFAULT)
+    try:
+        latmin, latmax, lonmin, lonmax = [float(x) for x in bbox.split(",")]
+    except Exception:
+        latmin, latmax, lonmin, lonmax = -90, 90, -180, 180
+    resp = httpx.get(_VF_LIVEDATA_URL, params={
+        "userkey": VESSEL_FINDER_API_KEY,
+        "latmin":  latmin,
+        "latmax":  latmax,
+        "lonmin":  lonmin,
+        "lonmax":  lonmax,
     }, timeout=20)
     resp.raise_for_status()
     data = resp.json()
-    if isinstance(data, dict) and "errors" in data:
-        raise RuntimeError(f"MarineTraffic API error: {data['errors']}")
+    if isinstance(data, dict) and ("errors" in data or "error" in data):
+        raise RuntimeError(f"VesselFinder error: {data.get('errors') or data.get('error')}")
     vessels = []
-    for v in (data if isinstance(data, list) else []):
-        mapped = _map_mt_vessel(v)
+    for entry in (data if isinstance(data, list) else []):
+        mapped = _map_vf_vessel(entry)
+        if mapped:
+            vessels.append(mapped)
+    return vessels[:100]
+
+
+# ── Datalastic integration ────────────────────────────────────────────────────
+# Vessel lookup by MMSI via bulk endpoint — up to 100 MMSIs per request.
+# Note: Datalastic has no area/broadcast endpoint; it requires known MMSIs.
+# Provide a comma-separated list via DATALASTIC_MMSI_LIST env var.
+# Free tier available. Register at https://datalastic.com
+# Set DATALASTIC_API_KEY and DATALASTIC_MMSI_LIST in Railway env vars.
+DATALASTIC_API_KEY  = os.getenv("DATALASTIC_API_KEY", "")
+_DL_BULK_URL        = "https://api.datalastic.com/api/v0/vessel_bulk"
+_DL_MMSI_DEFAULT    = ""   # comma-separated MMSIs — must be set via env var
+
+
+def _dl_ship_type(type_str: str) -> str:
+    t = (type_str or "").lower()
+    if "cargo" in t or "container" in t or "bulk" in t: return "Cargo"
+    if "tanker" in t:    return "Tanker"
+    if "passenger" in t: return "Passenger"
+    if "fishing" in t:   return "Fishing"
+    if "tug" in t:       return "Tug"
+    return "Other"
+
+
+def _dl_nav_status(status_str: str) -> str:
+    s = (status_str or "").lower()
+    if "anchor" in s:  return "ANCHORED"
+    if "moor" in s:    return "MOORED"
+    if "aground" in s: return "AGROUND"
+    if "way" in s:     return "UNDERWAY"
+    return "UNDERWAY"
+
+
+def _map_dl_vessel(v: dict) -> dict | None:
+    mmsi = str(v.get("mmsi") or "")
+    if not mmsi:
+        return None
+    try:
+        lat = float(v.get("lat") or 0.0)
+        lon = float(v.get("lon") or 0.0)
+    except (ValueError, TypeError):
+        return None
+    if not lat or not lon:
+        return None
+    try:
+        sog = float(v.get("speed") or 0.0)
+    except (ValueError, TypeError):
+        sog = 0.0
+    cog = v.get("course")
+    return {
+        "mmsi":      mmsi,
+        "name":      (v.get("name") or "UNKNOWN").strip(),
+        "flag":      "🌐",
+        "type":      _dl_ship_type(v.get("type_specific") or v.get("type") or ""),
+        "darkFleet": False,
+        "anomaly":   "None detected",
+        "risk":      "LOW",
+        "speed":     f"{sog:.1f} kn",
+        "course":    f"{int(float(cog))}°" if cog is not None else "N/A",
+        "draft":     "N/A",   # available on vessel_pro only
+        "dwt":       "N/A",   # available on vessel_pro only
+        "lastPort":  "N/A",
+        "nextPort":  v.get("destination") or "N/A",
+        "status":    _dl_nav_status(v.get("navigational_status") or ""),
+        "zone":      None,
+        "track":     [[lat, lon]],
+        "sigint":    None,
+    }
+
+
+def fetch_datalastic() -> list[dict]:
+    """Fetch vessel positions from Datalastic bulk endpoint.
+    Queries up to 100 MMSIs defined in DATALASTIC_MMSI_LIST (comma-separated).
+    Datalastic has no area/broadcast feed — MMSIs must be specified explicitly.
+    Register free at https://datalastic.com — set DATALASTIC_API_KEY and
+    DATALASTIC_MMSI_LIST in Railway env vars.
+    """
+    mmsi_list = [m.strip() for m in os.getenv("DATALASTIC_MMSI_LIST", _DL_MMSI_DEFAULT).split(",") if m.strip()]
+    if not mmsi_list:
+        raise RuntimeError("DATALASTIC_MMSI_LIST env var is empty — add comma-separated MMSIs to track")
+    params: list[tuple] = [("api-key", DATALASTIC_API_KEY)]
+    for m in mmsi_list[:100]:
+        params.append(("mmsi[]", m))
+    resp = httpx.get(_DL_BULK_URL, params=params, timeout=20)
+    resp.raise_for_status()
+    data = resp.json()
+    if isinstance(data, dict) and not data.get("meta", {}).get("success", True):
+        raise RuntimeError(f"Datalastic error: {data}")
+    entries = data if isinstance(data, list) else data.get("data", [])
+    vessels = []
+    for entry in entries:
+        # bulk response may wrap each result in {"data": {...}}
+        v = entry.get("data", entry) if isinstance(entry, dict) else {}
+        mapped = _map_dl_vessel(v)
         if mapped:
             vessels.append(mapped)
     return vessels[:100]
@@ -491,15 +599,15 @@ PROVIDERS: dict[str, dict] = {
         "fetch":   fetch_digitraffic,
     },
     # ── Free tier (API key required — set matching env var to enable) ──────────
-    "marineTraffic": {
-        "label":   "MarineTraffic",
-        "enabled": lambda: bool(MARINE_TRAFFIC_API_KEY),
-        "fetch":   fetch_marinetraffic,
-    },
     "vesselFinder": {
         "label":   "VesselFinder",
-        "enabled": lambda: bool(os.getenv("VESSEL_FINDER_API_KEY")),
-        "fetch":   _stub("VesselFinder"),
+        "enabled": lambda: bool(VESSEL_FINDER_API_KEY),
+        "fetch":   fetch_vesselfinder,
+    },
+    "datalastic": {
+        "label":   "Datalastic",
+        "enabled": lambda: bool(DATALASTIC_API_KEY and os.getenv("DATALASTIC_MMSI_LIST", "")),
+        "fetch":   fetch_datalastic,
     },
     "myShipTracking": {
         "label":   "MyShipTracking",
