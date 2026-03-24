@@ -481,7 +481,47 @@ def fetch_vesselfinder() -> list[dict]:
 # Set DATALASTIC_API_KEY and DATALASTIC_MMSI_LIST in Railway env vars.
 DATALASTIC_API_KEY  = os.getenv("DATALASTIC_API_KEY", "")
 _DL_BULK_URL        = "https://api.datalastic.com/api/v0/vessel_bulk"
-_DL_MMSI_DEFAULT    = ""   # comma-separated MMSIs — must be set via env var
+
+# Default watchlist: OFAC-sanctioned vessels from public SDN list (Jan 2025 designations).
+# Source: https://home.treasury.gov/news/press-releases/jy2777
+# Full machine-readable list: https://www.treasury.gov/ofac/downloads/sdn_advanced.xml
+# Override with DATALASTIC_MMSI_LIST env var (comma-separated).
+_DL_MMSI_DEFAULT = ",".join([
+    # ── SDGT — OCEANLINK MARITIME DMCC network ────────────────────────────────
+    "620999315",  # ANTHEA            Comoros  IMO 9281683
+    "312513000",  # BAXTER            Belize   IMO 9282522
+    "620999316",  # BOREAS            Comoros  IMO 9248497
+    "620739000",  # CAPE GAS          Comoros  IMO 9002491
+    "370921000",  # DEMETER           Panama   IMO 9258674
+    "312038000",  # ELSA              Belize   IMO 9256468
+    "620999379",  # HECATE            Comoros  IMO 9233753
+    "304552000",  # MERAKI            Antigua  IMO 9194139
+    "518999021",  # OUREA             Cook Is. IMO 9350422
+    "621819067",  # YOUNG YONG        Djibouti IMO 9194127
+    # ── IRAN-EO13846 / EO13902 designated ────────────────────────────────────
+    "312171000",  # ANHONA            Belize       IMO 9354521
+    "518999041",  # GOODWIN           Cook Is.     IMO 9379703
+    "352002704",  # TYCHE I           Panama       IMO 9247390
+    "636018950",  # ELZA              Liberia      IMO 9221671
+    "422169700",  # MASAL             Iran         IMO 9169421
+    "518999103",  # BERTHA/MONICA S   Cook Is.     IMO 9292163
+    "372988000",  # BLACK PANTHER     Panama       IMO 9285756
+    "668116233",  # CERES I           Sao Tome     IMO 9229439
+    "334017000",  # FT ISLAND         Honduras     IMO 9166675
+    "538010982",  # JAYA/MONOCEROS    Marshall Is. IMO 9410387
+    "352002495",  # MEROPE            Panama       IMO 9281891
+    "352002482",  # TONIL/PARAGON DAWN Panama      IMO 9307932
+    "312242000",  # VESNA             Belize       IMO 9233349
+    # ── RUSSIA-EO14024 designated (Sovcomflot) ────────────────────────────────
+    "636014308",  # SCF PRIMORYE      Liberia IMO 9421960
+    "626362000",  # GEORGY MASLOV     Gabon   IMO 9610793
+    "626364000",  # KRYMSK            Gabon   IMO 9270529
+    "626367000",  # LITEYNY PROSPECT  Gabon   IMO 9256078
+    "626369000",  # NEVSKIY PROSPECT  Gabon   IMO 9256054
+    "626372000",  # NS ANTARCTIC      Gabon   IMO 9413559
+    "352003372",  # ANATOLY KOLODKIN  Panama  IMO 9610808
+    "352002202",  # SAKHALIN ISLAND   Panama  IMO 9249128
+])
 
 
 def _dl_ship_type(type_str: str) -> str:
@@ -548,8 +588,6 @@ def fetch_datalastic() -> list[dict]:
     DATALASTIC_MMSI_LIST in Railway env vars.
     """
     mmsi_list = [m.strip() for m in os.getenv("DATALASTIC_MMSI_LIST", _DL_MMSI_DEFAULT).split(",") if m.strip()]
-    if not mmsi_list:
-        raise RuntimeError("DATALASTIC_MMSI_LIST env var is empty — add comma-separated MMSIs to track")
     params: list[tuple] = [("api-key", DATALASTIC_API_KEY)]
     for m in mmsi_list[:100]:
         params.append(("mmsi[]", m))
@@ -606,7 +644,7 @@ PROVIDERS: dict[str, dict] = {
     },
     "datalastic": {
         "label":   "Datalastic",
-        "enabled": lambda: bool(DATALASTIC_API_KEY and os.getenv("DATALASTIC_MMSI_LIST", "")),
+        "enabled": lambda: bool(DATALASTIC_API_KEY),
         "fetch":   fetch_datalastic,
     },
     "myShipTracking": {
@@ -792,6 +830,198 @@ _SIGINT = [
 ]
 
 
+# ── ACLED integration — maritime incident intelligence ─────────────────────────
+# Armed Conflict Location & Event Data (ACLED) — free API key.
+# Register at https://acleddata.com — set ACLED_API_KEY and ACLED_EMAIL env vars.
+# Queried countries: Yemen (Houthi/Red Sea), Somalia (piracy), Philippines (S.China Sea),
+# Indonesia (Malacca), Iran (Persian Gulf). Mapped to our SIGINT feed schema.
+ACLED_API_KEY = os.getenv("ACLED_API_KEY", "")
+ACLED_EMAIL   = os.getenv("ACLED_EMAIL",   "")
+_ACLED_URL    = "https://api.acleddata.com/acled/read"
+# Countries relevant to major maritime chokepoints / shipping threats
+_ACLED_MARITIME_COUNTRIES = "Yemen,Somalia,Philippines,Indonesia,Iran,Malaysia,Taiwan,Ukraine"
+
+
+def _acled_sig_type(event_type: str) -> str:
+    et = (event_type or "").lower()
+    if "explosion" in et:   return "ELINT"
+    if "battle"    in et:   return "SIGINT"
+    if "violence"  in et:   return "HUMINT"
+    return "OSINT"
+
+
+def _acled_severity(row: dict) -> str:
+    try:
+        fat = int(row.get("fatalities") or 0)
+    except (ValueError, TypeError):
+        fat = 0
+    if fat > 0:
+        return "CRITICAL"
+    sub = (row.get("sub_event_type") or "").lower()
+    if any(k in sub for k in ("attack", "shelling", "air/drone", "suicide bomb")):
+        return "CRITICAL"
+    return "HIGH"
+
+
+def fetch_acled_sigint() -> list[dict]:
+    """Fetch recent conflict events from ACLED for maritime-adjacent regions.
+    Maps armed-conflict events (Yemen/Houthi, Somalia/piracy, S.China Sea tensions)
+    to the SIGINT feed schema.  Returns up to 8 most recent events.
+    Register free at https://acleddata.com — set ACLED_API_KEY and ACLED_EMAIL.
+    """
+    from datetime import datetime, timedelta
+    since = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    resp = httpx.get(_ACLED_URL, params={
+        "key":              ACLED_API_KEY,
+        "email":            ACLED_EMAIL,
+        "country":          _ACLED_MARITIME_COUNTRIES,
+        "event_date":       since,
+        "event_date_where": "BETWEEN",
+        "event_date_end":   today,
+        "limit":            50,
+        "_format":          "json",
+    }, timeout=20)
+    resp.raise_for_status()
+    rows = resp.json().get("data", [])
+    # Sort by timestamp desc, take top 8
+    rows = sorted(rows, key=lambda r: r.get("timestamp", 0), reverse=True)[:8]
+    sigint = []
+    for row in rows:
+        try:
+            ts_raw = row.get("timestamp") or row.get("event_date", "")
+            try:
+                ts = __import__("datetime").datetime.fromtimestamp(int(ts_raw)).strftime("%H:%M")
+            except Exception:
+                ts = str(ts_raw)[11:16] or "N/A"
+            notes   = (row.get("notes") or row.get("event_type") or "Maritime incident").strip()[:200]
+            actor   = (row.get("actor1") or "UNKNOWN").strip()[:40]
+            country = (row.get("country") or "").strip()
+            loc     = (row.get("location") or "").strip()
+            sigint.append({
+                "ts":     ts,
+                "mmsi":   None,
+                "vessel": f"{country} — {loc}" if loc else country or "MARITIME ZONE",
+                "type":   _acled_sig_type(row.get("event_type", "")),
+                "msg":    f"[{actor}] {notes}",
+                "sev":    _acled_severity(row),
+            })
+        except Exception:
+            continue
+    return sigint
+
+
+def _get_sigint() -> list[dict]:
+    """Return SIGINT feed: real ACLED data if configured, else mock data."""
+    if not (ACLED_API_KEY and ACLED_EMAIL):
+        return _SIGINT
+    cache_key = "sigint:acled"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached.get("items", _SIGINT)
+    try:
+        items = fetch_acled_sigint()
+        cache_set(cache_key, {"items": items or _SIGINT})
+        return items or _SIGINT
+    except Exception:
+        return _SIGINT
+
+
+# ── Static chokepoint reference data ──────────────────────────────────────────
+# Moved here from Chokepoint.jsx so the backend can enrich with live event data.
+# flow / pct / history are semi-static (updated manually as geopolitical situation changes).
+_CHOKEPOINTS = [
+    {"id": "CP-01", "name": "Strait of Hormuz",    "location": "Persian Gulf",          "lat":  26.5, "lon":  56.5,  "risk": "CRITICAL", "flow": "21Mb/d",  "pct": "21%", "tension": "Extreme",  "threats": ["Iranian naval exercises", "Mine laying reports", "Drone harassment of tankers"],        "altRoute": "None — no viable alternative",                      "history": [18, 19, 20, 21, 20, 19, 21], "acled_country": "Iran,Oman"},
+    {"id": "CP-02", "name": "Strait of Malacca",   "location": "SE Asia",               "lat":   2.0, "lon": 101.5,  "risk": "HIGH",     "flow": "16Mb/d",  "pct": "16%", "tension": "Elevated", "threats": ["Piracy incidents up 40%", "Territorial disputes", "Cyber attacks on port systems"],    "altRoute": "Lombok Strait (+4 days transit)",                    "history": [14, 15, 15, 16, 16, 15, 16], "acled_country": "Indonesia,Malaysia"},
+    {"id": "CP-03", "name": "Bab-el-Mandeb",       "location": "Red Sea / Yemen",       "lat":  12.5, "lon":  43.5,  "risk": "CRITICAL", "flow": "8.8Mb/d", "pct": "9%",  "tension": "Extreme",  "threats": ["Houthi missile attacks", "Drone boats", "Coalition naval response"],                  "altRoute": "Cape of Good Hope (+15 days, +$1.2M/voyage)",        "history": [9, 8, 7, 6, 5, 4, 4],       "acled_country": "Yemen,Djibouti"},
+    {"id": "CP-04", "name": "Suez Canal",           "location": "Egypt",                 "lat":  30.5, "lon":  32.5,  "risk": "MEDIUM",   "flow": "5.5Mb/d", "pct": "5%",  "tension": "Moderate", "threats": ["Diversion due to Houthi threat", "Congestion incidents"],                            "altRoute": "Cape of Good Hope or SUMED pipeline",                "history": [7, 7, 6, 6, 5, 5, 6],       "acled_country": "Egypt,Yemen"},
+    {"id": "CP-05", "name": "Turkish Straits",      "location": "Bosphorus/Dardanelles", "lat":  41.0, "lon":  29.0,  "risk": "MEDIUM",   "flow": "2.4Mb/d", "pct": "2%",  "tension": "Moderate", "threats": ["Russian Black Sea fleet movements", "Sanctions complications"],                      "altRoute": "Trans-Anatolian Pipeline (TANAP)",                   "history": [3, 3, 2, 2, 2, 2, 2],       "acled_country": "Turkey,Ukraine"},
+    {"id": "CP-06", "name": "Danish Straits",       "location": "North Sea",             "lat":  56.0, "lon":  10.5,  "risk": "LOW",      "flow": "1.5Mb/d", "pct": "1%",  "tension": "Low",      "threats": ["Occasional Russian submarine activity"],                                              "altRoute": "Pipeline alternatives available",                    "history": [1, 1, 2, 1, 1, 2, 1],       "acled_country": ""},
+    {"id": "CP-07", "name": "Strait of Gibraltar",  "location": "Atlantic / Med",        "lat":  35.9, "lon":  -5.5,  "risk": "LOW",      "flow": "1.8Mb/d", "pct": "2%",  "tension": "Low",      "threats": ["Occasional migrant crisis spillover", "Russian sub activity"],                       "altRoute": "North Africa overland pipelines",                    "history": [2, 2, 1, 2, 2, 1, 2],       "acled_country": "Morocco"},
+    {"id": "CP-08", "name": "Cape of Good Hope",    "location": "South Africa",          "lat": -34.4, "lon":  18.5,  "risk": "LOW",      "flow": "3.2Mb/d", "pct": "3%",  "tension": "Low",      "threats": ["Weather-driven routing disruptions", "Piracy uptick near Cape"],                     "altRoute": "Suez Canal (normal route)",                          "history": [2, 3, 3, 4, 4, 5, 6],       "acled_country": "South Africa,Somalia"},
+    {"id": "CP-09", "name": "Panama Canal",         "location": "Central America",       "lat":   9.0, "lon": -79.5,  "risk": "MEDIUM",   "flow": "1.0Mb/d", "pct": "1%",  "tension": "Moderate", "threats": ["Water shortage reducing daily transits", "US-China geopolitical pressure", "Cartel activity near locks"], "altRoute": "Suez Canal or US land bridge", "history": [1, 1, 1, 1, 1, 1, 1], "acled_country": "Panama"},
+    {"id": "CP-10", "name": "Luzon Strait",         "location": "Philippines / Taiwan",  "lat":  20.0, "lon": 121.0,  "risk": "HIGH",     "flow": "2.0Mb/d", "pct": "2%",  "tension": "Elevated", "threats": ["PLA Navy exercises", "Taiwan Strait tensions spillover", "Submarine cable vulnerability"], "altRoute": "Lombok Strait (+2 days transit)", "history": [1, 2, 2, 3, 3, 4, 5], "acled_country": "Philippines"},
+]
+
+# Countries queried per chokepoint for ACLED enrichment (batched into single request)
+_CP_ACLED_ALL = ",".join({cp["acled_country"] for cp in _CHOKEPOINTS if cp["acled_country"]})
+
+
+def _enrich_chokepoints_acled(cps: list[dict]) -> list[dict]:
+    """Add `acled_events_30d` and `latest_incident` to each chokepoint using ACLED data.
+    Single batched API call for all relevant countries.
+    """
+    from datetime import datetime, timedelta
+    since = (__import__("datetime").datetime.utcnow() - __import__("datetime").timedelta(days=30)).strftime("%Y-%m-%d")
+    today = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d")
+    resp = httpx.get(_ACLED_URL, params={
+        "key":              ACLED_API_KEY,
+        "email":            ACLED_EMAIL,
+        "country":          _CP_ACLED_ALL,
+        "event_date":       since,
+        "event_date_where": "BETWEEN",
+        "event_date_end":   today,
+        "limit":            500,
+        "_format":          "json",
+    }, timeout=20)
+    if resp.status_code != 200:
+        return cps
+    rows = resp.json().get("data", [])
+    # Group events by country
+    by_country: dict[str, list] = {}
+    for row in rows:
+        c = (row.get("country") or "").strip()
+        by_country.setdefault(c, []).append(row)
+    enriched = []
+    for cp in cps:
+        cp = cp.copy()
+        cp_countries = {c.strip() for c in cp.get("acled_country", "").split(",") if c.strip()}
+        events: list = []
+        for c in cp_countries:
+            events.extend(by_country.get(c, []))
+        cp["acled_events_30d"] = len(events)
+        if events:
+            latest = max(events, key=lambda r: r.get("timestamp", 0))
+            actor  = (latest.get("actor1") or "").strip()[:40]
+            notes  = (latest.get("notes") or latest.get("event_type") or "").strip()[:150]
+            cp["latest_incident"] = f"[{actor}] {notes}" if actor else notes
+        else:
+            cp["latest_incident"] = None
+        enriched.append(cp)
+    return enriched
+
+
+@app.get("/api/maritime/chokepoints")
+def maritime_chokepoints(_: None = Depends(require_auth)):
+    """Return global chokepoint status.
+    Static baseline data enriched with ACLED conflict event counts
+    when ACLED_API_KEY + ACLED_EMAIL env vars are configured (free key).
+    """
+    cache_key = "chokepoints"
+    cached = cache_get(cache_key)
+    if cached:
+        return {**cached, "cache_hit": True}
+    cps = [cp.copy() for cp in _CHOKEPOINTS]
+    source = "static"
+    if ACLED_API_KEY and ACLED_EMAIL:
+        try:
+            cps = _enrich_chokepoints_acled(cps)
+            source = "live"
+        except Exception:
+            pass  # silently fall back to static data
+    # Strip internal field before returning
+    for cp in cps:
+        cp.pop("acled_country", None)
+    data = {
+        "chokepoints": cps,
+        "source":      source,
+        "fetched_at":  time.time(),
+        "cache_hit":   False,
+    }
+    cache_set(cache_key, data)
+    return data
+
+
 @app.get("/api/maritime/vessels")
 def maritime_vessels(
     sources: Optional[list[str]] = Query(default=None),
@@ -815,7 +1045,7 @@ def maritime_vessels(
     if vessels:
         data: dict = {
             "vessels":   vessels,
-            "sigint":    _SIGINT,
+            "sigint":    _get_sigint(),
             "source":    "live",
             "providers": active_providers,
             "fetched_at": time.time(),

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MapContainer, TileLayer, CircleMarker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { BADGE, Card, ST, PageHeader, StatBar, Spark, Btn, LiveBadge, riskColor, riskBadgeColor, ExportBtn, LastAnalysisTag, useLastAnalysis } from "../components/shared";
 import { useApiKey } from "../context/ApiKeyContext";
+import { beFetch } from "../utils/beClient";
 
 async function callClaude(apiKey, prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -182,6 +183,20 @@ export default function Chokepoint() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [tab, setTab] = useState("map");
+  const [cpData, setCpData] = useState(chokepoints);
+  const [cpSource, setCpSource] = useState("static");
+
+  useEffect(() => {
+    beFetch("/api/maritime/chokepoints")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.chokepoints?.length) {
+          setCpData(d.chokepoints);
+          setCpSource(d.source || "live");
+        }
+      })
+      .catch(() => {/* keep static fallback */});
+  }, []);
 
   async function analyzeChokepoint(cp) {
     setAiResult(null); setAiError(""); setAiLoading(true);
@@ -213,12 +228,12 @@ Include 2-3 threat_actors and 3-4 recommendations.`
 
   return (
     <div>
-      <PageHeader icon="🚢" title="Strategic Chokepoint Monitor" sub="Global maritime energy chokepoints — flow, tension and disruption risk." accent="#ff9d00" dataMode={apiKey ? "hybrid" : "mock"} />
+      <PageHeader icon="🚢" title="Strategic Chokepoint Monitor" sub="Global maritime energy chokepoints — flow, tension and disruption risk." accent="#ff9d00" dataMode={cpSource === "live" ? "live" : apiKey ? "hybrid" : "mock"} />
 
       <StatBar stats={[
-        { label: "Monitored",          value: String(chokepoints.length),                                               color: "#ff9d00" },
-        { label: "Critical",           value: String(chokepoints.filter(c => c.risk === "CRITICAL").length),            color: "#ff4d4d" },
-        { label: "Extreme Tension",    value: String(chokepoints.filter(c => c.tension === "Extreme").length),          color: "#ff4d4d" },
+        { label: "Monitored",          value: String(cpData.length),                                               color: "#ff9d00" },
+        { label: "Critical",           value: String(cpData.filter(c => c.risk === "CRITICAL").length),            color: "#ff4d4d" },
+        { label: "Extreme Tension",    value: String(cpData.filter(c => c.tension === "Extreme").length),          color: "#ff4d4d" },
         { label: "Rerouting Events",   value: "3",                                                                      color: "#ffd700" },
       ]} />
 
@@ -247,7 +262,7 @@ Include 2-3 threat_actors and 3-4 recommendations.`
                 maxZoom={8}
               />
               <MapClickHandler onDeselect={() => setSel(null)} />
-              {chokepoints.map(cp => {
+              {cpData.map(cp => {
                 const color = riskColor(cp.risk);
                 const isSel = sel?.id === cp.id;
                 return (
@@ -286,6 +301,17 @@ Include 2-3 threat_actors and 3-4 recommendations.`
                   <div style={{ color: "#e2e8f0", fontSize: 12 }}>{sel.altRoute}</div>
                   <div style={{ color: "#9ca3af", fontSize: 11, marginTop: 8, marginBottom: 2 }}>7-DAY FLOW TREND (Mb/d)</div>
                   <Spark data={sel.history} color={riskColor(sel.risk)} />
+                  {sel.acled_events_30d != null && (
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1f2d45" }}>
+                      <div style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>
+                        ACLED — CONFLICT EVENTS (30d)&nbsp;
+                        <span style={{ color: sel.acled_events_30d > 10 ? "#ff4d4d" : sel.acled_events_30d > 3 ? "#ffd700" : "#4db8ff", fontWeight: 700 }}>{sel.acled_events_30d}</span>
+                      </div>
+                      {sel.latest_incident && (
+                        <div style={{ color: "#9ca3af", fontSize: 10, fontStyle: "italic", lineHeight: 1.4 }}>{sel.latest_incident}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div style={{ background: "#0d1626", borderRadius: 6, padding: 10, marginBottom: 12 }}>
@@ -311,7 +337,7 @@ Include 2-3 threat_actors and 3-4 recommendations.`
 
       {tab === "monitor" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12 }}>
-          {chokepoints.map(cp => (
+          {cpData.map(cp => (
             <Card key={cp.id}
               style={{ cursor: "pointer", borderColor: sel?.id === cp.id ? riskColor(cp.risk) : "#1f2d45", padding: 14 }}
               onClick={() => { setSel(sel?.id === cp.id ? null : cp); setTab("map"); }}
@@ -346,13 +372,13 @@ Include 2-3 threat_actors and 3-4 recommendations.`
           <Card>
             <ST icon="📈" label="Global Flow Trend Comparison" color="#ff9d00"
               sub="7-day flow for high/critical chokepoints · bold = selected" style={{ marginBottom: 14 }} />
-            <GlobalFlowTrendChart data={chokepoints} selected={sel} />
+            <GlobalFlowTrendChart data={cpData} selected={sel} />
           </Card>
           {/* Rerouting cost matrix */}
           <Card>
             <ST icon="🔀" label="Closure Impact Summary" color="#ff4d4d"
               sub="Disruption severity at a glance" style={{ marginBottom: 12 }} />
-            {chokepoints.filter(cp => cp.risk === "CRITICAL" || cp.risk === "HIGH").map(cp => (
+            {cpData.filter(cp => cp.risk === "CRITICAL" || cp.risk === "HIGH").map(cp => (
               <div key={cp.id} style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
                 background: "#0d1626", borderRadius: 6, padding: "8px 12px", marginBottom: 6,
