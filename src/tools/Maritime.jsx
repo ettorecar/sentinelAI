@@ -177,7 +177,7 @@ const PROVIDERS_UI = [
   { key: "aisstream",      label: "AISStream.io",   icon: "📶",  color: "#38bdf8", region: "Global",     free: true,  live: true  },
   { key: "digitraffic",    label: "Digitraffic",    icon: "🇫🇮",  color: "#60a5fa", region: "Baltic Sea", free: true,  live: true  },
   // ── Paid / API key required ──────────────────────────────────────────────────
-  { key: "marineTraffic",  label: "MarineTraffic",  icon: "📡",  color: "#a78bfa", region: "Global",     free: false, live: false },
+  { key: "marineTraffic",  label: "MarineTraffic",  icon: "📡",  color: "#a78bfa", region: "Global",     free: false, live: true  },
   { key: "vesselFinder",   label: "VesselFinder",   icon: "🔭",  color: "#ffd700", region: "Global",     free: false, live: false },
   { key: "myShipTracking", label: "MyShipTracking", icon: "📍",  color: "#ff9d00", region: "Global",     free: false, live: false },
   { key: "fleetMon",       label: "FleetMon",       icon: "🌊",  color: "#4db8ff", region: "Global",     free: false, live: false },
@@ -359,7 +359,7 @@ export default function Maritime() {
   const [sigintFeed, setSigintFeed] = useState(SIGINT_FEED);
   const [dataSource, setDataSource] = useState(BE_URL ? "checking" : "unconfigured");
   const [liveVesselCount, setLiveVesselCount] = useState(null);
-  const [activeSources, setActiveSources]     = useState(["barentsWatch", "aisstream", "digitraffic"]);
+  const [activeSources, setActiveSources]     = useState([]);
   const [activeProviderKeys, setActiveProviderKeys] = useState([]);
   const vesselsRef = useRef(VESSELS);
 
@@ -368,24 +368,36 @@ export default function Maritime() {
   }
 
   useEffect(() => {
+    // No sources selected → demo/mock mode, no backend call
+    if (activeSources.length === 0) {
+      setVessels(VESSELS);
+      vesselsRef.current = VESSELS;
+      setProgress(VESSELS.map((_, i) => i / VESSELS.length));
+      setSigintFeed(SIGINT_FEED);
+      setActiveProviderKeys([]);
+      setLiveVesselCount(null);
+      setDataSource(BE_URL ? "demo" : "unconfigured");
+      return;
+    }
     if (!BE_URL) return;
     setDataSource("checking");
     const ctrl = new AbortController();
     const qs = activeSources.map(s => `sources=${encodeURIComponent(s)}`).join("&");
-    beFetch(`/api/maritime/vessels${qs ? "?" + qs : ""}`, { signal: ctrl.signal })
+    beFetch(`/api/maritime/vessels?${qs}`, { signal: ctrl.signal })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(data => {
-        const isLive = data.source === "live";
+        const isLive = data.source === "live" || data.source === "live_empty";
         const bvessels = data.vessels ?? [];
-        if (bvessels.length) {
-          setVessels(bvessels);
-          vesselsRef.current = bvessels;
-          setProgress(bvessels.map((_, i) => i / bvessels.length));
-        }
+        // Always replace vessel list when a live request was made (even if empty)
+        setVessels(bvessels);
+        vesselsRef.current = bvessels;
+        setProgress(bvessels.map((_, i) => i / bvessels.length));
         if (data.sigint?.length) setSigintFeed(data.sigint);
+        else if (isLive) setSigintFeed([]);
         if (data.providers?.length) setActiveProviderKeys(data.providers);
-        if (isLive) setLiveVesselCount(bvessels.length);
-        setDataSource(isLive ? (bvessels.length ? "live" : "live_empty") : "demo");
+        else setActiveProviderKeys([]);
+        if (data.source === "live") setLiveVesselCount(bvessels.length);
+        setDataSource(data.source === "live" ? "live" : data.source === "live_empty" ? "live_empty" : "demo");
       })
       .catch(() => setDataSource("mock"));
     return () => ctrl.abort();
