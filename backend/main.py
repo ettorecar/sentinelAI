@@ -1,5 +1,7 @@
 import time
 import os
+import asyncio
+import json as _json
 import httpx
 from fastapi import FastAPI, Depends, Header, HTTPException, Query
 from typing import Optional
@@ -267,101 +269,104 @@ def fetch_digitraffic() -> list[dict]:
 
 
 # ── NOAA Marine Cadastre AIS integration ──────────────────────────────────────
-# Public ArcGIS REST service — no API key required.
-# Covers US coastal waters; data is near-historical (USCG receiver network).
-NOAA_AIS_URL = (
-    "https://coast.noaa.gov/arcgis/rest/services"
-    "/MarineCadastre/AISVesselTracks2023/MapServer/0/query"
-)
+# ── AISStream.io integration ──────────────────────────────────────────────────
+# Global real-time AIS via WebSocket. Free tier — register at https://aisstream.io
+# Set AISSTREAM_API_KEY in Railway env vars to enable.
+AISSTREAM_API_KEY = os.getenv("AISSTREAM_API_KEY", "")
+AISSTREAM_URL     = "wss://stream.aisstream.io/v0/stream"
+_AISSTREAM_BBOX   = [[[-90, -180], [90, 180]]]   # global bounding box
+_AISSTREAM_SECS   = 8                             # seconds to collect before disconnecting
+_AISSTREAM_MAX    = 100                           # max vessels per request
 
 
-def _noaa_ship_type(code) -> str:
-    try:
-        c = int(code or 0)
-    except (ValueError, TypeError):
-        c = 0
-    if 70 <= c <= 79: return "Cargo"
-    if 80 <= c <= 89: return "Tanker"
-    if 60 <= c <= 69: return "Passenger"
-    if c == 30:       return "Fishing"
-    if c == 52:       return "Tug"
+def _ais_ship_type(type_id: int) -> str:
+    if 70 <= type_id <= 79: return "Cargo"
+    if 80 <= type_id <= 89: return "Tanker"
+    if 60 <= type_id <= 69: return "Passenger"
+    if type_id == 30:       return "Fishing"
+    if type_id in (31, 32, 52): return "Tug"
     return "Other"
 
 
-def _noaa_nav_status(code) -> str:
-    try:
-        c = int(code or 15)
-    except (ValueError, TypeError):
-        c = 15
-    return {0: "UNDERWAY", 1: "ANCHORED", 5: "MOORED", 6: "AGROUND", 8: "UNDERWAY"}.get(c, "UNKNOWN")
-
-
-def _map_noaa_vessel(attrs: dict, lat: float, lon: float) -> dict:
-    sog = attrs.get("SOG") or 0.0
-    cog = attrs.get("COG")
+def _ais_nav_status(status: int) -> str:
     return {
-        "mmsi":      str(attrs.get("MMSI") or ""),
-        "name":      (attrs.get("VesselName") or "UNKNOWN").strip(),
-        "flag":      "🇺🇸",
-        "type":      _noaa_ship_type(attrs.get("VesselType")),
+        0: "UNDERWAY", 1: "ANCHORED", 5: "MOORED",
+        6: "AGROUND",  8: "UNDERWAY",
+    }.get(status, "UNDERWAY")
+
+
+def _map_aisstream_vessel(msg: dict) -> dict | None:
+    meta    = msg.get("MetaData", {})
+    payload = (msg.get("Message", {}).get("PositionReport") or
+               msg.get("Message", {}).get("ExtendedClassBPositionReport") or {})
+    mmsi = str(meta.get("MMSI") or payload.get("UserID") or "")
+    if not mmsi:
+        return None
+    lat = float(payload.get("Latitude") or meta.get("latitude_dd") or 0.0)
+    lon = float(payload.get("Longitude") or meta.get("longitude_dd") or 0.0)
+    if not lat or not lon:
+        return None
+    sog     = float(payload.get("Sog") or 0.0)
+    cog     = payload.get("Cog")
+    status  = int(payload.get("NavigationalStatus") or 0)
+    type_id = int(meta.get("ShipType") or 0)
+    return {
+        "mmsi":      mmsi,
+        "name":      (meta.get("ShipName") or "UNKNOWN").strip(),
+        "flag":      "🌐",
+        "type":      _ais_ship_type(type_id),
         "darkFleet": False,
         "anomaly":   "None detected",
         "risk":      "LOW",
         "speed":     f"{sog:.1f} kn",
         "course":    f"{cog:.0f}°" if cog is not None else "N/A",
-        "draft":     f"{attrs.get('Draft', 0):.1f}m" if attrs.get("Draft") else "N/A",
+        "draft":     "N/A",
         "dwt":       "N/A",
         "lastPort":  "N/A",
         "nextPort":  "N/A",
-        "status":    _noaa_nav_status(attrs.get("Status")),
+        "status":    _ais_nav_status(status),
         "zone":      None,
         "track":     [[lat, lon]],
         "sigint":    None,
     }
 
 
-def fetch_noaa() -> list[dict]:
-    """Query NOAA Marine Cadastre AIS via ArcGIS REST (public, no API key).
-    Covers US coastal waters; updated periodically by USCG receiver network.
-
-    Coordinates are extracted from the ArcGIS geometry object (returnGeometry=true)
-    rather than LAT/LON attribute fields, which may not exist in all track datasets.
-    Handles both Point {x, y} and Polyline {paths} geometry types.
-    """
-    params = {
-        "where":             "SOG > 0",   # removed LAT/LON field refs — coords come from geometry
-        "outFields":         "MMSI,VesselName,VesselType,SOG,COG,Status,Draft,Length",
-        "returnGeometry":    "true",
-        "outSR":             "4326",      # ensure WGS-84
-        "resultRecordCount": 100,
-        "f":                 "json",
+async def _collect_aisstream(api_key: str) -> list[dict]:
+    import websockets
+    subscription = {
+        "APIKey":             api_key,
+        "BoundingBoxes":      _AISSTREAM_BBOX,
+        "FilterMessageTypes": ["PositionReport", "ExtendedClassBPositionReport"],
     }
-    resp = httpx.get(NOAA_AIS_URL, params=params, timeout=20)
-    resp.raise_for_status()
-    data = resp.json()
-    if "error" in data:
-        raise RuntimeError(f"NOAA ArcGIS error: {data['error']}")
-    features = data.get("features") or []
-    vessels = []
-    for f in features:
-        attrs = f.get("attributes") or {}
-        geom  = f.get("geometry")  or {}
-        # Point feature: geometry = {x: lon, y: lat}
-        if "x" in geom and "y" in geom:
-            lon, lat = float(geom["x"]), float(geom["y"])
-        # Polyline track: geometry = {paths: [[[lon, lat], ...], ...]}
-        # Use last point of last path as most-recent position in the track
-        elif geom.get("paths"):
-            last_pt = geom["paths"][-1][-1]
-            lon, lat = float(last_pt[0]), float(last_pt[1])
-        else:
-            # last resort: attribute-based LAT/LON (older datasets)
-            lat = float(attrs.get("LAT") or 0.0)
-            lon = float(attrs.get("LON") or 0.0)
-        if not lat or not lon:
-            continue
-        vessels.append(_map_noaa_vessel(attrs, lat, lon))
-    return vessels[:100]
+    vessels_by_mmsi: dict = {}
+    async with websockets.connect(AISSTREAM_URL, open_timeout=10) as ws:
+        await ws.send(_json.dumps(subscription))
+        deadline = asyncio.get_event_loop().time() + _AISSTREAM_SECS
+        while asyncio.get_event_loop().time() < deadline:
+            try:
+                raw = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                msg = _json.loads(raw)
+                v = _map_aisstream_vessel(msg)
+                if v and v["mmsi"] not in vessels_by_mmsi:
+                    vessels_by_mmsi[v["mmsi"]] = v
+                if len(vessels_by_mmsi) >= _AISSTREAM_MAX:
+                    break
+            except asyncio.TimeoutError:
+                continue
+    return list(vessels_by_mmsi.values())
+
+
+def fetch_aisstream() -> list[dict]:
+    """Fetch real-time global AIS from AISStream.io via WebSocket (free tier).
+    Opens a connection, collects up to 100 vessels for ~8 s, then closes.
+    Register free and get your API key at https://aisstream.io
+    Set AISSTREAM_API_KEY in Railway env vars to enable.
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(_collect_aisstream(AISSTREAM_API_KEY))
+    finally:
+        loop.close()
 
 
 # ── Provider registry ──────────────────────────────────────────────────────────
@@ -383,10 +388,10 @@ PROVIDERS: dict[str, dict] = {
         "enabled": lambda: bool(BW_CLIENT_ID and BW_CLIENT_SECRET),
         "fetch":   fetch_barentswatch,
     },
-    "noaa": {
-        "label":   "NOAA Marine Cadastre",
-        "enabled": lambda: True,          # public ArcGIS endpoint, no credentials needed
-        "fetch":   fetch_noaa,
+    "aisstream": {
+        "label":   "AISStream.io",
+        "enabled": lambda: bool(AISSTREAM_API_KEY),
+        "fetch":   fetch_aisstream,
     },
     "digitraffic": {
         "label":   "Digitraffic (FIN)",

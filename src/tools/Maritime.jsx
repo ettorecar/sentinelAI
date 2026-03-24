@@ -172,13 +172,16 @@ const PORTS = [
 
 // ── AIS provider catalogue ────────────────────────────────────────────────────
 const PROVIDERS_UI = [
+  // ── Free / open ─────────────────────────────────────────────────────────────
   { key: "barentsWatch",   label: "BarentsWatch",   icon: "🛰️",  color: "#00ff9d", region: "Global",     free: true,  live: true  },
-  { key: "noaa",           label: "NOAA Cadastre",  icon: "🇺🇸",  color: "#38bdf8", region: "USA Waters", free: true,  live: true  },
+  { key: "aisstream",      label: "AISStream.io",   icon: "📶",  color: "#38bdf8", region: "Global",     free: true,  live: true  },
   { key: "digitraffic",    label: "Digitraffic",    icon: "🇫🇮",  color: "#60a5fa", region: "Baltic Sea", free: true,  live: true  },
+  // ── Paid / API key required ──────────────────────────────────────────────────
   { key: "marineTraffic",  label: "MarineTraffic",  icon: "📡",  color: "#a78bfa", region: "Global",     free: false, live: false },
   { key: "vesselFinder",   label: "VesselFinder",   icon: "🔭",  color: "#ffd700", region: "Global",     free: false, live: false },
   { key: "myShipTracking", label: "MyShipTracking", icon: "📍",  color: "#ff9d00", region: "Global",     free: false, live: false },
-  { key: "fleetMon",       label: "FleetMon",       icon: "🌐",  color: "#4db8ff", region: "Global",     free: false, live: false },
+  { key: "fleetMon",       label: "FleetMon",       icon: "🌊",  color: "#4db8ff", region: "Global",     free: false, live: false },
+  // ── Commercial SAT-AIS ───────────────────────────────────────────────────────
   { key: "spire",          label: "Spire Maritime", icon: "🛸",  color: "#c084fc", region: "SAT-AIS",    free: false, live: false },
   { key: "exactEarth",     label: "exactEarth",     icon: "🌍",  color: "#fb923c", region: "SAT-AIS",    free: false, live: false },
 ];
@@ -356,7 +359,7 @@ export default function Maritime() {
   const [sigintFeed, setSigintFeed] = useState(SIGINT_FEED);
   const [dataSource, setDataSource] = useState(BE_URL ? "checking" : "unconfigured");
   const [liveVesselCount, setLiveVesselCount] = useState(null);
-  const [activeSources, setActiveSources]     = useState(["barentsWatch", "noaa", "digitraffic"]);
+  const [activeSources, setActiveSources]     = useState(["barentsWatch", "aisstream", "digitraffic"]);
   const [activeProviderKeys, setActiveProviderKeys] = useState([]);
   const vesselsRef = useRef(VESSELS);
 
