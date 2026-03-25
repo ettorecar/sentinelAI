@@ -910,7 +910,8 @@ def fetch_acled_sigint() -> list[dict]:
         "limit":            50,
         "_format":          "json",
     }, timeout=20)
-    resp.raise_for_status()
+    if not resp.is_success:
+        raise RuntimeError(f"ACLED {resp.status_code}: {resp.text[:400]}")
     rows = resp.json().get("data", [])
     # Sort by timestamp desc, take top 8
     rows = sorted(rows, key=lambda r: r.get("timestamp", 0), reverse=True)[:8]
