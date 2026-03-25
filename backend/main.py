@@ -841,7 +841,7 @@ ACLED_PASSWORD = os.getenv("ACLED_PASSWORD", "")
 _ACLED_URL     = "https://acleddata.com/api/acled/read"
 _ACLED_AUTH    = "https://acleddata.com/oauth/token"
 # Countries relevant to major maritime chokepoints / shipping threats
-_ACLED_MARITIME_COUNTRIES = "Yemen,Somalia,Philippines,Indonesia,Iran,Malaysia,Taiwan,Ukraine"
+_ACLED_MARITIME_COUNTRIES = "Yemen|Somalia|Philippines|Indonesia|Iran|Malaysia|Taiwan|Ukraine"
 
 # In-memory token cache: {"token": str, "expires_at": float}
 _acled_token_cache: dict = {}
@@ -976,7 +976,12 @@ _CHOKEPOINTS = [
 ]
 
 # Countries queried per chokepoint for ACLED enrichment (batched into single request)
-_CP_ACLED_ALL = ",".join({cp["acled_country"] for cp in _CHOKEPOINTS if cp["acled_country"]})
+_CP_ACLED_ALL = "|".join({
+    c.strip()
+    for cp in _CHOKEPOINTS if cp["acled_country"]
+    for c in cp["acled_country"].split(",")
+    if c.strip()
+})
 
 
 def _enrich_chokepoints_acled(cps: list[dict]) -> list[dict]:
