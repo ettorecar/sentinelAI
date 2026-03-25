@@ -902,16 +902,11 @@ def fetch_acled_sigint() -> list[dict]:
     since = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
     today = datetime.utcnow().strftime("%Y-%m-%d")
     token = _acled_bearer()
-    resp = httpx.get(_ACLED_URL,
+    # ACLED requires country=X:OR:country=Y format (not param dict encoding)
+    url = f"{_ACLED_URL}?country={_ACLED_MARITIME_COUNTRIES}&event_date={since}&event_date_where=BETWEEN&event_date_end={today}&limit=50&_format=json"
+    resp = httpx.get(url,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        params={
-            "country":   _ACLED_MARITIME_COUNTRIES,
-            "event_date": since,
-            "event_date_where": "BETWEEN",
-            "event_date_end":   today,
-            "limit":     50,
-            "_format":   "json",
-        }, timeout=20)
+        timeout=20)
     resp.raise_for_status()
     body = resp.json()
     if body.get("status") != 200:
@@ -997,16 +992,11 @@ def _enrich_chokepoints_acled(cps: list[dict]) -> list[dict]:
     since = (__import__("datetime").datetime.utcnow() - __import__("datetime").timedelta(days=30)).strftime("%Y-%m-%d")
     today = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d")
     token = _acled_bearer()
-    resp = httpx.get(_ACLED_URL,
+    # ACLED requires country=X:OR:country=Y format (not param dict encoding)
+    url = f"{_ACLED_URL}?country={_CP_ACLED_ALL}&event_date={since}&event_date_where=BETWEEN&event_date_end={today}&limit=500&_format=json"
+    resp = httpx.get(url,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        params={
-            "country":   _CP_ACLED_ALL,
-            "event_date": since,
-            "event_date_where": "BETWEEN",
-            "event_date_end":   today,
-            "limit":     500,
-            "_format":   "json",
-        }, timeout=20)
+        timeout=20)
     try:
         resp.raise_for_status()
         body = resp.json()
