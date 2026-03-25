@@ -14,8 +14,8 @@ from fastapi import APIRouter, Depends, Query
 
 from core.auth    import require_auth
 from core.cache   import cache_get, cache_set, cache_age
-from providers    import fetch_providers, PROVIDERS
-from providers.acled import (
+from providers          import fetch_providers, PROVIDERS
+from providers.maritime.acled import (
     ACLED_EMAIL, ACLED_PASSWORD,
     fetch_sigint as _fetch_acled_sigint,
     _bearer as _acled_bearer,
