@@ -244,16 +244,34 @@ function VesselCard({ v, selected, onClick }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 // ── Data source badge ─────────────────────────────────────────────────────────
 const DS_CFG = {
-  live:         { bg: "#020e06", border: "#00ff9d33", dot: "#00ff9d", pulse: "sentinelPulse 2s ease-in-out infinite",   icon: "🛰️",  label: "LIVE FEED",   text: "Real AIS vessel data from BarentsWatch" },
-  live_empty:   { bg: "#050e08", border: "#00ff9d22", dot: "#00ff9d", pulse: "none",                                    icon: "🛰️",  label: "LIVE FEED",   text: "BarentsWatch connected — 0 vessels returned (filter)" },
+  live:         { bg: "#020e06", border: "#00ff9d33", dot: "#00ff9d", pulse: "sentinelPulse 2s ease-in-out infinite",   icon: "🛰️",  label: "LIVE FEED",   text: null },
+  live_empty:   { bg: "#050e08", border: "#00ff9d22", dot: "#00ff9d", pulse: "none",                                    icon: "🛰️",  label: "LIVE FEED",   text: null },
   checking:     { bg: "#05080f", border: "#38bdf833", dot: "#38bdf8", pulse: "sentinelPulse 0.7s ease-in-out infinite", icon: "⏳",  label: "CONNECTING",  text: "Reaching backend AIS service…" },
-  demo:         { bg: "#06060e", border: "#a78bfa33", dot: "#a78bfa", pulse: "none",                                    icon: "🗄️",  label: "DEMO DATA",   text: "Backend connected — serving demo dataset (no BarentsWatch key)" },
+  demo:         { bg: "#06060e", border: "#a78bfa33", dot: "#a78bfa", pulse: "none",                                    icon: "🗄️",  label: "DEMO DATA",   text: "Backend connected — serving demo dataset" },
   mock:         { bg: "#0e0800", border: "#ff9d0033", dot: "#ff9d00", pulse: "none",                                    icon: "⚠️",  label: "MOCK DATA",   text: "Backend not reachable — showing static dataset" },
   unconfigured: { bg: "#06060e", border: "#2d3f5533", dot: "#3a4a5c", pulse: "none",                                    icon: "📦",  label: "LOCAL DATA",  text: "No backend configured — using built-in dataset" },
 };
 
-function DataSourceBadge({ source, vesselCount }) {
+const PROVIDER_LABELS = {
+  barentsWatch:    "BarentsWatch",
+  aisstream:       "AISStream",
+  digitraffic:     "Digitraffic",
+  vesselFinder:    "VesselFinder",
+  datalastic:      "Datalastic",
+  myShipTracking:  "MyShipTracking",
+  fleetMon:        "FleetMon",
+  spire:           "Spire",
+  exactEarth:      "ExactEarth",
+};
+
+function DataSourceBadge({ source, vesselCount, providers = [] }) {
   const c = DS_CFG[source] ?? DS_CFG.unconfigured;
+  const providerText = providers.length
+    ? `Real AIS data · ${providers.map(k => PROVIDER_LABELS[k] ?? k).join(" + ")}`
+    : source === "live_empty"
+      ? `${providers.map(k => PROVIDER_LABELS[k] ?? k).join(" + ")} connected — 0 vessels (filter)`
+      : null;
+  const text = providerText ?? c.text;
   return (
     <div style={{
       background: c.bg, border: `1px solid ${c.border}`, borderRadius: 6,
@@ -264,7 +282,7 @@ function DataSourceBadge({ source, vesselCount }) {
       <span style={{ width: 5, height: 5, borderRadius: "50%", background: c.dot, display: "inline-block", animation: c.pulse }} />
       <span style={{ color: c.dot, fontSize: 10, fontWeight: 700, fontFamily: "monospace", letterSpacing: 1 }}>{c.label}</span>
       <span style={{ color: "#2d3f55", fontSize: 10 }}>—</span>
-      <span style={{ color: "#6b7a8d", fontSize: 10 }}>{c.text}</span>
+      <span style={{ color: "#6b7a8d", fontSize: 10 }}>{text}</span>
       {(source === "live" || source === "live_empty") && (
         <span style={{ marginLeft: "auto", color: "#3a4a5c", fontSize: 9, fontFamily: "monospace", display: "flex", gap: 10 }}>
           {vesselCount != null && (
@@ -477,7 +495,7 @@ export default function Maritime() {
         classification="SECRET"
       />
 
-      <DataSourceBadge source={dataSource} vesselCount={liveVesselCount} />
+      <DataSourceBadge source={dataSource} vesselCount={liveVesselCount} providers={activeProviderKeys} />
       <ProviderPanel activeSources={activeSources} onToggle={toggleSource} activeKeys={activeProviderKeys} />
 
       <StatBar stats={[

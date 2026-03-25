@@ -934,20 +934,24 @@ def fetch_acled_sigint() -> list[dict]:
     return sigint
 
 
-def _get_sigint() -> list[dict]:
-    """Return SIGINT feed: real ACLED data if configured, else mock data."""
+def _get_sigint() -> tuple[list[dict], str | None]:
+    """Return (sigint_feed, error_string|None).
+    Real ACLED data if configured, else mock data with error=None.
+    """
     if not (ACLED_EMAIL and ACLED_PASSWORD):
-        return _SIGINT
+        return _SIGINT, None
     cache_key = "sigint:acled"
     cached = cache_get(cache_key)
     if cached:
-        return cached.get("items", _SIGINT)
+        return cached.get("items", _SIGINT), cached.get("error")
     try:
         items = fetch_acled_sigint()
-        cache_set(cache_key, {"items": items or _SIGINT})
-        return items or _SIGINT
-    except Exception:
-        return _SIGINT
+        cache_set(cache_key, {"items": items or _SIGINT, "error": None})
+        return items or _SIGINT, None
+    except Exception as exc:
+        err = str(exc)
+        cache_set(cache_key, {"items": _SIGINT, "error": err})
+        return _SIGINT, err
 
 
 # ── Static chokepoint reference data ──────────────────────────────────────────
@@ -1063,16 +1067,20 @@ def maritime_vessels(
         return {**cached, "cache_hit": True, "cache_age_seconds": cache_age(cache_key)}
 
     vessels, active_providers, errors = _fetch_providers(sources)
+    sigint_feed, sigint_error = _get_sigint()
 
     if vessels:
         data: dict = {
-            "vessels":   vessels,
-            "sigint":    _get_sigint(),
-            "source":    "live",
-            "providers": active_providers,
-            "fetched_at": time.time(),
-            "cache_hit": False,
+            "vessels":      vessels,
+            "sigint":       sigint_feed,
+            "sigint_source": "live" if sigint_error is None and (ACLED_EMAIL and ACLED_PASSWORD) else "mock",
+            "source":       "live",
+            "providers":    active_providers,
+            "fetched_at":   time.time(),
+            "cache_hit":    False,
         }
+        if sigint_error:
+            data["sigint_error"] = sigint_error
     elif sources:
         # Sources were explicitly requested but all failed — return empty, NOT mock.
         # The frontend must show an empty live view, not fall back to demo vessels.
