@@ -831,15 +831,39 @@ _SIGINT = [
 
 
 # ── ACLED integration — maritime incident intelligence ─────────────────────────
-# Armed Conflict Location & Event Data (ACLED) — free API key.
-# Register at https://acleddata.com — set ACLED_API_KEY and ACLED_EMAIL env vars.
+# Armed Conflict Location & Event Data (ACLED) — free account at https://acleddata.com
+# New auth system (Sep 2025): OAuth with email + password → Bearer token.
+# Set ACLED_EMAIL and ACLED_PASSWORD env vars. No API key needed.
 # Queried countries: Yemen (Houthi/Red Sea), Somalia (piracy), Philippines (S.China Sea),
 # Indonesia (Malacca), Iran (Persian Gulf). Mapped to our SIGINT feed schema.
-ACLED_API_KEY = os.getenv("ACLED_API_KEY", "")
-ACLED_EMAIL   = os.getenv("ACLED_EMAIL",   "")
-_ACLED_URL    = "https://api.acleddata.com/acled/read"
+ACLED_EMAIL    = os.getenv("ACLED_EMAIL",    "")
+ACLED_PASSWORD = os.getenv("ACLED_PASSWORD", "")
+_ACLED_URL     = "https://api.acleddata.com/acled/read"
+_ACLED_AUTH    = "https://api.acleddata.com/auth/login"
 # Countries relevant to major maritime chokepoints / shipping threats
 _ACLED_MARITIME_COUNTRIES = "Yemen,Somalia,Philippines,Indonesia,Iran,Malaysia,Taiwan,Ukraine"
+
+# In-memory token cache: {"token": str, "expires_at": float}
+_acled_token_cache: dict = {}
+
+
+def _acled_bearer() -> str:
+    """Return a valid ACLED OAuth Bearer token, refreshing if expired."""
+    import time as _time
+    cached = _acled_token_cache
+    if cached.get("token") and _time.time() < cached.get("expires_at", 0) - 60:
+        return cached["token"]
+    resp = httpx.post(_ACLED_AUTH, json={"email": ACLED_EMAIL, "password": ACLED_PASSWORD}, timeout=15)
+    resp.raise_for_status()
+    body = resp.json()
+    # Response shape: {"token": "...", "expires_in": 86400} or similar
+    token = body.get("token") or body.get("access_token") or body.get("data", {}).get("token", "")
+    if not token:
+        raise RuntimeError(f"ACLED auth response missing token: {body}")
+    expires_in = int(body.get("expires_in") or body.get("data", {}).get("expires_in") or 86400)
+    _acled_token_cache["token"] = token
+    _acled_token_cache["expires_at"] = _time.time() + expires_in
+    return token
 
 
 def _acled_sig_type(event_type: str) -> str:
@@ -867,14 +891,13 @@ def fetch_acled_sigint() -> list[dict]:
     """Fetch recent conflict events from ACLED for maritime-adjacent regions.
     Maps armed-conflict events (Yemen/Houthi, Somalia/piracy, S.China Sea tensions)
     to the SIGINT feed schema.  Returns up to 8 most recent events.
-    Register free at https://acleddata.com — set ACLED_API_KEY and ACLED_EMAIL.
+    Register free at https://acleddata.com — set ACLED_EMAIL and ACLED_PASSWORD.
     """
     from datetime import datetime, timedelta
     since = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
     today = datetime.utcnow().strftime("%Y-%m-%d")
-    resp = httpx.get(_ACLED_URL, params={
-        "key":              ACLED_API_KEY,
-        "email":            ACLED_EMAIL,
+    token = _acled_bearer()
+    resp = httpx.get(_ACLED_URL, headers={"Authorization": f"Bearer {token}"}, params={
         "country":          _ACLED_MARITIME_COUNTRIES,
         "event_date":       since,
         "event_date_where": "BETWEEN",
@@ -913,7 +936,7 @@ def fetch_acled_sigint() -> list[dict]:
 
 def _get_sigint() -> list[dict]:
     """Return SIGINT feed: real ACLED data if configured, else mock data."""
-    if not (ACLED_API_KEY and ACLED_EMAIL):
+    if not (ACLED_EMAIL and ACLED_PASSWORD):
         return _SIGINT
     cache_key = "sigint:acled"
     cached = cache_get(cache_key)
@@ -954,9 +977,8 @@ def _enrich_chokepoints_acled(cps: list[dict]) -> list[dict]:
     from datetime import datetime, timedelta
     since = (__import__("datetime").datetime.utcnow() - __import__("datetime").timedelta(days=30)).strftime("%Y-%m-%d")
     today = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d")
-    resp = httpx.get(_ACLED_URL, params={
-        "key":              ACLED_API_KEY,
-        "email":            ACLED_EMAIL,
+    token = _acled_bearer()
+    resp = httpx.get(_ACLED_URL, headers={"Authorization": f"Bearer {token}"}, params={
         "country":          _CP_ACLED_ALL,
         "event_date":       since,
         "event_date_where": "BETWEEN",
@@ -1003,7 +1025,7 @@ def maritime_chokepoints(_: None = Depends(require_auth)):
         return {**cached, "cache_hit": True}
     cps = [cp.copy() for cp in _CHOKEPOINTS]
     source = "static"
-    if ACLED_API_KEY and ACLED_EMAIL:
+    if ACLED_EMAIL and ACLED_PASSWORD:
         try:
             cps = _enrich_chokepoints_acled(cps)
             source = "live"
