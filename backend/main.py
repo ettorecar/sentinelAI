@@ -838,8 +838,8 @@ _SIGINT = [
 # Indonesia (Malacca), Iran (Persian Gulf). Mapped to our SIGINT feed schema.
 ACLED_EMAIL    = os.getenv("ACLED_EMAIL",    "")
 ACLED_PASSWORD = os.getenv("ACLED_PASSWORD", "")
-_ACLED_URL     = "https://api.acleddata.com/acled/read"
-_ACLED_AUTH    = "https://api.acleddata.com/auth/login"
+_ACLED_URL     = "https://acleddata.com/api/acled/read"
+_ACLED_AUTH    = "https://acleddata.com/oauth/token"
 # Countries relevant to major maritime chokepoints / shipping threats
 _ACLED_MARITIME_COUNTRIES = "Yemen,Somalia,Philippines,Indonesia,Iran,Malaysia,Taiwan,Ukraine"
 
@@ -853,11 +853,16 @@ def _acled_bearer() -> str:
     cached = _acled_token_cache
     if cached.get("token") and _time.time() < cached.get("expires_at", 0) - 60:
         return cached["token"]
-    resp = httpx.post(_ACLED_AUTH, json={"email": ACLED_EMAIL, "password": ACLED_PASSWORD}, timeout=15)
+    # OAuth2 password grant — form-encoded, not JSON
+    resp = httpx.post(_ACLED_AUTH, data={
+        "username":   ACLED_EMAIL,
+        "password":   ACLED_PASSWORD,
+        "grant_type": "password",
+        "client_id":  "acled",
+    }, timeout=15)
     resp.raise_for_status()
     body = resp.json()
-    # Response shape: {"token": "...", "expires_in": 86400} or similar
-    token = body.get("token") or body.get("access_token") or body.get("data", {}).get("token", "")
+    token = body.get("access_token") or body.get("token") or body.get("data", {}).get("access_token", "")
     if not token:
         raise RuntimeError(f"ACLED auth response missing token: {body}")
     expires_in = int(body.get("expires_in") or body.get("data", {}).get("expires_in") or 86400)
