@@ -369,15 +369,25 @@ def fetch_aisstream() -> list[dict]:
         loop.close()
 
 
-# ── MarineTraffic integration ─────────────────────────────────────────────────
-# Real-time vessel positions via MarineTraffic API v2 (PS07 — active vessels).
-# Paid plan required. Register at https://www.marinetraffic.com/en/ais-api-services
-# Set MARINE_TRAFFIC_API_KEY in Railway env vars to enable.
-MARINE_TRAFFIC_API_KEY = os.getenv("MARINE_TRAFFIC_API_KEY", "")
-_MT_BASE = "https://services.marinetraffic.com/api/exportvessel/v:8/{key}"
+# ── VesselFinder integration ──────────────────────────────────────────────────
+# Real-time vessel positions via geographic area query (livedata endpoint).
+# Free tier: 100 req/day. Register at https://www.vesselfinder.com/api
+# Set VESSEL_FINDER_API_KEY in Railway env vars to enable.
+# Optionally set VESSEL_FINDER_BBOX="latmin,latmax,lonmin,lonmax" (default: global).
+VESSEL_FINDER_API_KEY = os.getenv("VESSEL_FINDER_API_KEY", "")
+_VF_LIVEDATA_URL      = "https://api.vesselfinder.com/livedata"
+_VF_BBOX_DEFAULT      = "-90,90,-180,180"   # global; narrow down to save credits
 
 
-def _mt_ship_type(type_id) -> str:
+def _vf_nav_status(code) -> str:
+    try:
+        c = int(code or 15)
+    except (ValueError, TypeError):
+        c = 15
+    return {0: "UNDERWAY", 1: "ANCHORED", 5: "MOORED", 6: "AGROUND", 8: "UNDERWAY"}.get(c, "UNDERWAY")
+
+
+def _vf_ship_type(type_id) -> str:
     try:
         c = int(type_id or 0)
     except (ValueError, TypeError):
@@ -390,72 +400,208 @@ def _mt_ship_type(type_id) -> str:
     return "Other"
 
 
-def _mt_nav_status(code) -> str:
-    try:
-        c = int(code or 15)
-    except (ValueError, TypeError):
-        c = 15
-    return {0: "UNDERWAY", 1: "ANCHORED", 5: "MOORED", 6: "AGROUND", 8: "UNDERWAY"}.get(c, "UNDERWAY")
-
-
-def _map_mt_vessel(v: dict) -> dict | None:
-    mmsi = str(v.get("MMSI") or "")
+def _map_vf_vessel(entry: dict) -> dict | None:
+    ais  = entry.get("AIS", {})
+    mast = entry.get("MASTERDATA", {})
+    voy  = entry.get("VOYAGE", {})
+    mmsi = str(ais.get("MMSI") or "")
     if not mmsi:
         return None
     try:
-        lat = float(v.get("LAT") or 0.0)
-        lon = float(v.get("LON") or 0.0)
+        lat = float(ais.get("LATITUDE") or 0.0)
+        lon = float(ais.get("LONGITUDE") or 0.0)
     except (ValueError, TypeError):
         return None
     if not lat or not lon:
         return None
+    sog     = ais.get("SPEED")
+    cog     = ais.get("COURSE")
+    draught = ais.get("DRAUGHT")
+    dwt     = mast.get("DWT")
     try:
-        sog = float(v.get("SPEED") or 0.0)
+        sog_f = float(sog or 0.0)
     except (ValueError, TypeError):
-        sog = 0.0
-    cog = v.get("COURSE")
-    dwt = v.get("DWT")
-    draught = v.get("DRAUGHT")
+        sog_f = 0.0
     return {
         "mmsi":      mmsi,
-        "name":      (v.get("SHIP_NAME") or "UNKNOWN").strip(),
+        "name":      (ais.get("NAME") or "UNKNOWN").strip(),
         "flag":      "🌐",
-        "type":      _mt_ship_type(v.get("SHIPTYPE")),
+        "type":      _vf_ship_type(ais.get("TYPE")),
         "darkFleet": False,
         "anomaly":   "None detected",
         "risk":      "LOW",
-        "speed":     f"{sog:.1f} kn",
+        "speed":     f"{sog_f:.1f} kn",
         "course":    f"{int(float(cog))}°" if cog is not None else "N/A",
         "draft":     f"{float(draught):.1f}m" if draught else "N/A",
         "dwt":       f"{int(float(dwt)):,}t" if dwt else "N/A",
-        "lastPort":  v.get("LAST_PORT") or "N/A",
-        "nextPort":  v.get("NEXT_PORT_NAME") or v.get("DESTINATION") or "N/A",
-        "status":    _mt_nav_status(v.get("STATUS")),
+        "lastPort":  voy.get("LASTPORT") or "N/A",
+        "nextPort":  ais.get("DESTINATION") or "N/A",
+        "status":    _vf_nav_status(ais.get("NAVSTAT")),
         "zone":      None,
         "track":     [[lat, lon]],
         "sigint":    None,
     }
 
 
-def fetch_marinetraffic() -> list[dict]:
-    """Fetch vessel positions from MarineTraffic API v2 — PS07 active vessels.
-    Returns last-known positions for vessels active in the past 60 minutes.
-    Requires paid API plan. Register at https://www.marinetraffic.com/en/ais-api-services
-    Set MARINE_TRAFFIC_API_KEY in Railway env vars.
+def fetch_vesselfinder() -> list[dict]:
+    """Fetch vessel positions from VesselFinder livedata (area query).
+    Default bounding box: global. Set VESSEL_FINDER_BBOX env var to narrow down
+    and save free-tier credits (e.g. '30,47,-5,42' for Mediterranean).
+    Register free at https://www.vesselfinder.com/api — set VESSEL_FINDER_API_KEY.
     """
-    url = _MT_BASE.format(key=MARINE_TRAFFIC_API_KEY)
-    resp = httpx.get(url, params={
-        "msgtype":  "simple",
-        "protocol": "jsono",
-        "timespan": 60,
+    bbox = os.getenv("VESSEL_FINDER_BBOX", _VF_BBOX_DEFAULT)
+    try:
+        latmin, latmax, lonmin, lonmax = [float(x) for x in bbox.split(",")]
+    except Exception:
+        latmin, latmax, lonmin, lonmax = -90, 90, -180, 180
+    resp = httpx.get(_VF_LIVEDATA_URL, params={
+        "userkey": VESSEL_FINDER_API_KEY,
+        "latmin":  latmin,
+        "latmax":  latmax,
+        "lonmin":  lonmin,
+        "lonmax":  lonmax,
     }, timeout=20)
     resp.raise_for_status()
     data = resp.json()
-    if isinstance(data, dict) and "errors" in data:
-        raise RuntimeError(f"MarineTraffic API error: {data['errors']}")
+    if isinstance(data, dict) and ("errors" in data or "error" in data):
+        raise RuntimeError(f"VesselFinder error: {data.get('errors') or data.get('error')}")
     vessels = []
-    for v in (data if isinstance(data, list) else []):
-        mapped = _map_mt_vessel(v)
+    for entry in (data if isinstance(data, list) else []):
+        mapped = _map_vf_vessel(entry)
+        if mapped:
+            vessels.append(mapped)
+    return vessels[:100]
+
+
+# ── Datalastic integration ────────────────────────────────────────────────────
+# Vessel lookup by MMSI via bulk endpoint — up to 100 MMSIs per request.
+# Note: Datalastic has no area/broadcast endpoint; it requires known MMSIs.
+# Provide a comma-separated list via DATALASTIC_MMSI_LIST env var.
+# Free tier available. Register at https://datalastic.com
+# Set DATALASTIC_API_KEY and DATALASTIC_MMSI_LIST in Railway env vars.
+DATALASTIC_API_KEY  = os.getenv("DATALASTIC_API_KEY", "")
+_DL_BULK_URL        = "https://api.datalastic.com/api/v0/vessel_bulk"
+
+# Default watchlist: OFAC-sanctioned vessels from public SDN list (Jan 2025 designations).
+# Source: https://home.treasury.gov/news/press-releases/jy2777
+# Full machine-readable list: https://www.treasury.gov/ofac/downloads/sdn_advanced.xml
+# Override with DATALASTIC_MMSI_LIST env var (comma-separated).
+_DL_MMSI_DEFAULT = ",".join([
+    # ── SDGT — OCEANLINK MARITIME DMCC network ────────────────────────────────
+    "620999315",  # ANTHEA            Comoros  IMO 9281683
+    "312513000",  # BAXTER            Belize   IMO 9282522
+    "620999316",  # BOREAS            Comoros  IMO 9248497
+    "620739000",  # CAPE GAS          Comoros  IMO 9002491
+    "370921000",  # DEMETER           Panama   IMO 9258674
+    "312038000",  # ELSA              Belize   IMO 9256468
+    "620999379",  # HECATE            Comoros  IMO 9233753
+    "304552000",  # MERAKI            Antigua  IMO 9194139
+    "518999021",  # OUREA             Cook Is. IMO 9350422
+    "621819067",  # YOUNG YONG        Djibouti IMO 9194127
+    # ── IRAN-EO13846 / EO13902 designated ────────────────────────────────────
+    "312171000",  # ANHONA            Belize       IMO 9354521
+    "518999041",  # GOODWIN           Cook Is.     IMO 9379703
+    "352002704",  # TYCHE I           Panama       IMO 9247390
+    "636018950",  # ELZA              Liberia      IMO 9221671
+    "422169700",  # MASAL             Iran         IMO 9169421
+    "518999103",  # BERTHA/MONICA S   Cook Is.     IMO 9292163
+    "372988000",  # BLACK PANTHER     Panama       IMO 9285756
+    "668116233",  # CERES I           Sao Tome     IMO 9229439
+    "334017000",  # FT ISLAND         Honduras     IMO 9166675
+    "538010982",  # JAYA/MONOCEROS    Marshall Is. IMO 9410387
+    "352002495",  # MEROPE            Panama       IMO 9281891
+    "352002482",  # TONIL/PARAGON DAWN Panama      IMO 9307932
+    "312242000",  # VESNA             Belize       IMO 9233349
+    # ── RUSSIA-EO14024 designated (Sovcomflot) ────────────────────────────────
+    "636014308",  # SCF PRIMORYE      Liberia IMO 9421960
+    "626362000",  # GEORGY MASLOV     Gabon   IMO 9610793
+    "626364000",  # KRYMSK            Gabon   IMO 9270529
+    "626367000",  # LITEYNY PROSPECT  Gabon   IMO 9256078
+    "626369000",  # NEVSKIY PROSPECT  Gabon   IMO 9256054
+    "626372000",  # NS ANTARCTIC      Gabon   IMO 9413559
+    "352003372",  # ANATOLY KOLODKIN  Panama  IMO 9610808
+    "352002202",  # SAKHALIN ISLAND   Panama  IMO 9249128
+])
+
+
+def _dl_ship_type(type_str: str) -> str:
+    t = (type_str or "").lower()
+    if "cargo" in t or "container" in t or "bulk" in t: return "Cargo"
+    if "tanker" in t:    return "Tanker"
+    if "passenger" in t: return "Passenger"
+    if "fishing" in t:   return "Fishing"
+    if "tug" in t:       return "Tug"
+    return "Other"
+
+
+def _dl_nav_status(status_str: str) -> str:
+    s = (status_str or "").lower()
+    if "anchor" in s:  return "ANCHORED"
+    if "moor" in s:    return "MOORED"
+    if "aground" in s: return "AGROUND"
+    if "way" in s:     return "UNDERWAY"
+    return "UNDERWAY"
+
+
+def _map_dl_vessel(v: dict) -> dict | None:
+    mmsi = str(v.get("mmsi") or "")
+    if not mmsi:
+        return None
+    try:
+        lat = float(v.get("lat") or 0.0)
+        lon = float(v.get("lon") or 0.0)
+    except (ValueError, TypeError):
+        return None
+    if not lat or not lon:
+        return None
+    try:
+        sog = float(v.get("speed") or 0.0)
+    except (ValueError, TypeError):
+        sog = 0.0
+    cog = v.get("course")
+    return {
+        "mmsi":      mmsi,
+        "name":      (v.get("name") or "UNKNOWN").strip(),
+        "flag":      "🌐",
+        "type":      _dl_ship_type(v.get("type_specific") or v.get("type") or ""),
+        "darkFleet": False,
+        "anomaly":   "None detected",
+        "risk":      "LOW",
+        "speed":     f"{sog:.1f} kn",
+        "course":    f"{int(float(cog))}°" if cog is not None else "N/A",
+        "draft":     "N/A",   # available on vessel_pro only
+        "dwt":       "N/A",   # available on vessel_pro only
+        "lastPort":  "N/A",
+        "nextPort":  v.get("destination") or "N/A",
+        "status":    _dl_nav_status(v.get("navigational_status") or ""),
+        "zone":      None,
+        "track":     [[lat, lon]],
+        "sigint":    None,
+    }
+
+
+def fetch_datalastic() -> list[dict]:
+    """Fetch vessel positions from Datalastic bulk endpoint.
+    Queries up to 100 MMSIs defined in DATALASTIC_MMSI_LIST (comma-separated).
+    Datalastic has no area/broadcast feed — MMSIs must be specified explicitly.
+    Register free at https://datalastic.com — set DATALASTIC_API_KEY and
+    DATALASTIC_MMSI_LIST in Railway env vars.
+    """
+    mmsi_list = [m.strip() for m in os.getenv("DATALASTIC_MMSI_LIST", _DL_MMSI_DEFAULT).split(",") if m.strip()]
+    params: list[tuple] = [("api-key", DATALASTIC_API_KEY)]
+    for m in mmsi_list[:100]:
+        params.append(("mmsi[]", m))
+    resp = httpx.get(_DL_BULK_URL, params=params, timeout=20)
+    resp.raise_for_status()
+    data = resp.json()
+    if isinstance(data, dict) and not data.get("meta", {}).get("success", True):
+        raise RuntimeError(f"Datalastic error: {data}")
+    entries = data if isinstance(data, list) else data.get("data", [])
+    vessels = []
+    for entry in entries:
+        # bulk response may wrap each result in {"data": {...}}
+        v = entry.get("data", entry) if isinstance(entry, dict) else {}
+        mapped = _map_dl_vessel(v)
         if mapped:
             vessels.append(mapped)
     return vessels[:100]
@@ -491,15 +637,15 @@ PROVIDERS: dict[str, dict] = {
         "fetch":   fetch_digitraffic,
     },
     # ── Free tier (API key required — set matching env var to enable) ──────────
-    "marineTraffic": {
-        "label":   "MarineTraffic",
-        "enabled": lambda: bool(MARINE_TRAFFIC_API_KEY),
-        "fetch":   fetch_marinetraffic,
-    },
     "vesselFinder": {
         "label":   "VesselFinder",
-        "enabled": lambda: bool(os.getenv("VESSEL_FINDER_API_KEY")),
-        "fetch":   _stub("VesselFinder"),
+        "enabled": lambda: bool(VESSEL_FINDER_API_KEY),
+        "fetch":   fetch_vesselfinder,
+    },
+    "datalastic": {
+        "label":   "Datalastic",
+        "enabled": lambda: bool(DATALASTIC_API_KEY),
+        "fetch":   fetch_datalastic,
     },
     "myShipTracking": {
         "label":   "MyShipTracking",
@@ -684,6 +830,220 @@ _SIGINT = [
 ]
 
 
+# ── ACLED integration — maritime incident intelligence ─────────────────────────
+# Armed Conflict Location & Event Data (ACLED) — free account at https://acleddata.com
+# New auth system (Sep 2025): OAuth with email + password → Bearer token.
+# Set ACLED_EMAIL and ACLED_PASSWORD env vars. No API key needed.
+# Queried countries: Yemen (Houthi/Red Sea), Somalia (piracy), Philippines (S.China Sea),
+# Indonesia (Malacca), Iran (Persian Gulf). Mapped to our SIGINT feed schema.
+ACLED_EMAIL    = os.getenv("ACLED_EMAIL",    "")
+ACLED_PASSWORD = os.getenv("ACLED_PASSWORD", "")
+_ACLED_URL     = "https://api.acleddata.com/acled/read"
+_ACLED_AUTH    = "https://api.acleddata.com/auth/login"
+# Countries relevant to major maritime chokepoints / shipping threats
+_ACLED_MARITIME_COUNTRIES = "Yemen,Somalia,Philippines,Indonesia,Iran,Malaysia,Taiwan,Ukraine"
+
+# In-memory token cache: {"token": str, "expires_at": float}
+_acled_token_cache: dict = {}
+
+
+def _acled_bearer() -> str:
+    """Return a valid ACLED OAuth Bearer token, refreshing if expired."""
+    import time as _time
+    cached = _acled_token_cache
+    if cached.get("token") and _time.time() < cached.get("expires_at", 0) - 60:
+        return cached["token"]
+    resp = httpx.post(_ACLED_AUTH, json={"email": ACLED_EMAIL, "password": ACLED_PASSWORD}, timeout=15)
+    resp.raise_for_status()
+    body = resp.json()
+    # Response shape: {"token": "...", "expires_in": 86400} or similar
+    token = body.get("token") or body.get("access_token") or body.get("data", {}).get("token", "")
+    if not token:
+        raise RuntimeError(f"ACLED auth response missing token: {body}")
+    expires_in = int(body.get("expires_in") or body.get("data", {}).get("expires_in") or 86400)
+    _acled_token_cache["token"] = token
+    _acled_token_cache["expires_at"] = _time.time() + expires_in
+    return token
+
+
+def _acled_sig_type(event_type: str) -> str:
+    et = (event_type or "").lower()
+    if "explosion" in et:   return "ELINT"
+    if "battle"    in et:   return "SIGINT"
+    if "violence"  in et:   return "HUMINT"
+    return "OSINT"
+
+
+def _acled_severity(row: dict) -> str:
+    try:
+        fat = int(row.get("fatalities") or 0)
+    except (ValueError, TypeError):
+        fat = 0
+    if fat > 0:
+        return "CRITICAL"
+    sub = (row.get("sub_event_type") or "").lower()
+    if any(k in sub for k in ("attack", "shelling", "air/drone", "suicide bomb")):
+        return "CRITICAL"
+    return "HIGH"
+
+
+def fetch_acled_sigint() -> list[dict]:
+    """Fetch recent conflict events from ACLED for maritime-adjacent regions.
+    Maps armed-conflict events (Yemen/Houthi, Somalia/piracy, S.China Sea tensions)
+    to the SIGINT feed schema.  Returns up to 8 most recent events.
+    Register free at https://acleddata.com — set ACLED_EMAIL and ACLED_PASSWORD.
+    """
+    from datetime import datetime, timedelta
+    since = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    token = _acled_bearer()
+    resp = httpx.get(_ACLED_URL, headers={"Authorization": f"Bearer {token}"}, params={
+        "country":          _ACLED_MARITIME_COUNTRIES,
+        "event_date":       since,
+        "event_date_where": "BETWEEN",
+        "event_date_end":   today,
+        "limit":            50,
+        "_format":          "json",
+    }, timeout=20)
+    resp.raise_for_status()
+    rows = resp.json().get("data", [])
+    # Sort by timestamp desc, take top 8
+    rows = sorted(rows, key=lambda r: r.get("timestamp", 0), reverse=True)[:8]
+    sigint = []
+    for row in rows:
+        try:
+            ts_raw = row.get("timestamp") or row.get("event_date", "")
+            try:
+                ts = __import__("datetime").datetime.fromtimestamp(int(ts_raw)).strftime("%H:%M")
+            except Exception:
+                ts = str(ts_raw)[11:16] or "N/A"
+            notes   = (row.get("notes") or row.get("event_type") or "Maritime incident").strip()[:200]
+            actor   = (row.get("actor1") or "UNKNOWN").strip()[:40]
+            country = (row.get("country") or "").strip()
+            loc     = (row.get("location") or "").strip()
+            sigint.append({
+                "ts":     ts,
+                "mmsi":   None,
+                "vessel": f"{country} — {loc}" if loc else country or "MARITIME ZONE",
+                "type":   _acled_sig_type(row.get("event_type", "")),
+                "msg":    f"[{actor}] {notes}",
+                "sev":    _acled_severity(row),
+            })
+        except Exception:
+            continue
+    return sigint
+
+
+def _get_sigint() -> list[dict]:
+    """Return SIGINT feed: real ACLED data if configured, else mock data."""
+    if not (ACLED_EMAIL and ACLED_PASSWORD):
+        return _SIGINT
+    cache_key = "sigint:acled"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached.get("items", _SIGINT)
+    try:
+        items = fetch_acled_sigint()
+        cache_set(cache_key, {"items": items or _SIGINT})
+        return items or _SIGINT
+    except Exception:
+        return _SIGINT
+
+
+# ── Static chokepoint reference data ──────────────────────────────────────────
+# Moved here from Chokepoint.jsx so the backend can enrich with live event data.
+# flow / pct / history are semi-static (updated manually as geopolitical situation changes).
+_CHOKEPOINTS = [
+    {"id": "CP-01", "name": "Strait of Hormuz",    "location": "Persian Gulf",          "lat":  26.5, "lon":  56.5,  "risk": "CRITICAL", "flow": "21Mb/d",  "pct": "21%", "tension": "Extreme",  "threats": ["Iranian naval exercises", "Mine laying reports", "Drone harassment of tankers"],        "altRoute": "None — no viable alternative",                      "history": [18, 19, 20, 21, 20, 19, 21], "acled_country": "Iran,Oman"},
+    {"id": "CP-02", "name": "Strait of Malacca",   "location": "SE Asia",               "lat":   2.0, "lon": 101.5,  "risk": "HIGH",     "flow": "16Mb/d",  "pct": "16%", "tension": "Elevated", "threats": ["Piracy incidents up 40%", "Territorial disputes", "Cyber attacks on port systems"],    "altRoute": "Lombok Strait (+4 days transit)",                    "history": [14, 15, 15, 16, 16, 15, 16], "acled_country": "Indonesia,Malaysia"},
+    {"id": "CP-03", "name": "Bab-el-Mandeb",       "location": "Red Sea / Yemen",       "lat":  12.5, "lon":  43.5,  "risk": "CRITICAL", "flow": "8.8Mb/d", "pct": "9%",  "tension": "Extreme",  "threats": ["Houthi missile attacks", "Drone boats", "Coalition naval response"],                  "altRoute": "Cape of Good Hope (+15 days, +$1.2M/voyage)",        "history": [9, 8, 7, 6, 5, 4, 4],       "acled_country": "Yemen,Djibouti"},
+    {"id": "CP-04", "name": "Suez Canal",           "location": "Egypt",                 "lat":  30.5, "lon":  32.5,  "risk": "MEDIUM",   "flow": "5.5Mb/d", "pct": "5%",  "tension": "Moderate", "threats": ["Diversion due to Houthi threat", "Congestion incidents"],                            "altRoute": "Cape of Good Hope or SUMED pipeline",                "history": [7, 7, 6, 6, 5, 5, 6],       "acled_country": "Egypt,Yemen"},
+    {"id": "CP-05", "name": "Turkish Straits",      "location": "Bosphorus/Dardanelles", "lat":  41.0, "lon":  29.0,  "risk": "MEDIUM",   "flow": "2.4Mb/d", "pct": "2%",  "tension": "Moderate", "threats": ["Russian Black Sea fleet movements", "Sanctions complications"],                      "altRoute": "Trans-Anatolian Pipeline (TANAP)",                   "history": [3, 3, 2, 2, 2, 2, 2],       "acled_country": "Turkey,Ukraine"},
+    {"id": "CP-06", "name": "Danish Straits",       "location": "North Sea",             "lat":  56.0, "lon":  10.5,  "risk": "LOW",      "flow": "1.5Mb/d", "pct": "1%",  "tension": "Low",      "threats": ["Occasional Russian submarine activity"],                                              "altRoute": "Pipeline alternatives available",                    "history": [1, 1, 2, 1, 1, 2, 1],       "acled_country": ""},
+    {"id": "CP-07", "name": "Strait of Gibraltar",  "location": "Atlantic / Med",        "lat":  35.9, "lon":  -5.5,  "risk": "LOW",      "flow": "1.8Mb/d", "pct": "2%",  "tension": "Low",      "threats": ["Occasional migrant crisis spillover", "Russian sub activity"],                       "altRoute": "North Africa overland pipelines",                    "history": [2, 2, 1, 2, 2, 1, 2],       "acled_country": "Morocco"},
+    {"id": "CP-08", "name": "Cape of Good Hope",    "location": "South Africa",          "lat": -34.4, "lon":  18.5,  "risk": "LOW",      "flow": "3.2Mb/d", "pct": "3%",  "tension": "Low",      "threats": ["Weather-driven routing disruptions", "Piracy uptick near Cape"],                     "altRoute": "Suez Canal (normal route)",                          "history": [2, 3, 3, 4, 4, 5, 6],       "acled_country": "South Africa,Somalia"},
+    {"id": "CP-09", "name": "Panama Canal",         "location": "Central America",       "lat":   9.0, "lon": -79.5,  "risk": "MEDIUM",   "flow": "1.0Mb/d", "pct": "1%",  "tension": "Moderate", "threats": ["Water shortage reducing daily transits", "US-China geopolitical pressure", "Cartel activity near locks"], "altRoute": "Suez Canal or US land bridge", "history": [1, 1, 1, 1, 1, 1, 1], "acled_country": "Panama"},
+    {"id": "CP-10", "name": "Luzon Strait",         "location": "Philippines / Taiwan",  "lat":  20.0, "lon": 121.0,  "risk": "HIGH",     "flow": "2.0Mb/d", "pct": "2%",  "tension": "Elevated", "threats": ["PLA Navy exercises", "Taiwan Strait tensions spillover", "Submarine cable vulnerability"], "altRoute": "Lombok Strait (+2 days transit)", "history": [1, 2, 2, 3, 3, 4, 5], "acled_country": "Philippines"},
+]
+
+# Countries queried per chokepoint for ACLED enrichment (batched into single request)
+_CP_ACLED_ALL = ",".join({cp["acled_country"] for cp in _CHOKEPOINTS if cp["acled_country"]})
+
+
+def _enrich_chokepoints_acled(cps: list[dict]) -> list[dict]:
+    """Add `acled_events_30d` and `latest_incident` to each chokepoint using ACLED data.
+    Single batched API call for all relevant countries.
+    """
+    from datetime import datetime, timedelta
+    since = (__import__("datetime").datetime.utcnow() - __import__("datetime").timedelta(days=30)).strftime("%Y-%m-%d")
+    today = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d")
+    token = _acled_bearer()
+    resp = httpx.get(_ACLED_URL, headers={"Authorization": f"Bearer {token}"}, params={
+        "country":          _CP_ACLED_ALL,
+        "event_date":       since,
+        "event_date_where": "BETWEEN",
+        "event_date_end":   today,
+        "limit":            500,
+        "_format":          "json",
+    }, timeout=20)
+    if resp.status_code != 200:
+        return cps
+    rows = resp.json().get("data", [])
+    # Group events by country
+    by_country: dict[str, list] = {}
+    for row in rows:
+        c = (row.get("country") or "").strip()
+        by_country.setdefault(c, []).append(row)
+    enriched = []
+    for cp in cps:
+        cp = cp.copy()
+        cp_countries = {c.strip() for c in cp.get("acled_country", "").split(",") if c.strip()}
+        events: list = []
+        for c in cp_countries:
+            events.extend(by_country.get(c, []))
+        cp["acled_events_30d"] = len(events)
+        if events:
+            latest = max(events, key=lambda r: r.get("timestamp", 0))
+            actor  = (latest.get("actor1") or "").strip()[:40]
+            notes  = (latest.get("notes") or latest.get("event_type") or "").strip()[:150]
+            cp["latest_incident"] = f"[{actor}] {notes}" if actor else notes
+        else:
+            cp["latest_incident"] = None
+        enriched.append(cp)
+    return enriched
+
+
+@app.get("/api/maritime/chokepoints")
+def maritime_chokepoints(_: None = Depends(require_auth)):
+    """Return global chokepoint status.
+    Static baseline data enriched with ACLED conflict event counts
+    when ACLED_API_KEY + ACLED_EMAIL env vars are configured (free key).
+    """
+    cache_key = "chokepoints"
+    cached = cache_get(cache_key)
+    if cached:
+        return {**cached, "cache_hit": True}
+    cps = [cp.copy() for cp in _CHOKEPOINTS]
+    source = "static"
+    if ACLED_EMAIL and ACLED_PASSWORD:
+        try:
+            cps = _enrich_chokepoints_acled(cps)
+            source = "live"
+        except Exception:
+            pass  # silently fall back to static data
+    # Strip internal field before returning
+    for cp in cps:
+        cp.pop("acled_country", None)
+    data = {
+        "chokepoints": cps,
+        "source":      source,
+        "fetched_at":  time.time(),
+        "cache_hit":   False,
+    }
+    cache_set(cache_key, data)
+    return data
+
+
 @app.get("/api/maritime/vessels")
 def maritime_vessels(
     sources: Optional[list[str]] = Query(default=None),
@@ -707,7 +1067,7 @@ def maritime_vessels(
     if vessels:
         data: dict = {
             "vessels":   vessels,
-            "sigint":    _SIGINT,
+            "sigint":    _get_sigint(),
             "source":    "live",
             "providers": active_providers,
             "fetched_at": time.time(),
