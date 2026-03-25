@@ -841,7 +841,7 @@ ACLED_PASSWORD = os.getenv("ACLED_PASSWORD", "")
 _ACLED_URL     = "https://acleddata.com/api/acled/read"
 _ACLED_AUTH    = "https://acleddata.com/oauth/token"
 # Countries relevant to major maritime chokepoints / shipping threats
-_ACLED_MARITIME_COUNTRIES = "Yemen|Somalia|Philippines|Indonesia|Iran|Malaysia|Taiwan|Ukraine"
+_ACLED_MARITIME_COUNTRIES = "Yemen:OR:country=Somalia:OR:country=Philippines:OR:country=Indonesia:OR:country=Iran:OR:country=Malaysia:OR:country=Taiwan:OR:country=Ukraine"
 
 # In-memory token cache: {"token": str, "expires_at": float}
 _acled_token_cache: dict = {}
@@ -902,17 +902,21 @@ def fetch_acled_sigint() -> list[dict]:
     since = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
     today = datetime.utcnow().strftime("%Y-%m-%d")
     token = _acled_bearer()
-    resp = httpx.get(_ACLED_URL, headers={"Authorization": f"Bearer {token}"}, params={
-        "country":          _ACLED_MARITIME_COUNTRIES,
-        "event_date":       since,
-        "event_date_where": "BETWEEN",
-        "event_date_end":   today,
-        "limit":            50,
-        "_format":          "json",
-    }, timeout=20)
-    if not resp.is_success:
-        raise RuntimeError(f"ACLED {resp.status_code}: {resp.text[:400]}")
-    rows = resp.json().get("data", [])
+    resp = httpx.get(_ACLED_URL,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        params={
+            "country":   _ACLED_MARITIME_COUNTRIES,
+            "event_date": since,
+            "event_date_where": "BETWEEN",
+            "event_date_end":   today,
+            "limit":     50,
+            "_format":   "json",
+        }, timeout=20)
+    resp.raise_for_status()
+    body = resp.json()
+    if body.get("status") != 200:
+        raise RuntimeError(f"ACLED API error (status {body.get('status')}): {body.get('message', 'unknown error')}")
+    rows = body.get("data", [])
     # Sort by timestamp desc, take top 8
     rows = sorted(rows, key=lambda r: r.get("timestamp", 0), reverse=True)[:8]
     sigint = []
@@ -977,7 +981,7 @@ _CHOKEPOINTS = [
 ]
 
 # Countries queried per chokepoint for ACLED enrichment (batched into single request)
-_CP_ACLED_ALL = "|".join({
+_CP_ACLED_ALL = ":OR:country=".join({
     c.strip()
     for cp in _CHOKEPOINTS if cp["acled_country"]
     for c in cp["acled_country"].split(",")
@@ -993,17 +997,24 @@ def _enrich_chokepoints_acled(cps: list[dict]) -> list[dict]:
     since = (__import__("datetime").datetime.utcnow() - __import__("datetime").timedelta(days=30)).strftime("%Y-%m-%d")
     today = __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d")
     token = _acled_bearer()
-    resp = httpx.get(_ACLED_URL, headers={"Authorization": f"Bearer {token}"}, params={
-        "country":          _CP_ACLED_ALL,
-        "event_date":       since,
-        "event_date_where": "BETWEEN",
-        "event_date_end":   today,
-        "limit":            500,
-        "_format":          "json",
-    }, timeout=20)
-    if resp.status_code != 200:
+    resp = httpx.get(_ACLED_URL,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        params={
+            "country":   _CP_ACLED_ALL,
+            "event_date": since,
+            "event_date_where": "BETWEEN",
+            "event_date_end":   today,
+            "limit":     500,
+            "_format":   "json",
+        }, timeout=20)
+    try:
+        resp.raise_for_status()
+        body = resp.json()
+        if body.get("status") != 200:
+            return cps
+        rows = body.get("data", [])
+    except Exception:
         return cps
-    rows = resp.json().get("data", [])
     # Group events by country
     by_country: dict[str, list] = {}
     for row in rows:
